@@ -1,0 +1,70 @@
+# Artefatos de IA / agentes
+.gsd/
+.bg-shell/
+.claude/
+.cursor/
+.windsurf/
+.continue/
+.codex/
+.aider*
+.ai/
+.roo/
+.kilocode/
+.copilot/
+.mcp.json
+
+# Debug e evidências locais
+Imagens_Debug/
+*.trace.zip
+*.har
+*.log
+*.dump
+*.xml
+logs/
+*.mp4
+*.avi
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Configuração local e credenciais
+.env
+.env.*
+!.env.example
+config.ini
+*.local.ini
+secrets.*
+*.key
+*.pem
+*.pfx
+*.p12
+
+# AutoHotkey / build local
+*.exe
+*.ahk2exe
+*.bin
+*.obj
+*.pdb
+
+# WebView2 / runtime local
+EBWebView/
+WebView2Cache/
+User Data/
+Crashpad/
+
+# Sistema operacional e IDE
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Dependências/cache comuns
+node_modules/
+.cache/
+dist/
+build/
+out/
+coverage/
