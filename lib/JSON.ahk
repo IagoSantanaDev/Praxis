@@ -1,3 +1,8 @@
+; Componente de terceiros distribuído junto ao Praxis.
+; Autores originais conforme cabeçalho upstream: thqby, HotKeyIt.
+; SPDX-License-Identifier: MIT
+; A licença proprietária do Praxis não se aplica a este arquivo; preserve os avisos/autoria upstream.
+
 /************************************************************************
  * @description: JSON格式字符串序列化和反序列化, 修改自[HotKeyIt/Yaml](https://github.com/HotKeyIt/Yaml)
  * 增加了对true/false/null类型的支持, 保留了数值的类型

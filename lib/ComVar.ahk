@@ -1,4 +1,9 @@
-﻿; Construction and deconstruction VARIANT struct
+﻿; Componente de terceiros distribuído junto ao Praxis.
+; Projeto original: thqby/ahk2_lib.
+; SPDX-License-Identifier: MIT
+; A licença proprietária do Praxis não se aplica a este arquivo; preserve os avisos/autoria upstream.
+
+; Construction and deconstruction VARIANT struct
 class ComVar extends Buffer {
 	/**
 	 * Construction VARIANT struct, `ptr` property points to the address, `__Item` property returns var's Value

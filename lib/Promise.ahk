@@ -1,3 +1,8 @@
+; Componente de terceiros distribuído junto ao Praxis.
+; Projeto original: thqby/ahk2_lib.
+; SPDX-License-Identifier: MIT
+; A licença proprietária do Praxis não se aplica a este arquivo; preserve os avisos/autoria upstream.
+
 /************************************************************************
  * @description Implements a javascript-like Promise
  * @author thqby
