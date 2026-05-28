@@ -20,17 +20,18 @@ MV_WIN_LOGIN_ERROR := "Mensagem do MV2000 ahk_class ui60Modal_W32 ahk_exe ifrun6
 
 ; Atenção: para detecção inicial, nunca exigir subtela exata.
 ; O usuário pode ter deixado MOV DOC/FFCV aberto em qualquer tela interna.
-MV_WIN_MOVDOC_ANY := "Movimentação de Documentos ahk_exe ifrun60.EXE"
-MV_WIN_FFCV_ANY   := "MV2000i - Faturamento ahk_exe ifrun60.EXE"
+MV_WIN_MOVDOC_ANY := "Movimentação ahk_exe ifrun60.EXE"
+; Detectar FFCV pelo executável e título principal para evitar dependência de subtela.
+MV_WIN_FFCV_ANY   := "Faturamento ahk_exe ifrun60.EXE"
 
 ; Títulos específicos só devem ser usados depois de navegar para a tela esperada.
 MV_WIN_MOVDOC_BAIXA := "Protocolação de Baixa de Documentos ahk_exe ifrun60.EXE"
-MV_WIN_FFCV_REMESSA := "Manutenção de Remessa ahk_exe ifrun60.EXE"
+MV_WIN_FFCV_REMESSA := "MV2000i - Faturamento ahk_exe ifrun60.EXE"
 MV_WIN_FFCV         := MV_WIN_FFCV_ANY
 MV_WIN_MOVDOC       := MV_WIN_MOVDOC_ANY
 
 ; ── Imagens de referência ─────────────────────────────────────
-MV_IMG_DIR            := A_ScriptDir "\Imagens_Debug"
+MV_IMG_DIR := MV_PROJECT_ROOT "\images"
 
 ; ── Controles de popups conhecidos ────────────────────────────
 MV_MODAL_OK_CLASS := "Button1"
@@ -43,20 +44,24 @@ MV_LOGIN_USER_Y := 118
 MV_LOGIN_PASS_X := 307
 MV_LOGIN_PASS_Y := 119
 
-; ── Polling ───────────────────────────────────────────────────
-MV_POLL_MS      := 50
-MV_TIMEOUT_LOAD := 20
-MV_TIMEOUT_ACOE := 10
-MV_DELAY_INPUT  := 50
+; ── Polling / estabilidade ────────────────────────────────────
+MV_POLL_MS          := 100
+MV_TIMEOUT_LOAD     := 100
+MV_TIMEOUT_ACOE     := 100
+MV_DELAY_INPUT      := 100
+MV_LOGIN_STABLE_MS  := 600
+MV_MODULE_STABLE_MS := 600
+MV_TARGET_STABLE_MS := 600
 
 ; ════════════════════════════════════════════════════════════════
 ;  API PÚBLICA
 ; ════════════════════════════════════════════════════════════════
 
 MV_EnsureMovDoc() {
-    if MV_ModuleReady(MV_WIN_MOVDOC_ANY) {
+    if WinExist(MV_WIN_MOVDOC_ANY) {
         MV_ActivateModule(MV_WIN_MOVDOC_ANY)
-        return true
+        if MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
+            return true
     }
 
     if !MV_AbrirMovDoc()
@@ -65,9 +70,11 @@ MV_EnsureMovDoc() {
 }
 
 MV_EnsureFFCV() {
-    if MV_ModuleReady(MV_WIN_FFCV_ANY) {
+    if WinExist(MV_WIN_FFCV_ANY) {
         MV_ActivateModule(MV_WIN_FFCV_ANY)
-        return true
+        if MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
+            return true
+        ; fallback to open again if the existing FFCV window could not be activated/stabilized
     }
 
     if !MV_AbrirFFCV()
@@ -97,7 +104,7 @@ MV_LoginOpenedModule(moduleWin, moduleName) {
     if !MV_Poll(() => WinExist(MV_WIN_LOGIN) || MV_ModuleReady(moduleWin), MV_TIMEOUT_LOAD)
         return MV_RequestNewCredentials("Não consegui abrir a tela de login do " moduleName ".")
 
-    if WinExist(MV_WIN_LOGIN) {
+    if WinExist(MV_WIN_LOGIN) {         
         if !MV_DoLoginKeyboard(moduleWin, moduleName)
             return false
     }
@@ -106,6 +113,9 @@ MV_LoginOpenedModule(moduleWin, moduleName) {
         return MV_RequestNewCredentials("Login enviado, mas o " moduleName " não ficou disponível.")
 
     MV_ActivateModule(moduleWin)
+    if !MV_WaitWindowStable(moduleWin, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
+        return MV_RequestNewCredentials("Login enviado, mas o " moduleName " não estabilizou antes de continuar.")
+
     return true
 }
 
@@ -118,6 +128,9 @@ MV_DoLoginKeyboard(moduleWin, moduleName) {
         return MV_RequestNewCredentials("Credenciais não carregadas. Informe usuário e senha.")
 
     if !MV_ActivateLoginWindow()
+        return false
+
+    if !MV_WaitWindowStable(MV_WIN_LOGIN, MV_LOGIN_STABLE_MS, MV_TIMEOUT_LOAD)
         return false
 
     if !MV_ClickLoginField(MV_LOGIN_USER_X, MV_LOGIN_USER_Y)
@@ -492,6 +505,37 @@ MV_Poll(condFn, timeoutSecs) {
             return true
         if A_TickCount > deadline
             return false
+        Sleep MV_POLL_MS
+    }
+}
+
+MV_WaitWindowStable(winTitle, stableMs := 800, timeoutSecs := 20) {
+    startedAt := A_TickCount
+    stableSince := 0
+    lastCount := -1
+
+    Loop {
+        if WinExist(winTitle) {
+            WinActivate winTitle
+            try hwnds := WinGetControlsHwnd(winTitle)
+            catch
+                hwnds := []
+            count := hwnds.Length
+
+            if WinActive(winTitle) && count = lastCount {
+                if (stableSince = 0)
+                    stableSince := A_TickCount
+                if (A_TickCount - stableSince >= stableMs)
+                    return true
+            } else {
+                stableSince := 0
+                lastCount := count
+            }
+        }
+
+        if (A_TickCount - startedAt > timeoutSecs * 1000)
+            return false
+
         Sleep MV_POLL_MS
     }
 }
