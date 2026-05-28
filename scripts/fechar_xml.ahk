@@ -1,21 +1,5 @@
 #Requires AutoHotkey v2.0
 
-; ============================================================================
-; Projeto: Praxis
-; Arquivo: fechar_xml.ahk
-; Descrição: automação do fluxo de fechamento de remessa e geração de XML.
-;
-; Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
-;
-; Este arquivo integra o software proprietário Praxis.
-; O acesso ao código-fonte não concede licença de uso, cópia, modificação,
-; redistribuição, engenharia reversa, criação de obras derivadas ou
-; exploração comercial sem autorização prévia e expressa por escrito.
-;
-; Consulte: LICENSE, COPYRIGHT, NOTICE.md, EULA.md, NDA.md,
-; PRIVACY_LGPD.md e THIRD_PARTY_NOTICES.md.
-; ============================================================================
-
 ; ════════════════════════════════════════════════════════════════
 ;  FECHAR E GERAR XML
 ; ════════════════════════════════════════════════════════════════

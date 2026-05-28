@@ -1,21 +1,5 @@
 #Requires AutoHotkey v2.0
 
-; ============================================================================
-; Projeto: Praxis
-; Arquivo: protocolar.ahk
-; Descrição: automação do fluxo de protocolar contas/remessas.
-;
-; Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
-;
-; Este arquivo integra o software proprietário Praxis.
-; O acesso ao código-fonte não concede licença de uso, cópia, modificação,
-; redistribuição, engenharia reversa, criação de obras derivadas ou
-; exploração comercial sem autorização prévia e expressa por escrito.
-;
-; Consulte: LICENSE, COPYRIGHT, NOTICE.md, EULA.md, NDA.md,
-; PRIVACY_LGPD.md e THIRD_PARTY_NOTICES.md.
-; ============================================================================
-
 ; ════════════════════════════════════════════════════════════════
 ;  PROTOCOLAR
 ; ════════════════════════════════════════════════════════════════
