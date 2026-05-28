@@ -1,27 +1,13 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
-; ============================================================================
-; Projeto: Praxis
-; Arquivo: main.ahk
-; Descrição: entrada principal da aplicação, inicialização da UI WebView2 e despacho dos scripts.
-;
-; Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
-;
-; Este arquivo integra o software proprietário Praxis.
-; O acesso ao código-fonte não concede licença de uso, cópia, modificação,
-; redistribuição, engenharia reversa, criação de obras derivadas ou
-; exploração comercial sem autorização prévia e expressa por escrito.
-;
-; Consulte: LICENSE, COPYRIGHT, NOTICE.md, EULA.md, NDA.md,
-; PRIVACY_LGPD.md e THIRD_PARTY_NOTICES.md.
-; ============================================================================
-
 #Include lib\WebView2.ahk
 #Include lib\JSON.ahk
 #Include scripts\remessa_protocolo.ahk
 #Include scripts\protocolar.ahk
 #Include scripts\fechar_xml.ahk
+
+SetTitleMatchMode 2
 
 ; ─── State ────────────────────────────────────────────────────
 global gController := ""
@@ -97,9 +83,9 @@ AppInit() {
 
     ; Lê o WorkDir configurado pelo installer
     gWorkDir := IniRead(A_ScriptDir "\config.ini", "Paths", "WorkDir",
-                        A_MyDocuments "\Praxis")
+                        A_MyDocuments "\RPA MV2000i")
 
-    gMainGui := Gui("+Resize +MinSize640x460", "Praxis")
+    gMainGui := Gui("+Resize +MinSize640x460", "RPA MV2000i")
     gMainGui.BackColor := "0xD4D0C8"
     gMainGui.OnEvent("Close", (*) => ExitApp())
     gMainGui.OnEvent("Size",  OnGuiResize)
@@ -145,7 +131,7 @@ SyncViewBounds() {
 ; ─── JS → AHK ─────────────────────────────────────────────────
 OnJsMessage(handler, args) {
     raw  := args.TryGetWebMessageAsString()
-    data := JSON.Load(raw)
+    data := JSON.parse(raw)
 
     switch data["action"] {
         case "ready":       CheckSavedCredentials()
@@ -158,7 +144,7 @@ OnJsMessage(handler, args) {
 
 SendToUI(data) {
     global gWebView
-    gWebView.PostWebMessageAsJson(JSON.Dump(data))
+    gWebView.PostWebMessageAsJson(JSON.stringify(data))
 }
 
 ; ─── Auth ─────────────────────────────────────────────────────

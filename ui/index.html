@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Praxis</title>
+<title>RPA MV2000i</title>
 <style>
 :root {
   --win-bg:      #D4D0C8;
@@ -226,15 +226,15 @@ body {
 <!-- LOGIN -->
 <div id="login-overlay">
   <div class="login-brand">
-    <div class="login-brand-logo">PX</div>
-    <div class="login-brand-name">Praxis</div>
+    <div class="login-brand-logo">MV</div>
+    <div class="login-brand-name">MV2000i · RPA</div>
     <div class="login-brand-sub">Automação Hospitalar</div>
   </div>
   <div id="login-box">
     <div class="login-box-title">🔒 Identificação</div>
     <div class="login-box-body">
       <div class="login-box-head">Identifique-se</div>
-      <div class="login-box-sub">Informe suas credenciais de acesso ao sistema.</div>
+      <div class="login-box-sub">Informe suas credenciais de acesso ao MV2000i.</div>
       <div id="login-error"></div>
       <div class="login-field">
         <label class="login-label" for="inp-user">Usuário</label>
@@ -257,8 +257,8 @@ body {
 <!-- APP -->
 <div id="app" class="hidden">
   <div id="hdr">
-    <div class="hdr-logo">PX</div>
-    <span class="hdr-title">Praxis</span>
+    <div class="hdr-logo">MV</div>
+    <span class="hdr-title">MV2000i · RPA</span>
     <div class="hdr-sep"></div>
     <span style="font-size:10px;color:#7AADCC;">Automação Hospitalar</span>
     <div class="hdr-spacer"></div>
@@ -275,7 +275,7 @@ body {
 
   <div id="main">
     <div id="sidebar">
-      <div class="sb-hdr">📋 Módulos Praxis</div>
+      <div class="sb-hdr">📋 Módulos RPA</div>
       <div id="script-list"></div>
     </div>
     <div id="content">
@@ -319,7 +319,8 @@ const ahk = {
   },
   receive(data) {
     switch (data.type) {
-      case 'show_login': showLogin();                           break;
+      case 'show_login': showLogin(data.message || '');              break;
+      case 'login_failed': showLogin(data.message || 'Login recusado pelo MV.'); break;
       case 'login_ok':   onLoginOk(data);                      break;
       case 'status':     onStatus(data.message, data.running); break;
       case 'log':        appendLog(data.message, 'i');         break;
@@ -330,15 +331,28 @@ const ahk = {
   }
 };
 
+function parseWebViewMessage(data) {
+  return typeof data === 'string' ? JSON.parse(data) : data;
+}
+
 if (window.chrome?.webview)
-  window.chrome.webview.addEventListener('message', e => ahk.receive(JSON.parse(e.data)));
+  window.chrome.webview.addEventListener('message', e => ahk.receive(parseWebViewMessage(e.data)));
 
 document.addEventListener('DOMContentLoaded', () => ahk.send({ action: 'ready' }));
 
 // ─── Login ────────────────────────────────────────────────────
-function showLogin() {
+function showLogin(message = '') {
   document.getElementById('login-overlay').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
+  const err = document.getElementById('login-error');
+  if (message) {
+    err.textContent = message;
+    err.classList.add('visible');
+  } else {
+    err.textContent = '';
+    err.classList.remove('visible');
+  }
+  document.getElementById('inp-pass').value = '';
   document.getElementById('inp-user').focus();
 }
 
