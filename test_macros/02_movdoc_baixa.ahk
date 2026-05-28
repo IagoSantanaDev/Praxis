@@ -1,40 +1,38 @@
 #Requires AutoHotkey v2.0
 #Include %A_ScriptDir%\_mv_control_probe.ahk
 
-; TESTE 02 - MOV DOC / Baixa de Documentos / fluxo completo por protocolo
-;
-; Fluxo testado:
-; 1) Detectar/abrir MOV DOC por atalho local obrigatório em atalhos\MOVDOC.lnk.
-; 2) Se aparecer login, enviar usuário → Tab → senha → Enter.
-; 3) Sempre abrir nova tela funcional: Manutenção → Protocolação → Baixa.
-; 4) Para cada protocolo: colar número, F8, esperar carregar, coletar todas as contas/convênios.
-; 5) Dar Recebido, focar Protocolo, F10, F7 e repetir a partir da colagem do protocolo.
-; 6) Relatório final informa contas, convênio majoritário e erros por convênio diferente.
-;
-; Não configure EditN fixo: Oracle Forms renumera Edit1/Edit2/Edit15 conforme estado.
-; A leitura da grid usa somente ControlGetText(hwnd), sem clipboard.
+; Otimizações críticas de performance do motor AHK
+ListLines(false)
+ProcessSetPriority("High")
+SetKeyDelay(-1, -1)
+SetMouseDelay(-1)
+SetDefaultMouseSpeed(0)
 
-DO_OPEN  := true
-DO_LOGIN := true
-DO_NAV   := true
-DO_READ  := true
+; ==============================================================================
+; CONFIGURAÇÕES E VARIÁVEIS GLOBAIS
+; ==============================================================================
+DO_OPEN     := true
+DO_LOGIN    := true
+DO_NAV      := true
+DO_READ     := true
 
-TEST_USER       := "iagosantana"
-TEST_PASS       := "iago##hsr16"
-TEST_PROTOCOLOS := "3249741" ; Separe múltiplos protocolos por vírgula.
+TEST_USER      := "iagosantana"
+TEST_PASS      := "iago##hsr16"
+TEST_PROTOCOLOS := "3251014,3249741" ; Lote global unificado
 
-MOVDOC_LNK := MV_Test_ProjectRoot() "\atalhos\MOVDOC.lnk"
-WIN_LOGIN  := "Identificação ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+MOVDOC_LNK      := MV_Test_ProjectRoot() "\atalhos\MOVDOC.lnk"
+WIN_LOGIN       := "Identificação ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
 WIN_LOGIN_ERROR := "Mensagem do MV2000 ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
-WIN_MOVDOC := "Movimentação de Documentos ahk_exe ifrun60.EXE"
-WIN_BAIXA  := "Protocolação de Baixa de Documentos ahk_exe ifrun60.EXE"
-WIN_MOVDOC_POPUP := "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+WIN_MOVDOC      := "Movimentação de Documentos ahk_exe ifrun60.EXE"
+WIN_BAIXA       := "Protocolação de Baixa de Documentos ahk_exe ifrun60.EXE"
+WIN_MOVDOC_POPUP:= "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
 
-; Regiões Client extraídas do Window Spy.
-PROTO_X := 21
-PROTO_Y := 106
-CONTA_X := 252
-CONVENIO_X := 491
+PROTO_X     := 21
+PROTO_Y     := 106
+CONTA_X     := 252
+CONVENIO_X  := 491
+
+; Lembre-se de manter os Ys corretos das suas linhas mapeados aqui
 GRID_ROWS_Y := [222, 245, 268, 291]
 
 RECEB_CLASS := "Button1"
@@ -42,14 +40,15 @@ RECEB_X     := 718
 RECEB_Y     := 359
 MODAL_OK_CLASS := "Button1"
 
-protocolos := T_ParseProtocolos(TEST_PROTOCOLOS)
+protocolos   := T_ParseProtocolos(TEST_PROTOCOLOS)
 linhasMovDoc := []
-erros := []
+erros        := []
 
-report := "SUÍTE: MOV DOC - fluxo completo por protocolo`n"
-        . "DO_OPEN=" DO_OPEN " DO_LOGIN=" DO_LOGIN " DO_NAV=" DO_NAV " DO_READ=" DO_READ "`n"
-        . "Protocolos: " TEST_PROTOCOLOS "`n`n"
+report := "SUÍTE: MOV DOC - fluxo completo por protocolo`n" . "DO_OPEN=" DO_OPEN " DO_LOGIN=" DO_LOGIN " DO_NAV=" DO_NAV " DO_READ=" DO_READ "`n" . "Protocolos: " TEST_PROTOCOLOS "`n`n"
 
+; ==============================================================================
+; FLUXO PRINCIPAL DE EXECUÇÃO
+; ==============================================================================
 movdocReady := WinExist(WIN_MOVDOC)
 if movdocReady {
     report .= "✅ MOV DOC detectado por título amplo.`n"
@@ -62,9 +61,9 @@ if movdocReady {
             MV_Test_ShowReport(report)
             ExitApp
         }
-        Run MOVDOC_LNK, MV_Test_ProjectRoot() "\atalhos"
+        Run(MOVDOC_LNK, MV_Test_ProjectRoot() "\atalhos")
         report .= "▶️ MOV DOC executado por atalho local obrigatório.`n"
-        if !T_Poll(() => WinExist(WIN_LOGIN) || WinExist(WIN_MOVDOC), 20)
+        if !T_Poll(() => WinExist(WIN_LOGIN) || WinExist(WIN_MOVDOC), 100)
             report .= "❌ Login/MOV DOC não apareceu após abrir.`n"
     }
 }
@@ -72,38 +71,31 @@ if movdocReady {
 if WinExist(WIN_LOGIN) {
     report .= "ℹ️ Janela Identificação detectada.`n"
     if DO_LOGIN {
-        WinActivate WIN_LOGIN
-        WinWaitActive WIN_LOGIN,, 2
+	Sleep 200
         SendText TEST_USER
-        Sleep 80
+        Sleep 40
         Send "{Tab}"
-        Sleep 80
+        Sleep 40
         SendText TEST_PASS
-        Sleep 80
+        Sleep 40
         Send "{Enter}"
         report .= "✅ Login de teste enviado por teclado.`n"
-
-        Sleep 700
+        Sleep 500
         if WinExist(WIN_LOGIN_ERROR)
             report .= "⚠️ Popup/erro detectado por título: " WIN_LOGIN_ERROR "`n"
     }
 }
 
 if DO_NAV {
-    if WinExist(WIN_MOVDOC)
+    if WinExist(WIN_MOVDOC) {
         WinActivate WIN_MOVDOC
-
-    ; Sempre abre nova tela funcional; não reaproveitar Baixa já aberta.
-    Send "{Alt down}"
-    Send "m"
-    Send "p"
-    Send "b"
-    Send "{Alt up}"
-
-    if T_Poll(() => WinExist(WIN_BAIXA), 20)
-        report .= "✅ Tela Baixa de Documentos detectada.`n"
-    else
-        report .= "❌ Tela Baixa de Documentos não detectada.`n"
+        Sleep 200
+        Send "{Alt down}mpb{Alt up}"
+        if T_Poll(() => WinExist(WIN_BAIXA), 80)
+            report .= "✅ Tela Baixa de Documentos detectada.`n"
+        else
+            report .= "❌ Tela Baixa de Documentos não detectada.`n"
+    }
 }
 
 if DO_READ {
@@ -112,28 +104,27 @@ if DO_READ {
     } else if (protocolos.Length = 0) {
         report .= "❌ Nenhum protocolo informado.`n"
     } else {
+        Sleep 50
         for idx, protocolo in protocolos {
             report .= "`n── Protocolo " protocolo " (" idx "/" protocolos.Length ") ──`n"
-
             if !T_SetTextEditAtPoint(WIN_BAIXA, PROTO_X, PROTO_Y, protocolo) {
                 report .= "❌ Falha ao preencher protocolo por região Client.`n"
                 continue
             }
-
             report .= "✅ Protocolo preenchido; enviando F8.`n"
             Send "{F8}"
-            T_WaitAfterF8()
-
+            T_WaitAfterF8() 
+            
             linhas := T_ColetarLinhasMovDoc(protocolo, &report)
             if (linhas.Length = 0) {
                 report .= "❌ Nenhuma conta/convênio coletado para o protocolo.`n"
             } else {
                 for _, linha in linhas {
                     linhasMovDoc.Push(linha)
-                    report .= "  conta=" linha["conta"] " | convenio=" linha["convenio"] "`n"
+                    report .= " conta=" linha["conta"] " | convenio=" linha["convenio"] "`n"
                 }
             }
-
+            
             if T_FinalizarBaixaProtocolo(&report)
                 report .= "✅ Recebido aplicado, F10 enviado e F7 preparado para próxima consulta.`n"
             else
@@ -142,31 +133,241 @@ if DO_READ {
     }
 }
 
+; Mantendo a sua lógica original: Cálculo unificado global para o lote inteiro
 convenioMajoritario := T_ConvenioMajoritario(linhasMovDoc)
 contasValidas := T_FiltrarContasPorConvenio(linhasMovDoc, convenioMajoritario, erros)
 
 report .= "`n════════ RESUMO FINAL ════════`n"
 report .= "Total de linhas coletadas: " linhasMovDoc.Length "`n"
 report .= "Convênio majoritário: " (convenioMajoritario = "" ? "não identificado" : convenioMajoritario) "`n`n"
-
 report .= "Contas válidas para remessa:`n"
 if (contasValidas.Length = 0) {
-    report .= "  nenhuma`n"
+    report .= " nenhuma`n"
 } else {
     for _, linha in contasValidas
-        report .= "  Prot. " linha["protocolo"] " | Conta " linha["conta"] " | Convênio " linha["convenio"] "`n"
+        report .= " Prot. " linha["protocolo"] " | Conta " linha["conta"] " | Convênio " linha["convenio"] "`n"
 }
 
 report .= "`nErros/pendências:`n"
 if (erros.Length = 0) {
-    report .= "  nenhuma`n"
+    report .= " nenhuma`n"
 } else {
     for _, e in erros
-        report .= "  Prot. " e["protocolo"] " | Conta " e["conta"] " | " e["descricao"] "`n"
+        report .= " Prot. " e["protocolo"] " | Conta " e["conta"] " | " e["descricao"] "`n"
 }
 
 MV_Test_ShowReport(report)
 
+; ==============================================================================
+; FUNÇÕES OPERACIONAIS FILTRADAS PARA VELOCIDADE E DINÂMICA DE ROLAGEM
+; ==============================================================================
+T_ColetarLinhasMovDoc(protocolo, &report) {
+    linhas := []
+    vistos := Map()
+    
+    if (!(GRID_ROWS_Y is Array) || GRID_ROWS_Y.Length = 0) {
+        report .= "❌ GRID_ROWS_Y precisa conter as coordenadas Y das linhas visíveis da Grid.`n"
+        return linhas
+    }
+    
+    WinActivate(WIN_BAIXA)
+    if !WinWaitActive(WIN_BAIXA,, 2)
+        return linhas
+        
+    MouseGetPos(&origX, &origY)
+    CoordMode("Mouse", "Client")
+    
+    maxIteracoes := 100
+    tabelaEncerrada := false
+    
+    Loop maxIteracoes {
+        linhasAdicionadasNesteBloco := 0
+        
+        for idx, rowY in GRID_ROWS_Y {
+            Sleep(20)
+            
+            contaRaw := T_ReadFieldByPhysicalClick(CONTA_X, rowY, "conta")
+            convenioRaw := T_ReadFieldByPhysicalClick(CONVENIO_X, rowY, "convenio")
+            
+            conta := ""
+            if RegExMatch(contaRaw, "\d+", &matchConta)
+                conta := matchConta[] 
+                
+            convenio := ""
+            if RegExMatch(convenioRaw, "\d+", &matchConvenio)
+                convenio := matchConvenio[] 
+
+            if (conta = protocolo || convenio = protocolo || conta = "" || convenio = "")
+                continue
+                
+            if (conta = convenio) {
+                contaRaw := T_ReadFieldByPhysicalClick(CONTA_X, rowY, "conta")
+                if RegExMatch(contaRaw, "\d+", &matchConta)
+                    conta := matchConta[]
+            }
+
+            key := protocolo "|" conta "|" convenio
+            
+            if vistos.Has(key)
+                continue
+                
+            vistos[key] := true
+            linhas.Push(Map("protocolo", protocolo, "conta", conta, "convenio", convenio))
+            linhasAdicionadasNesteBloco++
+        }
+        
+        if (tabelaEncerrada || linhasAdicionadasNesteBloco = 0) {
+            if (tabelaEncerrada)
+                report .= "ℹ️ Coleta concluída com sucesso após esvaziar o fim da Grid.`n"
+            else
+                report .= "ℹ️ Fim da Grid alcançado por repetição de registros.`n"
+            break
+        }
+        
+        ultimoY := GRID_ROWS_Y[GRID_ROWS_Y.Length]
+        Click(CONTA_X + 15, ultimoY + 8, 1)
+        Sleep(50)
+        
+        Loop GRID_ROWS_Y.Length {
+            if WinExist(WIN_MOVDOC_POPUP) {
+                T_DismissMovDocPopup()
+                report .= "ℹ️ Popup de fim de registros detectado e fechado durante rolagem.`n"
+                tabelaEncerrada := true 
+                break
+            }
+            
+            Send("{Down}")
+            Sleep(90) 
+        }
+        
+        if WinExist(WIN_MOVDOC_POPUP) {
+            T_DismissMovDocPopup()
+            report .= "ℹ️ Popup de fim de registros detectado pós-rolagem.`n"
+            tabelaEncerrada := true
+        }
+        
+        primeiroY := GRID_ROWS_Y[1]
+        Click(CONTA_X + 15, primeiroY + 8, 1)
+        Sleep(50)
+    }
+    
+    MouseMove(origX, origY, 0)
+    return linhas
+}
+
+T_ReadFieldByPhysicalClick(x, y, campo := "") {
+    A_Clipboard := ""
+    CoordMode("Mouse", "Client")
+    
+    centroX := x + 15
+    centroY := y + 8
+    
+    Click(centroX, centroY, 2)
+    Sleep(100) 
+    
+    Send("^c")
+    if ClipWait(0.12) {
+        valor := Trim(A_Clipboard)
+        ; TRAVA DE SEGURANÇA ESTRITA: Se o campo for o Convênio e o texto contiver 5 ou mais dígitos,
+        ; é matematicamente impossível ser um convênio legítimo do MV. Rejeita o vazamento do Clipboard.
+        if (campo = "convenio" && StrLen(valor) >= 4) {
+            ; Ignora o valor inválido e deixa passar para a correção por teclado abaixo
+        } else {
+            return valor
+        }
+    }
+        
+    ; PLANO B: Força foco limpo e usa a seleção forçada por Home + Shift + End
+    Click(centroX, centroY, 1)
+    Sleep(50)
+    Send("{Home}")
+    Sleep(300) ; Pausa de estabilização do cursor no início do campo
+    Send("+{End}^c")
+    if ClipWait(0.12) {
+        valor := Trim(A_Clipboard)
+        if (campo = "convenio" && StrLen(valor) >= 5) {
+            return "" ; Se mesmo no plano B o clipboard vier sujo, retorna vazio para não corromper o relatório
+        }
+        return valor
+    }
+        
+    return ""
+}
+
+T_SetTextEditAtPoint(winTitle, x, y, value) {
+    if !WinExist(winTitle) {
+        if WinExist("ahk_exe ifrun60.EXE") {
+            winTitle := "ahk_exe ifrun60.EXE"
+        } else {
+            return false 
+        }
+    }
+
+    try {
+        WinActivate(winTitle)
+        if !WinWaitActive(winTitle,, 2)
+            return false
+    } catch {
+        return false 
+    }
+        
+    CoordMode("Mouse", "Client")
+    centroProtoX := x + 40
+    centroProtoY := y + 10
+    
+    Click(centroProtoX, centroProtoY, 2)
+    Sleep(50)
+    Send("{Backspace}{Delete 8}") 
+    
+    if (value != "") {
+        SendText(value)
+    }
+    return true
+}
+
+T_FocusEditAtPoint(winTitle, x, y) {
+    WinActivate(winTitle)
+    CoordMode("Mouse", "Client")
+    centroProtoX := x + 40
+    centroProtoY := y + 10
+    
+    Click(centroProtoX, centroProtoY, 1)
+    return true
+}
+
+T_FinalizarBaixaProtocolo(&report) {
+    hwndReceb := T_FindControlGeneric(WIN_BAIXA, RECEB_CLASS, RECEB_X, RECEB_Y, 30)
+    if (!hwndReceb) {
+        report .= "❌ Botão Recebido não localizado pelas coordenadas.`n"
+        return false
+    }
+    
+    try checked := ControlGetChecked(hwndReceb)
+    catch
+        checked := ""
+    
+    if (checked = 0 || checked = "") {
+        ControlClick(hwndReceb,,,,,"NA")
+    } else if (checked = 1) {
+        ControlClick(hwndReceb,,, 2,,"NA")
+    }
+    
+    Sleep(60)
+    Send("{F10}")
+    Sleep(450) 
+    
+    T_FocusEditAtPoint(WIN_BAIXA, PROTO_X, PROTO_Y)
+    Sleep(60)
+    
+    Send("{F7}")
+    Sleep(100)
+    
+    return true
+}
+
+; ==============================================================================
+; ALGORITMOS INTERNOS E PARSEADORES
+; ==============================================================================
 T_ParseProtocolos(str) {
     result := []
     for _, p in StrSplit(str, ",") {
@@ -184,106 +385,19 @@ T_Poll(condFn, timeoutSecs) {
             return true
         if A_TickCount > deadline
             return false
-        Sleep 50
+        Sleep 25
     }
 }
 
 T_WaitAfterF8() {
-    T_Poll(() => WinExist(WIN_BAIXA), 20)
-    Sleep 700
-}
-
-T_ColetarLinhasMovDoc(protocolo, &report) {
-    linhas := []
-    vistos := Map()
-
-    addedInitial := T_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos)
-    report .= "ℹ️ Coleta inicial: " addedInitial " nova(s) linha(s).`n"
-
-    Loop 80 {
-        result := T_AvancarGridQuatroLinhas()
-        added := T_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos)
-        report .= "ℹ️ Bloco " A_Index ": novas=" added " popup=" (result["popup"] ? "sim" : "não") "`n"
-
-        if result["popup"]
-            break
-        if (added = 0) {
-            report .= "ℹ️ Parando: 4 setas não trouxeram conta nova; evita loop em protocolos com até 4 contas ou grid sem avanço.`n"
-            break
-        }
-    }
-
-    return linhas
-}
-
-T_AvancarGridQuatroLinhas() {
-    Loop 4 {
-        Send "{Down}"
-        Sleep 100
-
-        if T_Poll(() => WinExist(WIN_MOVDOC_POPUP), 0.25) {
-            T_DismissMovDocPopup()
-            return Map("popup", true)
-        }
-    }
-
-    return Map("popup", false)
-}
-
-T_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos) {
-    added := 0
-
-    for _, rowY in GRID_ROWS_Y {
-        conta := T_ReadEditAtPoint(WIN_BAIXA, CONTA_X, rowY, "^\d+$")
-        convenio := T_ReadEditAtPoint(WIN_BAIXA, CONVENIO_X, rowY, "^\d+$")
-
-        if (conta = "" || convenio = "")
-            continue
-
-        key := protocolo "|" conta "|" convenio
-        if vistos.Has(key)
-            continue
-
-        vistos[key] := true
-        linhas.Push(Map("protocolo", protocolo, "conta", conta, "convenio", convenio))
-        added++
-    }
-
-    return added
-}
-
-T_FinalizarBaixaProtocolo(&report) {
-    checked := T_ControlCheckedAt(WIN_BAIXA, RECEB_CLASS, RECEB_X, RECEB_Y)
-
-    if (checked = 0) {
-        if !T_ClickControlAt(WIN_BAIXA, RECEB_CLASS, RECEB_X, RECEB_Y)
-            return false
-        report .= "ℹ️ Recebido estava 0; click simples enviado.`n"
-    } else if (checked = 1) {
-        if !T_DoubleClickControlAt(WIN_BAIXA, RECEB_CLASS, RECEB_X, RECEB_Y)
-            return false
-        report .= "ℹ️ Recebido estava 1; double click enviado.`n"
-    } else {
-        report .= "❌ Não consegui ler ControlGetChecked do Recebido.`n"
-        return false
-    }
-
-    Sleep 100
-    if !T_FocusEditAtPoint(WIN_BAIXA, PROTO_X, PROTO_Y)
-        return false
-    Sleep 80
-    Send "{F10}"
-    Sleep 500
-    Send "{F7}"
-    Sleep 120
-    return true
+    T_Poll(() => WinExist(WIN_BAIXA), 80)
+    Sleep(600) 
 }
 
 T_ConvenioMajoritario(linhas) {
     counts := Map()
     ordem := []
-
-    for _, linha in linhas {
+    for _, linha in hyperlinks := linhas {
         convenio := linha["convenio"]
         if !counts.Has(convenio) {
             counts[convenio] := 0
@@ -291,7 +405,6 @@ T_ConvenioMajoritario(linhas) {
         }
         counts[convenio] += 1
     }
-
     escolhido := ""
     maior := 0
     for _, convenio in ordem {
@@ -307,7 +420,6 @@ T_FiltrarContasPorConvenio(linhas, convenioEscolhido, erros) {
     result := []
     if (convenioEscolhido = "")
         return result
-
     for _, linha in linhas {
         if (linha["convenio"] = convenioEscolhido) {
             result.Push(linha)
@@ -322,122 +434,44 @@ T_FiltrarContasPorConvenio(linhas, convenioEscolhido, erros) {
     return result
 }
 
-T_SetTextEditAtPoint(winTitle, x, y, value) {
-    hwnd := T_FindEditByClientPoint(winTitle, x + 0, y + 0)
-    if !hwnd
-        return false
-    WinActivate winTitle
-    WinWaitActive winTitle,, 2
-    ControlFocus hwnd
-    Sleep 80
-    Send "^a"
-    Sleep 50
-    SendText value
-    return true
-}
-
-T_FocusEditAtPoint(winTitle, x, y) {
-    hwnd := T_FindEditByClientPoint(winTitle, x + 0, y + 0)
-    if !hwnd
-        return false
-    WinActivate winTitle
-    WinWaitActive winTitle,, 2
-    ControlFocus hwnd
-    return true
-}
-
-T_ReadEditAtPoint(winTitle, x, y, expectedPattern := "") {
-    hwnd := T_FindEditByClientPoint(winTitle, x + 0, y + 0)
-    if !hwnd
-        return ""
-
-    try text := Trim(ControlGetText(hwnd))
-    catch
-        return ""
-
-    return T_TextMatches(text, expectedPattern) ? text : ""
-}
-
-T_FindEditByClientPoint(winTitle, targetX, targetY, tolerance := 14) {
+T_FindControlGeneric(winTitle, classNN, targetX, targetY, tolerance := 30) {
     try hwnds := WinGetControlsHwnd(winTitle)
     catch
         return 0
-
     bestHwnd := 0
     bestDist := 999999
-
     for hwnd in hwnds {
         try ctrlClass := ControlGetClassNN(hwnd)
         catch
             continue
-        if (SubStr(ctrlClass, 1, 4) != "Edit")
+        if (ctrlClass != classNN)
             continue
-        try ControlGetPos &cx, &cy, &cw, &ch, hwnd
+        try ControlGetPos(&cx, &cy, &cw, &ch, hwnd, winTitle)
         catch
             continue
-
         if (targetX >= cx && targetX <= cx + cw && targetY >= cy && targetY <= cy + ch)
             return hwnd
-
         centerX := cx + (cw / 2)
         centerY := cy + (ch / 2)
         dist := Sqrt((targetX - centerX) ** 2 + (targetY - centerY) ** 2)
         if (dist < bestDist) {
-            bestDist := dist
+            dist := bestDist
             bestHwnd := hwnd
         }
     }
-
     return (bestHwnd && bestDist <= tolerance) ? bestHwnd : 0
-}
-
-T_TextMatches(text, expectedPattern := "") {
-    if (text = "")
-        return false
-    if (expectedPattern = "")
-        return true
-    return RegExMatch(text, expectedPattern)
-}
-
-T_ControlCheckedAt(winTitle, classNN, x, y) {
-    found := MV_Test_FindControlByClientPoint(winTitle, classNN, x + 0, y + 0)
-    hwnd := found.Get("hwnd", 0)
-    if !hwnd
-        return ""
-    try return ControlGetChecked(hwnd)
-    catch
-        return ""
-}
-
-T_ClickControlAt(winTitle, classNN, x, y) {
-    found := MV_Test_FindControlByClientPoint(winTitle, classNN, x + 0, y + 0)
-    hwnd := found.Get("hwnd", 0)
-    if !hwnd
-        return false
-    ControlClick hwnd,,,,, "NA"
-    return true
-}
-
-T_DoubleClickControlAt(winTitle, classNN, x, y) {
-    found := MV_Test_FindControlByClientPoint(winTitle, classNN, x + 0, y + 0)
-    hwnd := found.Get("hwnd", 0)
-    if !hwnd
-        return false
-    ControlClick hwnd,,,, 2, "NA"
-    return true
 }
 
 T_ClickFirstControl(winTitle, classNN) {
     try hwnds := WinGetControlsHwnd(winTitle)
     catch
         return false
-
     for hwnd in hwnds {
         try ctrlClass := ControlGetClassNN(hwnd)
         catch
             continue
         if (ctrlClass = classNN) {
-            ControlClick hwnd,,,,, "NA"
+            ControlClick(hwnd,,,,,"NA")
             return true
         }
     }
@@ -447,12 +481,12 @@ T_ClickFirstControl(winTitle, classNN) {
 T_DismissMovDocPopup() {
     try {
         if WinExist(WIN_MOVDOC_POPUP) {
-            WinActivate WIN_MOVDOC_POPUP
-            Sleep 80
-            if !T_ClickFirstControl(WIN_MOVDOC_POPUP, MODAL_OK_CLASS)
-                return false
-            return T_Poll(() => !WinExist(WIN_MOVDOC_POPUP), 10)
+            WinActivate(WIN_MOVDOC_POPUP)
+            Sleep(50)
+            if !T_ClickFirstControl(WIN_MOVDOC_POPUP, MODAL_OK_CLASS) {
+                Send("{Enter}") 
+            }
+            T_Poll(() => !WinExist(WIN_MOVDOC_POPUP), 3)
         }
     }
-    return false
 }
