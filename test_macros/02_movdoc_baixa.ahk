@@ -1,12 +1,12 @@
 #Requires AutoHotkey v2.0
 #Include %A_ScriptDir%\_mv_control_probe.ahk
 
-; Otimizações críticas de performance do motor AHK
 ListLines(false)
-ProcessSetPriority("High")
-SetKeyDelay(-1, -1)
+ProcessSetPriority("AboveNormal")
+SetKeyDelay(10, 10)
 SetMouseDelay(-1)
 SetDefaultMouseSpeed(0)
+SetControlDelay(-1)
 
 ; ==============================================================================
 ; CONFIGURAÇÕES E VARIÁVEIS GLOBAIS
@@ -32,7 +32,6 @@ PROTO_Y     := 106
 CONTA_X     := 252
 CONVENIO_X  := 491
 
-; Lembre-se de manter os Ys corretos das suas linhas mapeados aqui
 GRID_ROWS_Y := [222, 245, 268, 291]
 
 RECEB_CLASS := "Button1"
@@ -68,19 +67,33 @@ if movdocReady {
     }
 }
 
+if DO_LOGIN
+    T_Poll(() => WinExist(WIN_LOGIN) || WinExist(WIN_MOVDOC), 30)
+
 if WinExist(WIN_LOGIN) {
     report .= "ℹ️ Janela Identificação detectada.`n"
     if DO_LOGIN {
-	Sleep 200
+        WinActivate WIN_LOGIN
+        if !WinWaitActive(WIN_LOGIN,, 5) {
+            report .= "❌ Janela Identificação apareceu, mas não ficou ativa para receber login.`n"
+            MV_Test_ShowReport(report)
+            ExitApp
+        }
+
+        CoordMode("Mouse", "Client")
+        Click(170, 118, 1)
+        Sleep 20
         SendText TEST_USER
-        Sleep 40
-        Send "{Tab}"
-        Sleep 40
+        Sleep 20
+        Click(307, 119, 1)
+        Sleep 20
         SendText TEST_PASS
-        Sleep 40
+        Sleep 20
         Send "{Enter}"
-        report .= "✅ Login de teste enviado por teclado.`n"
-        Sleep 500
+        report .= "✅ Login de teste enviado por coordenadas Client validadas da Identificação.`n"
+
+        if !T_Poll(() => WinExist(WIN_LOGIN_ERROR) || !WinExist(WIN_LOGIN) || WinExist(WIN_MOVDOC), 30)
+            report .= "⚠️ Login enviado, mas não houve mudança observável em 30s.`n"
         if WinExist(WIN_LOGIN_ERROR)
             report .= "⚠️ Popup/erro detectado por título: " WIN_LOGIN_ERROR "`n"
     }
@@ -113,7 +126,10 @@ if DO_READ {
             }
             report .= "✅ Protocolo preenchido; enviando F8.`n"
             Send "{F8}"
-            T_WaitAfterF8() 
+            if !T_WaitAfterF8(protocolo, &report) {
+                report .= "❌ A primeira linha da grid não ficou legível após F8; coleta ignorada para este protocolo.`n"
+                continue
+            }
             
             linhas := T_ColetarLinhasMovDoc(protocolo, &report)
             if (linhas.Length = 0) {
@@ -133,7 +149,6 @@ if DO_READ {
     }
 }
 
-; Mantendo a sua lógica original: Cálculo unificado global para o lote inteiro
 convenioMajoritario := T_ConvenioMajoritario(linhasMovDoc)
 contasValidas := T_FiltrarContasPorConvenio(linhasMovDoc, convenioMajoritario, erros)
 
@@ -255,43 +270,54 @@ T_ColetarLinhasMovDoc(protocolo, &report) {
     return linhas
 }
 
-T_ReadFieldByPhysicalClick(x, y, campo := "") {
-    A_Clipboard := ""
+T_ReadFieldByPhysicalClick(x, y, campo := "", fastTimeoutMs := 200, fallbackTimeoutMs := 300) {
     CoordMode("Mouse", "Client")
     
     centroX := x + 15
     centroY := y + 8
     
-    Click(centroX, centroY, 2)
-    Sleep(100) 
-    
-    Send("^c")
-    if ClipWait(0.12) {
-        valor := Trim(A_Clipboard)
-        ; TRAVA DE SEGURANÇA ESTRITA: Se o campo for o Convênio e o texto contiver 5 ou mais dígitos,
-        ; é matematicamente impossível ser um convênio legítimo do MV. Rejeita o vazamento do Clipboard.
-        if (campo = "convenio" && StrLen(valor) >= 4) {
-            ; Ignora o valor inválido e deixa passar para a correção por teclado abaixo
-        } else {
-            return valor
-        }
-    }
-        
-    ; PLANO B: Força foco limpo e usa a seleção forçada por Home + Shift + End
     Click(centroX, centroY, 1)
-    Sleep(50)
+    Sleep(40)
     Send("{Home}")
-    Sleep(300) ; Pausa de estabilização do cursor no início do campo
-    Send("+{End}^c")
-    if ClipWait(0.12) {
-        valor := Trim(A_Clipboard)
-        if (campo = "convenio" && StrLen(valor) >= 5) {
-            return "" ; Se mesmo no plano B o clipboard vier sujo, retorna vazio para não corromper o relatório
-        }
+    Sleep(30)
+    Send("+{End}")
+    Sleep(30)
+
+    valor := T_CopySelectedFieldText(campo, fastTimeoutMs)
+    if T_ValorCampoValido(valor, campo)
         return valor
-    }
+
+    valor := T_CopySelectedFieldText(campo, fallbackTimeoutMs)
+    if T_ValorCampoValido(valor, campo)
+        return valor
         
     return ""
+}
+
+T_CopySelectedFieldText(campo := "", timeoutMs := 500) {
+    A_Clipboard := ""
+    Send("^c")
+    if !ClipWait(timeoutMs / 1000)
+        return ""
+
+    return Trim(A_Clipboard)
+}
+
+T_ValorCampoValido(valor, campo := "") {
+    valor := Trim(valor)
+    if (valor = "")
+        return false
+
+    if !RegExMatch(valor, "^\d+$")
+        return false
+
+    if (campo = "convenio" && StrLen(valor) >= 4)
+        return false
+
+    if (campo = "conta" && StrLen(valor) < 5)
+        return false
+
+    return true
 }
 
 T_SetTextEditAtPoint(winTitle, x, y, value) {
@@ -315,9 +341,8 @@ T_SetTextEditAtPoint(winTitle, x, y, value) {
     centroProtoX := x + 40
     centroProtoY := y + 10
     
-    Click(centroProtoX, centroProtoY, 2)
-    Sleep(50)
-    Send("{Backspace}{Delete 8}") 
+    Click(centroProtoX, centroProtoY, 1)
+    Sleep(20)
     
     if (value != "") {
         SendText(value)
@@ -348,19 +373,26 @@ T_FinalizarBaixaProtocolo(&report) {
     
     if (checked = 0 || checked = "") {
         ControlClick(hwndReceb,,,,,"NA")
+        report .= "✅ Recebido estava desmarcado/indefinido; click simples enviado.`n"
     } else if (checked = 1) {
         ControlClick(hwndReceb,,, 2,,"NA")
+        report .= "✅ Recebido já estava marcado; double click enviado.`n"
     }
     
-    Sleep(60)
+    Sleep(20)
     Send("{F10}")
-    Sleep(450) 
+    report .= "✅ F10 enviado após checkbox Recebido.`n"
+    Sleep(20)
     
-    T_FocusEditAtPoint(WIN_BAIXA, PROTO_X, PROTO_Y)
-    Sleep(60)
+    if !T_FocusEditAtPoint(WIN_BAIXA, PROTO_X, PROTO_Y) {
+        report .= "❌ Não consegui clicar/focar o campo Protocolo após F10.`n"
+        return false
+    }
+    Sleep(20)
     
     Send("{F7}")
-    Sleep(100)
+    Sleep(20)
+    report .= "✅ Campo Protocolo clicado e F7 enviado para preparar nova consulta.`n"
     
     return true
 }
@@ -389,9 +421,40 @@ T_Poll(condFn, timeoutSecs) {
     }
 }
 
-T_WaitAfterF8() {
+T_WaitAfterF8(protocolo, &report) {
     T_Poll(() => WinExist(WIN_BAIXA), 80)
-    Sleep(600) 
+
+    startedAt := A_TickCount
+    deadline := startedAt + 12000
+
+    Loop {
+        if T_FirstGridLineReady(protocolo, &conta, &convenio) {
+            elapsed := A_TickCount - startedAt
+            report .= "ℹ️ Primeira linha legível após F8 em " elapsed "ms: conta=" conta " | convenio=" convenio "`n"
+            return true
+        }
+
+        if (A_TickCount >= deadline) {
+            elapsed := A_TickCount - startedAt
+            report .= "❌ Timeout aguardando primeira linha legível após F8 (" elapsed "ms).`n"
+            return false
+        }
+
+        Sleep(80)
+    }
+}
+
+T_FirstGridLineReady(protocolo, &conta, &convenio) {
+    conta := T_ReadFieldByPhysicalClick(CONTA_X, GRID_ROWS_Y[1], "conta", 100, 200)
+    convenio := T_ReadFieldByPhysicalClick(CONVENIO_X, GRID_ROWS_Y[1], "convenio", 100, 200)
+
+    if (conta = "" || convenio = "")
+        return false
+
+    if (conta = protocolo || convenio = protocolo)
+        return false
+
+    return true
 }
 
 T_ConvenioMajoritario(linhas) {
@@ -455,7 +518,7 @@ T_FindControlGeneric(winTitle, classNN, targetX, targetY, tolerance := 30) {
         centerY := cy + (ch / 2)
         dist := Sqrt((targetX - centerX) ** 2 + (targetY - centerY) ** 2)
         if (dist < bestDist) {
-            dist := bestDist
+            bestDist := dist
             bestHwnd := hwnd
         }
     }
