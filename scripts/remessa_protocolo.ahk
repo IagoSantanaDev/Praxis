@@ -5,14 +5,6 @@
 ;  REMESSA POR PROTOCOLO
 ; ════════════════════════════════════════════════════════════════
 
-; ── Imagens do fluxo MOV DOC ──────────────────────────────────
-RP_IMG_MENU_MANUTENCAO       := MV_IMG_DIR "\Menu_Manutenção.png"
-RP_IMG_MENU_PROTOCOLACAO     := MV_IMG_DIR "\Menu_Protocolação.png"
-RP_IMG_MENU_BAIXA            := MV_IMG_DIR "\Menu_Baixa.png"
-RP_IMG_TELA_BAIXA            := MV_IMG_DIR "\Tittle_TelaBaixa.png"
-RP_IMG_ERRO_ICONE            := MV_IMG_DIR "\Erro_Icone.png"
-RP_IMG_RECEBIMENTO_CHECKADO  := MV_IMG_DIR "\Botão_RecebimentoCheckado.png"
-
 ; ── Janelas ───────────────────────────────────────────────────
 WIN_MOVDOC_BAIXA       := MV_WIN_MOVDOC_BAIXA
 WIN_MOVDOC_POPUP       := "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
@@ -24,19 +16,14 @@ WIN_XML                := "Monitoração de Faturamento - TISS"
 WIN_XML_PATH_FORM      := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
 WIN_XML_POPUP_SIMNAO   := "Mensagem ao Usuário do MV 2000"
 
-; ── Controles MOV DOC — preencher com Window Spy ──────────────
-; Use ClassNN + coordenada Client. Quando faltar mapeamento, o script aborta.
-MOVDOC_CAMPO_PROTOCOLO_CLASS := "CLASSNN"  ; pendente Window Spy
-MOVDOC_CAMPO_PROTOCOLO_X     := ""         ; pendente Window Spy
-MOVDOC_CAMPO_PROTOCOLO_Y     := ""         ; pendente Window Spy
-
-MOVDOC_CAMPO_CONVENIO_CLASS  := "CLASSNN"  ; pendente Window Spy
-MOVDOC_CAMPO_CONVENIO_X      := ""         ; pendente Window Spy
-MOVDOC_CAMPO_CONVENIO_Y      := ""         ; pendente Window Spy
-
-MOVDOC_CAMPO_CONTA_CLASS     := "CLASSNN"  ; pendente Window Spy
-MOVDOC_CAMPO_CONTA_X         := ""         ; pendente Window Spy
-MOVDOC_CAMPO_CONTA_Y         := ""         ; pendente Window Spy
+; ── Regiões MOV DOC em coordenadas Client ─────────────────────
+; Não usar EditN como contrato: Oracle Forms renumera Edit1/Edit2/Edit15 conforme estado.
+; A automação localiza qualquer Edit* nessas regiões e valida texto numérico.
+MOVDOC_PROTOCOLO_X := 21
+MOVDOC_PROTOCOLO_Y := 106
+MOVDOC_CONTA_X     := 252
+MOVDOC_CONVENIO_X  := 491
+MOVDOC_GRID_ROWS_Y := [222, 245, 268, 291]
 
 ; Confirmado previamente para primeira linha, mas manter validável por teste.
 MOVDOC_CHECK_RECEBIDO_CLASS  := "Button1"
@@ -44,18 +31,24 @@ MOVDOC_CHECK_RECEBIDO_X      := 718
 MOVDOC_CHECK_RECEBIDO_Y      := 359
 
 ; ── Controles FFCV ────────────────────────────────────────────
-FFCV_BTN_HABILITAR     := "CLASSNN"  ; preferir F7; pendente Window Spy
-FFCV_CAMPO_CONVENIO    := "CLASSNN"  ; pendente Window Spy
-FFCV_AREA_REMESSAS     := "CLASSNN"  ; alternativa Tab x3; pendente Window Spy
-FFCV_BTN_BUSCAR_REM    := "CLASSNN"  ; preferir F7; pendente Window Spy
-FFCV_CAMPO_NUM_REM     := "CLASSNN"  ; pendente Window Spy
-FFCV_BTN_CONFIRMAR_REM := "CLASSNN"  ; preferir F8; pendente Window Spy
-FFCV_BTN_NOVA_REM      := "CLASSNN"  ; preferir F6; pendente Window Spy
-FFCV_CAMPO_DATA_REM    := "CLASSNN"  ; pendente Window Spy
-FFCV_CAMPO_TIPO        := "CLASSNN"  ; pendente Window Spy
-FFCV_BTN_SALVAR_REM    := "CLASSNN"  ; preferir F10; pendente Window Spy
+; Manutenção de Remessa usa teclado/atalhos de propósito.
+; Os campos de remessa são Oracle Forms com EditN variável conforme quantidade de
+; remessas do convênio e estado da tela. Preferir o fluxo validado no mini macro 03:
+; F7/F8 para consulta, F6/F10 para nova remessa e Tab apenas onde foi testado.
+FFCV_BTN_HABILITAR     := "CLASSNN"  ; preferir F7; não mapear campo variável sem nova validação
+FFCV_CAMPO_CONVENIO    := "CLASSNN"  ; fluxo atual usa F7 + digitação por foco do Oracle Forms
+FFCV_AREA_REMESSAS     := "CLASSNN"  ; fluxo atual usa Tab x3 validado no mini macro 03
+FFCV_BTN_BUSCAR_REM    := "CLASSNN"  ; preferir F8; não mapear campo variável sem nova validação
+FFCV_CAMPO_NUM_REM     := "CLASSNN"  ; EditN variável; manter teclado no fluxo atual
+FFCV_BTN_CONFIRMAR_REM := "CLASSNN"  ; preferir F8; não mapear campo variável sem nova validação
+FFCV_BTN_NOVA_REM      := "CLASSNN"  ; preferir F6; não mapear campo variável sem nova validação
+FFCV_CAMPO_DATA_REM    := "CLASSNN"  ; EditN variável; manter teclado no fluxo atual
+FFCV_CAMPO_TIPO        := "CLASSNN"  ; EditN variável; manter teclado no fluxo atual
+FFCV_BTN_SALVAR_REM    := "CLASSNN"  ; preferir F10; não mapear campo variável sem nova validação
 FFCV_BTN_ADICIONAR     := "Button10" ; 1 - Inserir Conta
 FFCV_BTN_FINALIZAR     := "Button3"  ; fechar contas sem imprimir faturas
+FFCV_BTN_FINALIZAR_X   := 541        ; Window Spy: client x do Button3
+FFCV_BTN_FINALIZAR_Y   := 242        ; Window Spy: client y do Button3
 FFCV_BTN_ABRIR_DATAS   := "Button6"  ; 5 - Entregar Rem.
 
 ; ── Controles popup de envio de contas ────────────────────────
@@ -76,11 +69,17 @@ DATAS_BTN_VOLTAR       := "Button7"
 XML_CAMPO_REMESSA   := "CLASSNN"  ; pendente Window Spy
 XML_BTN_BUSCAR      := "CLASSNN"  ; preferir F8; pendente Window Spy
 XML_BTN_FATURAMENTO := "Button7"  ; 1 Faturamento
-XML_FORM_CAMPO_PATH := "Edit1"
-XML_FORM_BTN_ENVIAR := "Button4"
-XML_BTN_NAO         := "Button2"
-XML_BTN_SAIR_FORM   := "Button7"
-XML_BTN_SAIR_TELA   := ""         ; pendente
+XML_FORM_CAMPO_PATH   := "Edit1"
+XML_FORM_CAMPO_PATH_X := 267       ; Window Spy: client x dentro do Edit1 do caminho XML
+XML_FORM_CAMPO_PATH_Y := 467       ; Window Spy: client y dentro do Edit1 do caminho XML
+XML_FORM_BTN_SALVAR   := "Button4" ; Salvar_XML / Window Spy: Visualizar XML
+XML_FORM_BTN_SALVAR_X := 623       ; Window Spy: client x do Button4
+XML_FORM_BTN_SALVAR_Y := 471       ; Window Spy: client y do Button4
+XML_BTN_NAO           := "Button2"
+XML_FORM_BTN_VOLTAR   := "Button7" ; Voltar
+XML_FORM_BTN_VOLTAR_X := 731       ; Window Spy: client x do Button7
+XML_FORM_BTN_VOLTAR_Y := 470       ; Window Spy: client y do Button7
+XML_BTN_SAIR_TELA     := ""        ; pendente
 
 ; ── Fragmentos de texto dos erros no popup de envio ───────────
 ERR_JA_DIGITADA        := "já digitada"
@@ -103,9 +102,9 @@ RunRemessaProtocolo(params) {
     if (protocolos.Length = 0)
         return RP_Abort("Informe ao menos um protocolo.")
 
-    protocolContas := Map()
-    erros          := []
-    convenioNum    := ""
+    linhasMovDoc := []
+    erros        := []
+    convenioNum  := ""
 
     Notify("Garantindo MOV DOC...")
     if !MV_EnsureMovDoc()
@@ -118,30 +117,34 @@ RunRemessaProtocolo(params) {
 
     for idx, protocolo in protocolos {
         Notify("Processando protocolo " protocolo " (" idx "/" protocolos.Length ")")
-        result := ProcessarProtocolo(protocolo, convenioNum = "")
+        result := ProcessarProtocolo(protocolo)
 
         if !result["ok"]
             return RP_Abort(result["erro"])
 
-        if (convenioNum = "" && result["convenio"] != "")
-            convenioNum := result["convenio"]
+        for _, linha in result["linhas"]
+            linhasMovDoc.Push(linha)
 
-        protocolContas[protocolo] := result["contas"]
         Progress(5 + (idx / protocolos.Length) * 40)
     }
 
+    convenioNum := RP_ConvenioMajoritario(linhasMovDoc)
     if (convenioNum = "")
-        return RP_Abort("Convênio não identificado. Falta mapear/validar o textfield de convênio.")
+        return RP_Abort("Convênio não identificado no MOV DOC.")
+
+    protocolContas := RP_FiltrarContasPorConvenio(linhasMovDoc, convenioNum, erros)
 
     Notify("Garantindo FFCV...")
     if !MV_EnsureFFCV()
         return RP_Abort("Não foi possível acessar o FFCV.")
 
-    Progress(50)
-    HabilitarEdicaoFFCV()
+    if !RP_AbrirManutencaoRemessaFFCV()
+        return RP_Abort("Não consegui abrir Manutenção de Remessa no FFCV.")
 
-    if !RP_SetControlText(MV_WIN_FFCV, FFCV_CAMPO_CONVENIO, convenioNum, "campo Convênio do FFCV")
-        return false
+    Progress(50)
+
+    if !CarregarConvenioFFCV(convenioNum)
+        return RP_Abort("Não consegui carregar o convênio " convenioNum " no FFCV.")
 
     PosicionarAreaRemessas()
 
@@ -189,86 +192,145 @@ RunRemessaProtocolo(params) {
 ; ════════════════════════════════════════════════════════════════
 
 RP_AbrirTelaBaixaMovDoc() {
+    ; Sempre abre uma nova instância da tela funcional. Não reutilizar Baixa já aberta.
     MV_ActivateModule(MV_WIN_MOVDOC_ANY)
     Sleep MV_DELAY_INPUT
 
-    if !MV_ClickImage(RP_IMG_MENU_MANUTENCAO)
-        return false
-    Sleep 180
+    ; Atalho validado no macro 02: Manutenção → Protocolação → Baixa.
+    Send "{Alt down}"
+    Send "m"
+    Send "p"
+    Send "b"
+    Send "{Alt up}"
 
-    if !MV_ClickImage(RP_IMG_MENU_PROTOCOLACAO)
-        return false
-    Sleep 180
-
-    if !MV_ClickImage(RP_IMG_MENU_BAIXA)
-        return false
-
-    return MV_Poll(() => WinExist(WIN_MOVDOC_BAIXA) || MV_ImageVisible(RP_IMG_TELA_BAIXA), MV_TIMEOUT_LOAD)
+    return MV_Poll(() => WinExist(WIN_MOVDOC_BAIXA), MV_TIMEOUT_LOAD)
 }
 
-ProcessarProtocolo(protocolo, coletarConvenio := true) {
-    if !RP_RequireClientControl(MOVDOC_CAMPO_PROTOCOLO_CLASS, MOVDOC_CAMPO_PROTOCOLO_X, MOVDOC_CAMPO_PROTOCOLO_Y, "campo Protocolo do MOV DOC")
-        return Map("ok", false, "erro", "Falta mapear ClassNN/coordenada do campo Protocolo do MOV DOC.")
-    if coletarConvenio && !RP_RequireClientControl(MOVDOC_CAMPO_CONVENIO_CLASS, MOVDOC_CAMPO_CONVENIO_X, MOVDOC_CAMPO_CONVENIO_Y, "campo Convênio do MOV DOC")
-        return Map("ok", false, "erro", "Falta mapear ClassNN/coordenada do campo Convênio do MOV DOC.")
-    if !RP_RequireClientControl(MOVDOC_CAMPO_CONTA_CLASS, MOVDOC_CAMPO_CONTA_X, MOVDOC_CAMPO_CONTA_Y, "primeiro campo Conta do MOV DOC")
-        return Map("ok", false, "erro", "Falta mapear ClassNN/coordenada do primeiro campo Conta do MOV DOC.")
-
+ProcessarProtocolo(protocolo) {
     WinActivate WIN_MOVDOC_BAIXA
-    if !MV_SetTextControlAt(WIN_MOVDOC_BAIXA, MOVDOC_CAMPO_PROTOCOLO_CLASS, MOVDOC_CAMPO_PROTOCOLO_X, MOVDOC_CAMPO_PROTOCOLO_Y, protocolo)
+    if !MV_SetTextEditAtPoint(WIN_MOVDOC_BAIXA, MOVDOC_PROTOCOLO_X, MOVDOC_PROTOCOLO_Y, protocolo)
         return Map("ok", false, "erro", "Não consegui focar/preencher o campo Protocolo.")
 
     Sleep MV_DELAY_INPUT
     Send "{F8}"
     RP_WaitLoadingAfterF8()
 
-    convenio := ""
-    if coletarConvenio
-        convenio := MV_ReadTextControlAt(WIN_MOVDOC_BAIXA, MOVDOC_CAMPO_CONVENIO_CLASS, MOVDOC_CAMPO_CONVENIO_X, MOVDOC_CAMPO_CONVENIO_Y)
-
-    contas := RP_ColetarContasPorClipboard()
-    if (contas.Length = 0)
-        return Map("ok", false, "erro", "Nenhuma conta foi coletada para o protocolo " protocolo ".")
+    linhas := RP_ColetarLinhasMovDoc(protocolo)
+    if (linhas.Length = 0)
+        return Map("ok", false, "erro", "Nenhuma conta/convênio foi coletado para o protocolo " protocolo ".")
 
     if !RP_FinalizarBaixaProtocolo()
         return Map("ok", false, "erro", "Falha ao salvar/baixar o protocolo " protocolo ".")
 
-    return Map("ok", true, "contas", contas, "convenio", convenio)
+    return Map("ok", true, "linhas", linhas)
 }
 
-RP_ColetarContasPorClipboard() {
-    contas := []
+RP_ColetarLinhasMovDoc(protocolo) {
+    linhas := []
+    vistos := Map()
 
-    Loop {
-        A_Clipboard := ""
-        if !MV_DoubleClickControlAt(WIN_MOVDOC_BAIXA, MOVDOC_CAMPO_CONTA_CLASS, MOVDOC_CAMPO_CONTA_X, MOVDOC_CAMPO_CONTA_Y)
+    RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos)
+
+    Loop 80 {
+        result := RP_AvancarGridMovDocQuatroLinhas()
+        added := RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos)
+
+        if result["popup"]
             break
-        Sleep MV_DELAY_INPUT
-        Send "^c"
-        MV_Poll(() => A_Clipboard != "" || RP_MovDocPopupVisible(), 3)
-
-        if RP_MovDocPopupVisible()
-            break
-
-        numConta := Trim(A_Clipboard)
-        if (numConta != "")
-            contas.Push(Map("conta", numConta))
-
-        Send "{Down}"
-        Sleep MV_DELAY_INPUT
-
-        if MV_Poll(() => RP_MovDocPopupVisible(), 0.25)
+        if (added = 0)
             break
     }
 
-    if RP_MovDocPopupVisible()
-        RP_DismissMovDocPopup()
+    return linhas
+}
 
-    return contas
+RP_AvancarGridMovDocQuatroLinhas() {
+    Loop 4 {
+        Send "{Down}"
+        Sleep MV_DELAY_INPUT
+
+        if MV_Poll(() => RP_MovDocPopupWindowVisible(), 0.25) {
+            RP_DismissMovDocPopup()
+            return Map("popup", true)
+        }
+    }
+
+    return Map("popup", false)
+}
+
+RP_ColetarLinhasVisiveisMovDoc(protocolo, linhas, vistos) {
+    added := 0
+
+    for _, rowY in MOVDOC_GRID_ROWS_Y {
+        conta := MV_ReadEditAtPoint(WIN_MOVDOC_BAIXA, MOVDOC_CONTA_X, rowY, "^\d+$")
+        convenio := MV_ReadEditAtPoint(WIN_MOVDOC_BAIXA, MOVDOC_CONVENIO_X, rowY, "^\d+$")
+
+        if (conta = "" || convenio = "")
+            continue
+
+        key := protocolo "|" conta "|" convenio
+        if vistos.Has(key)
+            continue
+
+        vistos[key] := true
+        linhas.Push(Map("protocolo", protocolo, "conta", conta, "convenio", convenio))
+        added++
+    }
+
+    return added
+}
+
+RP_ConvenioMajoritario(linhas) {
+    counts := Map()
+    ordem := []
+
+    for _, linha in linhas {
+        convenio := linha["convenio"]
+        if !counts.Has(convenio) {
+            counts[convenio] := 0
+            ordem.Push(convenio)
+        }
+        counts[convenio] += 1
+    }
+
+    escolhido := ""
+    maior := 0
+    for _, convenio in ordem {
+        if (counts[convenio] > maior) {
+            maior := counts[convenio]
+            escolhido := convenio
+        }
+    }
+    return escolhido
+}
+
+RP_FiltrarContasPorConvenio(linhas, convenioEscolhido, erros) {
+    protocolContas := Map()
+
+    for _, linha in linhas {
+        protocolo := linha["protocolo"]
+        conta := linha["conta"]
+        convenio := linha["convenio"]
+
+        if (convenio != convenioEscolhido) {
+            erros.Push(Map("protocolo", protocolo, "conta", conta, "descricao", "Convênio diferente: " convenio))
+            continue
+        }
+
+        if !protocolContas.Has(protocolo)
+            protocolContas[protocolo] := []
+        protocolContas[protocolo].Push(Map("conta", conta, "convenio", convenio))
+    }
+
+    return protocolContas
 }
 
 RP_MovDocPopupVisible() {
-    return WinExist(WIN_MOVDOC_POPUP) || MV_ImageVisible(RP_IMG_ERRO_ICONE)
+    return WinExist(WIN_MOVDOC_POPUP)
+}
+
+RP_MovDocPopupWindowVisible() {
+    return WinExist(WIN_MOVDOC_POPUP)
 }
 
 RP_DismissMovDocPopup() {
@@ -276,28 +338,33 @@ RP_DismissMovDocPopup() {
         if WinExist(WIN_MOVDOC_POPUP) {
             WinActivate WIN_MOVDOC_POPUP
             Sleep MV_DELAY_INPUT
-            ControlClick "Button1", WIN_MOVDOC_POPUP,,,, "NA"
-            MV_Poll(() => !WinExist(WIN_MOVDOC_POPUP), MV_TIMEOUT_ACOE)
-            return true
+            if !MV_ClickFirstControl(WIN_MOVDOC_POPUP, MV_MODAL_OK_CLASS)
+                return false
+            return MV_Poll(() => !WinExist(WIN_MOVDOC_POPUP), MV_TIMEOUT_ACOE)
         }
     }
-    Send "{Enter}"
-    Sleep MV_DELAY_INPUT
-    return true
+    return false
 }
 
 RP_FinalizarBaixaProtocolo() {
-    ; Checkbox Recebido: se a imagem de checkado já existe, double-click; se não, click simples.
-    checked := MV_ImageVisible(RP_IMG_RECEBIMENTO_CHECKADO)
-    if checked
-        MV_DoubleClickControlAt(WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS, MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y)
-    else
-        MV_ClickControlAt(WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS, MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y)
+    ; Checkbox Recebido: estado vem do controle Button1.
+    ; Regra validada pelo usuário: 0 → click simples; 1 → double click.
+    checked := MV_ControlCheckedAt(WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS, MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y)
+
+    if (checked = 0) {
+        if !MV_ClickControlAt(WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS, MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y)
+            return false
+    } else if (checked = 1) {
+        if !MV_DoubleClickControlAt(WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS, MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y)
+            return false
+    } else {
+        return false
+    }
 
     Sleep MV_DELAY_INPUT
 
     ; Volta para o campo inicial do protocolo, salva com F10, espera loading e prepara nova consulta com F7.
-    if !MV_FocusControlAt(WIN_MOVDOC_BAIXA, MOVDOC_CAMPO_PROTOCOLO_CLASS, MOVDOC_CAMPO_PROTOCOLO_X, MOVDOC_CAMPO_PROTOCOLO_Y)
+    if !MV_FocusEditAtPoint(WIN_MOVDOC_BAIXA, MOVDOC_PROTOCOLO_X, MOVDOC_PROTOCOLO_Y)
         return false
 
     Sleep MV_DELAY_INPUT
@@ -310,36 +377,56 @@ RP_FinalizarBaixaProtocolo() {
 
 RP_WaitLoadingAfterF8() {
     ; O MV não expõe loading confiável ainda; esta espera curta é só estabilização pós-F8.
-    MV_Poll(() => WinExist(WIN_MOVDOC_BAIXA) || MV_ImageVisible(RP_IMG_TELA_BAIXA), MV_TIMEOUT_LOAD)
+    MV_Poll(() => WinExist(WIN_MOVDOC_BAIXA), MV_TIMEOUT_LOAD)
     Sleep 250
 }
 
 RP_WaitLoadingAfterSave() {
     Sleep 400
-    MV_Poll(() => WinExist(WIN_MOVDOC_BAIXA) || MV_ImageVisible(RP_IMG_TELA_BAIXA), MV_TIMEOUT_LOAD)
+    MV_Poll(() => WinExist(WIN_MOVDOC_BAIXA), MV_TIMEOUT_LOAD)
 }
 
 ; ════════════════════════════════════════════════════════════════
 ;  FASE FFCV
 ; ════════════════════════════════════════════════════════════════
 
-HabilitarEdicaoFFCV() {
+RP_AbrirManutencaoRemessaFFCV() {
+    ; Sempre abre uma nova instância da tela funcional. Não reutilizar Manutenção já aberta.
+    MV_ActivateModule(MV_WIN_FFCV_ANY)
+    Sleep MV_DELAY_INPUT
+
+    ; Atalho validado no macro 03: Lançamentos → Manutenção de Remessa.
+    Send "{Alt down}"
+    Send "l"
+    Send "m"
+    Send "{Alt up}"
+    Send "{Enter}"
+
+    return MV_Poll(() => WinExist(MV_WIN_FFCV_REMESSA), MV_TIMEOUT_LOAD)
+}
+
+CarregarConvenioFFCV(convenioNum) {
+    MV_ActivateModule(MV_WIN_FFCV_ANY)
     Send "{F7}"
     Sleep MV_DELAY_INPUT
+    SendText convenioNum
+    Sleep MV_DELAY_INPUT
+    Send "{F8}"
+    return RP_WaitFFCVLoad()
 }
 
 PosicionarAreaRemessas() {
-    Send "{Tab}{Tab}{Tab}"
+    Send "{Tab 3}"
     Sleep MV_DELAY_INPUT
 }
 
 SelecionarRemessaExistente(numRemessa) {
     Send "{F7}"
     Sleep MV_DELAY_INPUT
-    if !RP_SetControlText(MV_WIN_FFCV, FFCV_CAMPO_NUM_REM, numRemessa, "campo Número da Remessa")
-        return false
+    SendText numRemessa
+    Sleep MV_DELAY_INPUT
     Send "{F8}"
-    return MV_Poll(() => WinExist(MV_WIN_FFCV), MV_TIMEOUT_LOAD)
+    return RP_WaitFFCVLoad()
 }
 
 CriarNovaRemessa(tipoConta) {
@@ -347,27 +434,21 @@ CriarNovaRemessa(tipoConta) {
     Sleep MV_DELAY_INPUT
 
     hoje := FormatTime(, "dd/MM/yyyy")
-    if !RP_SetControlText(MV_WIN_FFCV, FFCV_CAMPO_DATA_REM, hoje, "campo Data da Remessa")
-        return false
-
-    Send "{Enter}{Enter}{Enter}"
+    SendText hoje
     Sleep MV_DELAY_INPUT
-
-    if !RP_SetControlText(MV_WIN_FFCV, FFCV_CAMPO_TIPO, TIPO_CODIGO[tipoConta], "campo Tipo da Remessa")
-        return false
-
+    Send "{Tab 3}"
+    Sleep MV_DELAY_INPUT
+    SendText TIPO_CODIGO[tipoConta]
+    Sleep MV_DELAY_INPUT
     Send "{F10}"
-    return MV_Poll(() => WinExist(MV_WIN_FFCV), MV_TIMEOUT_LOAD)
+    return RP_WaitFFCVLoad()
 }
 
 InserirContasNaRemessa(protocolContas, tipoConta, erros) {
-    global gRunning
+    Send "!1"
+    if !RP_WaitAnyModalOrDelay(5)
+        Sleep 300
 
-    ControlClick FFCV_BTN_ADICIONAR, MV_WIN_FFCV,,,, "NA"
-    if !MV_Poll(() => WinExist(WIN_FFCV_POPUP), MV_TIMEOUT_ACOE)
-        return RP_Abort("Popup de envio de contas não abriu.")
-
-    WinActivate WIN_FFCV_POPUP
     ConfigurarDropdownsPopup(tipoConta)
 
     totalContas := ContarContas(protocolContas)
@@ -378,14 +459,14 @@ InserirContasNaRemessa(protocolContas, tipoConta, erros) {
             contaIdx++
             numConta := contaObj["conta"]
             Notify("Enviando conta " numConta " [prot. " protocolo "]")
-            erro := EnviarConta(numConta)
 
+            erro := EnviarConta(numConta)
             if (erro != "") {
-                if InStr(erro, ERR_JA_DIGITADA) {
-                    ControlClick POPUP_BTN_OK, WIN_FFCV_POPUP,,,, "NA"
+                if InStr(StrLower(erro), StrLower(ERR_JA_DIGITADA)) {
+                    RP_DismissActiveModal()
                 } else {
                     erros.Push(Map("protocolo", protocolo, "conta", numConta, "descricao", ClassificarErro(erro)))
-                    DismissErroPopup()
+                    RP_DismissActiveModal()
                 }
             }
 
@@ -393,41 +474,92 @@ InserirContasNaRemessa(protocolContas, tipoConta, erros) {
         }
     }
 
-    WinClose WIN_FFCV_POPUP
-    MV_Poll(() => !WinExist(WIN_FFCV_POPUP), MV_TIMEOUT_ACOE)
+    Send "!2"
+    Sleep MV_DELAY_INPUT
     return true
 }
 
 ConfigurarDropdownsPopup(tipoConta) {
-    ControlChooseIndex 2, POPUP_DROPDOWN_1, WIN_FFCV_POPUP
+    ; Foco inicial do popup nem sempre é confiável. A regra validada pelo usuário:
+    ; Tab x3 → dropdown 1 → Down x2 → Tab → dropdown 2 → se Emergência/Ambulatório Up x2 → Tab.
+    Sleep 250
+    Send "{Tab 3}"
     Sleep MV_DELAY_INPUT
-    opcaoDrop2 := (tipoConta = "Internamento") ? 1 : 2
-    ControlChooseIndex opcaoDrop2, POPUP_DROPDOWN_2, WIN_FFCV_POPUP
+    Send "{Down 2}"
+    Sleep MV_DELAY_INPUT
+    Send "{Tab}"
+    Sleep MV_DELAY_INPUT
+
+    if (tipoConta != "Internamento") {
+        Send "{Up 2}"
+        Sleep MV_DELAY_INPUT
+    }
+
+    Send "{Tab}"
     Sleep MV_DELAY_INPUT
 }
 
 EnviarConta(numConta) {
-    ControlSetText numConta, POPUP_CAMPO_CONTA, WIN_FFCV_POPUP
+    SendText numConta
     Sleep MV_DELAY_INPUT
-    ControlSend "{Enter}", POPUP_CAMPO_CONTA, WIN_FFCV_POPUP
+    Send "{Enter}"
 
-    popupErro := MV_WaitAnyWindow(["TÍTULO POPUP ERRO CONTA", "Atenção", "Aviso"], MV_TIMEOUT_ACOE)
+    popupErro := RP_WaitErrorModalAfterConta(1.5)
     return (popupErro != "") ? WinGetText(popupErro) : ""
 }
 
+RP_WaitErrorModalAfterConta(timeoutSecs) {
+    deadline := A_TickCount + timeoutSecs * 1000
+    Loop {
+        popup := RP_ActiveModalTitle()
+        if (popup != "")
+            return popup
+        if (A_TickCount > deadline)
+            return ""
+        Sleep MV_POLL_MS
+    }
+}
+
+RP_ActiveModalTitle() {
+    if WinExist("ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE")
+        return "ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+    return ""
+}
+
+RP_DismissActiveModal() {
+    try {
+        popup := RP_ActiveModalTitle()
+        if (popup != "") {
+            WinActivate popup
+            Sleep MV_DELAY_INPUT
+            Send "{Enter}"
+            MV_Poll(() => !WinExist(popup), MV_TIMEOUT_ACOE)
+            return true
+        }
+    }
+    Send "{Enter}"
+    Sleep MV_DELAY_INPUT
+    return true
+}
+
 ClassificarErro(textoPopup) {
-    if InStr(textoPopup, ERR_CONVENIO_DIFERENTE)
-        return "Convênio diferente"
-    if InStr(textoPopup, ERR_CONTA_ABERTA)
+    lower := StrLower(textoPopup)
+    if InStr(lower, StrLower(ERR_CONVENIO_DIFERENTE))
+        return "Conta de outro convênio"
+    if InStr(lower, StrLower(ERR_CONTA_ABERTA))
         return "Conta aberta"
-    if InStr(textoPopup, ERR_TIPO_DIFERENTE)
-        return "Tipo de conta diferente"
+    if InStr(lower, StrLower(ERR_TIPO_DIFERENTE))
+        return "Conta de outro tipo"
     return Trim(textoPopup)
 }
 
-DismissErroPopup() {
-    try ControlClick "Button1",,,,, "NA"
-    Sleep MV_DELAY_INPUT
+RP_WaitFFCVLoad() {
+    Sleep 300
+    return MV_Poll(() => WinExist(MV_WIN_FFCV_ANY), MV_TIMEOUT_LOAD)
+}
+
+RP_WaitAnyModalOrDelay(timeoutSecs) {
+    return MV_Poll(() => WinExist("ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"), timeoutSecs)
 }
 
 ; ════════════════════════════════════════════════════════════════
@@ -435,62 +567,66 @@ DismissErroPopup() {
 ; ════════════════════════════════════════════════════════════════
 
 FinalizarSemDatas() {
-    ControlClick FFCV_BTN_FINALIZAR, MV_WIN_FFCV,,,, "NA"
-    if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_ACOE)
+    Send "!6"
+    if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
         return
-    ControlSend "{Enter}",, WIN_CAPA_REMESSA
+    Send "{Enter}"
     MV_Poll(() => !WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
 }
 
 FinalizarComDatas(dataEntrega, dataVenc) {
-    ControlClick FFCV_BTN_ABRIR_DATAS, MV_WIN_FFCV,,,, "NA"
+    Send "!5"
     if !MV_Poll(() => WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_LOAD)
-        return Map("ok", false, "erro", "Tela de datas não abriu.")
+        return Map("ok", false, "erro", "Tela de fechar remessa/datas não abriu.")
 
-    WinActivate WIN_FFCV_DATAS
+    Sleep MV_DELAY_INPUT
+    Send "+{Tab}"
+    Sleep MV_DELAY_INPUT
+    numRemessa := RP_CopyFocusedText()
+
+    Send "{Tab}"
+    Sleep MV_DELAY_INPUT
+    SendText dataEntrega
+    Sleep MV_DELAY_INPUT
+    Send "{Enter}"
+    Sleep MV_DELAY_INPUT
+    SendText dataVenc
     Sleep MV_DELAY_INPUT
 
-    numRemessa := ControlGetText(DATAS_CAMPO_REMESSA, WIN_FFCV_DATAS)
-    ControlSetText dataEntrega, DATAS_CAMPO_ENTREGA, WIN_FFCV_DATAS
-    Sleep MV_DELAY_INPUT
-    ControlSetText dataVenc, DATAS_CAMPO_VENCIMENTO, WIN_FFCV_DATAS
+    if !MV_ClickControlAt(WIN_FFCV_DATAS, FFCV_BTN_FINALIZAR, FFCV_BTN_FINALIZAR_X, FFCV_BTN_FINALIZAR_Y)
+        Send "{Tab}"
     Sleep MV_DELAY_INPUT
 
-    ControlClick DATAS_CHECKBOX, WIN_FFCV_DATAS,,,, "NA"
-    Sleep MV_DELAY_INPUT
-    ControlClick DATAS_BTN_CONFIRMAR, WIN_FFCV_DATAS,,,, "NA"
-
-    if !MV_Poll(() => WinExist(WIN_FFCV_DATAS_OK), MV_TIMEOUT_ACOE)
+    Send "!1"
+    if !RP_WaitAnyModalOrDelay(MV_TIMEOUT_ACOE)
         return Map("ok", false, "erro", "Popup de confirmação não apareceu.")
-
-    ControlSend "{Enter}",, WIN_FFCV_DATAS_OK
-    MV_Poll(() => !WinExist(WIN_FFCV_DATAS_OK), MV_TIMEOUT_ACOE)
+    if !RP_ClickNaoModal()
+        return Map("ok", false, "erro", "Não consegui clicar Não no popup de confirmação.")
 
     if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
-        return Map("ok", false, "erro", "Popup de impressão não apareceu.")
+        return Map("ok", false, "erro", "Tela de impressão não apareceu.")
 
-    ControlSend "{Enter}",, WIN_CAPA_REMESSA
+    Send "{Enter}"
     MV_Poll(() => !WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
 
-    ControlClick DATAS_BTN_VOLTAR, WIN_FFCV_DATAS,,,, "NA"
-    MV_Poll(() => !WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_LOAD)
-
+    RP_SairTelaAtual()
     return Map("ok", true, "remessa", Trim(numRemessa))
 }
 
 GerarXML(numRemessa) {
     global gWorkDir
 
-    if !MV_Poll(() => WinExist(WIN_XML), MV_TIMEOUT_LOAD)
-        return Notify("Erro: tela de XML não encontrada.")
+    if !RP_AbrirTelaTISS()
+        return Notify("Erro: tela XML/TISS não abriu.")
 
-    WinActivate WIN_XML
+    Send "{Tab 5}"
     Sleep MV_DELAY_INPUT
-    ControlSetText numRemessa, XML_CAMPO_REMESSA, WIN_XML
+    SendText numRemessa
     Sleep MV_DELAY_INPUT
-    ControlSend "{F8}", XML_CAMPO_REMESSA, WIN_XML
+    Send "{F8}"
+    RP_WaitFFCVLoad()
 
-    ControlClick XML_BTN_FATURAMENTO, WIN_XML,,,, "NA"
+    Send "!1"
     if !MV_Poll(() => WinExist(WIN_XML_PATH_FORM), MV_TIMEOUT_LOAD)
         return Notify("Erro: tela de XML gerado não abriu.")
 
@@ -499,18 +635,66 @@ GerarXML(numRemessa) {
         DirCreate xmlDir
 
     xmlPath := xmlDir "\" numRemessa ".xml"
-    ControlSetText xmlPath, XML_FORM_CAMPO_PATH, WIN_XML_PATH_FORM
+
+    if !MV_FocusControlAt(WIN_XML_PATH_FORM, XML_FORM_CAMPO_PATH, XML_FORM_CAMPO_PATH_X, XML_FORM_CAMPO_PATH_Y)
+        return RP_Abort("Não consegui focar o campo de caminho do XML.")
     Sleep MV_DELAY_INPUT
-    ControlClick XML_FORM_BTN_ENVIAR, WIN_XML_PATH_FORM,,,, "NA"
+    Send "^a"
+    Sleep MV_DELAY_INPUT
+    SendText xmlPath
+    Sleep MV_DELAY_INPUT
 
-    popup := MV_WaitAnyWindow([WIN_XML_POPUP_SIMNAO], MV_TIMEOUT_ACOE)
-    if (popup != "") {
-        ControlClick XML_BTN_NAO, popup,,,, "NA"
-        MV_Poll(() => !WinExist(popup), MV_TIMEOUT_ACOE)
-    }
+    if !MV_ClickControlAt(WIN_XML_PATH_FORM, XML_FORM_BTN_SALVAR, XML_FORM_BTN_SALVAR_X, XML_FORM_BTN_SALVAR_Y)
+        return RP_Abort("Não consegui acionar o botão Salvar_XML.")
 
-    ControlClick XML_BTN_SAIR_FORM, WIN_XML_PATH_FORM,,,, "NA"
-    MV_Poll(() => !WinExist(WIN_XML_PATH_FORM), MV_TIMEOUT_LOAD)
+    if !RP_WaitAnyModalOrDelay(MV_TIMEOUT_ACOE)
+        return RP_Abort("Popup de confirmação do XML não apareceu.")
+    if !RP_ClickNaoModal()
+        return RP_Abort("Não consegui clicar Não no popup de confirmação do XML.")
+    MV_Poll(() => !WinExist("ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"), MV_TIMEOUT_ACOE)
+
+    if !MV_ClickControlAt(WIN_XML_PATH_FORM, XML_FORM_BTN_VOLTAR, XML_FORM_BTN_VOLTAR_X, XML_FORM_BTN_VOLTAR_Y)
+        return RP_Abort("Não consegui voltar da tela de XML gerado.")
+    Sleep 500
+
+    RP_SairTelaAtual()
+}
+
+RP_AbrirTelaTISS() {
+    ; Sempre abre uma nova instância da tela funcional. Não reutilizar TISS já aberta.
+    MV_ActivateModule(MV_WIN_FFCV_ANY)
+    Sleep MV_DELAY_INPUT
+
+    ; Atalho esperado: Lançamentos → Monitoração de Faturamento - TISS.
+    Send "{Alt down}"
+    Send "l"
+    Send "t"
+    Send "{Alt up}"
+    Send "{Enter}"
+
+    return MV_Poll(() => WinExist(WIN_XML), MV_TIMEOUT_LOAD)
+}
+
+RP_CopyFocusedText() {
+    A_Clipboard := ""
+    Send "^c"
+    MV_Poll(() => A_Clipboard != "", 3)
+    return Trim(A_Clipboard)
+}
+
+RP_ClickNaoModal() {
+    if WinExist(WIN_XML_POPUP_SIMNAO)
+        return MV_ClickFirstControl(WIN_XML_POPUP_SIMNAO, XML_BTN_NAO)
+    popup := RP_ActiveModalTitle()
+    if (popup != "")
+        return MV_ClickFirstControl(popup, XML_BTN_NAO)
+    return false
+}
+
+RP_SairTelaAtual() {
+    Send "{Esc}"
+    Sleep MV_DELAY_INPUT
+    return true
 }
 
 ; ════════════════════════════════════════════════════════════════
