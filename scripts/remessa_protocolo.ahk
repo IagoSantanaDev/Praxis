@@ -8,7 +8,8 @@
 ; ── Janelas ───────────────────────────────────────────────────
 WIN_MOVDOC_BAIXA       := MV_WIN_MOVDOC_BAIXA
 WIN_MOVDOC_POPUP       := "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
-WIN_FFCV_POPUP         := "TÍTULO POPUP ENVIO DE CONTA"    ; pendente Window Spy
+; O popup "Informações da Conta" é embarcado na janela FFCV: o título não muda.
+; Detectá-lo por controle sentinela dentro de MV_WIN_FFCV_ANY, não por WinTitle próprio.
 WIN_FFCV_DATAS         := "Cadastro: Faturas e Remessas"
 WIN_FFCV_DATAS_OK      := "Mensagem ao Usuário do MV 2000"
 WIN_CAPA_REMESSA       := "Relatório de Atendimentos da Remessa"
@@ -46,29 +47,53 @@ FFCV_CAMPO_DATA_REM    := "CLASSNN"  ; EditN variável; manter teclado no fluxo 
 FFCV_CAMPO_TIPO        := "CLASSNN"  ; EditN variável; manter teclado no fluxo atual
 FFCV_BTN_SALVAR_REM    := "CLASSNN"  ; preferir F10; não mapear campo variável sem nova validação
 FFCV_BTN_ADICIONAR     := "Button10" ; 1 - Inserir Conta
-FFCV_BTN_FINALIZAR     := "Button3"  ; fechar contas sem imprimir faturas
-FFCV_BTN_FINALIZAR_X   := 541        ; Window Spy: client x do Button3
-FFCV_BTN_FINALIZAR_Y   := 242        ; Window Spy: client y do Button3
 FFCV_BTN_ABRIR_DATAS   := "Button6"  ; 5 - Entregar Rem.
 
 ; ── Controles popup de envio de contas ────────────────────────
-POPUP_DROPDOWN_1   := "CLASSNN"  ; pendente Window Spy
-POPUP_DROPDOWN_2   := "CLASSNN"  ; pendente Window Spy
-POPUP_CAMPO_CONTA  := "CLASSNN"  ; pendente Window Spy
-POPUP_BTN_OK       := "CLASSNN"  ; pendente botão OK do popup de conta já digitada
+; Validado por captura do usuário: "Informações da Conta" não abre WinTitle próprio;
+; o sentinela é o painel desenhado ui60Drawn W323 dentro da janela principal FFCV.
+FFCV_POPUP_CONTA_SENTINEL_CLASS := "ui60Drawn W323"
+FFCV_POPUP_CONTA_SENTINEL_X     := 432
+FFCV_POPUP_CONTA_SENTINEL_Y     := 109
+POPUP_DROPDOWN_1   := "ComboBox2"
+POPUP_DROPDOWN_1_X := 84
+POPUP_DROPDOWN_1_Y := 143
+POPUP_DROPDOWN_2   := "ComboBox1"
+POPUP_DROPDOWN_2_X := 190
+POPUP_DROPDOWN_2_Y := 143
+POPUP_CAMPO_CONTA  := "Edit2"
+POPUP_CAMPO_CONTA_X := 298
+POPUP_CAMPO_CONTA_Y := 143
+POPUP_BTN_OK       := "Button1"  ; modal de aviso/erro usa o primeiro Button1
 
 ; ── Controles tela de datas ───────────────────────────────────
-DATAS_CAMPO_REMESSA    := "Edit1"    ; pendente confirmar
-DATAS_CAMPO_ENTREGA    := "CLASSNN"  ; pendente Window Spy
-DATAS_CAMPO_VENCIMENTO := "CLASSNN"  ; pendente Window Spy
+; Spy em Fluxos/Fluxo_FecharRemessa: tela "Cadastro: Faturas e Remessas".
+DATAS_CAMPO_REMESSA    := "Edit5"
+DATAS_CAMPO_REMESSA_X  := 59
+DATAS_CAMPO_REMESSA_Y  := 101
+DATAS_CAMPO_ENTREGA    := "Edit1"
+DATAS_CAMPO_ENTREGA_X  := 146
+DATAS_CAMPO_ENTREGA_Y  := 101
+DATAS_CAMPO_VENCIMENTO := "Edit1"
+DATAS_CAMPO_VENCIMENTO_X := 244
+DATAS_CAMPO_VENCIMENTO_Y := 227
 DATAS_CHECKBOX         := "Button3"
+DATAS_CHECKBOX_X       := 541
+DATAS_CHECKBOX_Y       := 242
 DATAS_BTN_CONFIRMAR    := "Button10"
+DATAS_BTN_CONFIRMAR_X  := 30
+DATAS_BTN_CONFIRMAR_Y  := 426
 DATAS_BTN_VOLTAR       := "Button7"
 
 ; ── Controles tela XML ────────────────────────────────────────
-XML_CAMPO_REMESSA   := "CLASSNN"  ; pendente Window Spy
-XML_BTN_BUSCAR      := "CLASSNN"  ; preferir F8; pendente Window Spy
+; Spy em Fluxos/Fluxo_XML: tela "Monitoração de Faturamento - TISS".
+XML_CAMPO_REMESSA   := "Edit1"
+XML_CAMPO_REMESSA_X := 272
+XML_CAMPO_REMESSA_Y := 89
+XML_BTN_BUSCAR      := ""        ; consulta continua por F8
 XML_BTN_FATURAMENTO := "Button7"  ; 1 Faturamento
+XML_BTN_FATURAMENTO_X := 12
+XML_BTN_FATURAMENTO_Y := 446
 XML_FORM_CAMPO_PATH   := "Edit1"
 XML_FORM_CAMPO_PATH_X := 267       ; Window Spy: client x dentro do Edit1 do caminho XML
 XML_FORM_CAMPO_PATH_Y := 467       ; Window Spy: client y dentro do Edit1 do caminho XML
@@ -446,8 +471,8 @@ CriarNovaRemessa(tipoConta) {
 
 InserirContasNaRemessa(protocolContas, tipoConta, erros) {
     Send "!1"
-    if !RP_WaitAnyModalOrDelay(5)
-        Sleep 300
+    if !RP_WaitContaPopupAfterOpen(5)
+        return RP_Abort("Popup Informações da Conta não apareceu após Alt+1. Ele deve ser detectado pelo controle " FFCV_POPUP_CONTA_SENTINEL_CLASS " dentro da janela FFCV.")
 
     ConfigurarDropdownsPopup(tipoConta)
 
@@ -477,6 +502,16 @@ InserirContasNaRemessa(protocolContas, tipoConta, erros) {
     Send "!2"
     Sleep MV_DELAY_INPUT
     return true
+}
+
+RP_WaitContaPopupAfterOpen(timeoutSecs := 5) {
+    return MV_Poll(() => RP_FFCVContaPopupVisible(), timeoutSecs)
+}
+
+RP_FFCVContaPopupVisible() {
+    sentinel := MV_FindControlByClientPoint(MV_WIN_FFCV_ANY, FFCV_POPUP_CONTA_SENTINEL_CLASS, FFCV_POPUP_CONTA_SENTINEL_X, FFCV_POPUP_CONTA_SENTINEL_Y, 20) != 0
+    campoConta := MV_FindControlByClientPoint(MV_WIN_FFCV_ANY, POPUP_CAMPO_CONTA, POPUP_CAMPO_CONTA_X, POPUP_CAMPO_CONTA_Y, 20) != 0
+    return sentinel && campoConta
 }
 
 ConfigurarDropdownsPopup(tipoConta) {
@@ -532,14 +567,13 @@ RP_DismissActiveModal() {
         if (popup != "") {
             WinActivate popup
             Sleep MV_DELAY_INPUT
-            Send "{Enter}"
-            MV_Poll(() => !WinExist(popup), MV_TIMEOUT_ACOE)
-            return true
+            if MV_ClickFirstControl(popup, MV_MODAL_OK_CLASS) {
+                MV_Poll(() => !WinExist(popup), MV_TIMEOUT_ACOE)
+                return true
+            }
         }
     }
-    Send "{Enter}"
-    Sleep MV_DELAY_INPUT
-    return true
+    return false
 }
 
 ClassificarErro(textoPopup) {
@@ -580,24 +614,29 @@ FinalizarComDatas(dataEntrega, dataVenc) {
         return Map("ok", false, "erro", "Tela de fechar remessa/datas não abriu.")
 
     Sleep MV_DELAY_INPUT
-    Send "+{Tab}"
-    Sleep MV_DELAY_INPUT
-    numRemessa := RP_CopyFocusedText()
+    numRemessa := MV_ReadEditAtPoint(WIN_FFCV_DATAS, DATAS_CAMPO_REMESSA_X, DATAS_CAMPO_REMESSA_Y, "^\d+$")
+    if (numRemessa = "")
+        return Map("ok", false, "erro", "Não consegui ler o número da remessa na tela de datas.")
 
-    Send "{Tab}"
-    Sleep MV_DELAY_INPUT
-    SendText dataEntrega
-    Sleep MV_DELAY_INPUT
-    Send "{Enter}"
-    Sleep MV_DELAY_INPUT
-    SendText dataVenc
+    if !MV_SetTextEditAtPoint(WIN_FFCV_DATAS, DATAS_CAMPO_ENTREGA_X, DATAS_CAMPO_ENTREGA_Y, dataEntrega)
+        return Map("ok", false, "erro", "Não consegui preencher a data de entrega.")
     Sleep MV_DELAY_INPUT
 
-    if !MV_ClickControlAt(WIN_FFCV_DATAS, FFCV_BTN_FINALIZAR, FFCV_BTN_FINALIZAR_X, FFCV_BTN_FINALIZAR_Y)
-        Send "{Tab}"
+    if !MV_SetTextEditAtPoint(WIN_FFCV_DATAS, DATAS_CAMPO_VENCIMENTO_X, DATAS_CAMPO_VENCIMENTO_Y, dataVenc)
+        return Map("ok", false, "erro", "Não consegui preencher a data prevista para pagamento.")
     Sleep MV_DELAY_INPUT
 
-    Send "!1"
+    checkedFecharContas := MV_ControlCheckedAt(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y)
+    if (checkedFecharContas = 0) {
+        if !MV_ClickControlAt(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y)
+            return Map("ok", false, "erro", "Não consegui marcar 'Fechar contas sem imprimir faturas'.")
+    } else if (checkedFecharContas = "") {
+        return Map("ok", false, "erro", "Não consegui ler o estado de 'Fechar contas sem imprimir faturas'.")
+    }
+    Sleep MV_DELAY_INPUT
+
+    if !MV_ClickControlAt(WIN_FFCV_DATAS, DATAS_BTN_CONFIRMAR, DATAS_BTN_CONFIRMAR_X, DATAS_BTN_CONFIRMAR_Y)
+        return Map("ok", false, "erro", "Não consegui confirmar a entrega da remessa.")
     if !RP_WaitAnyModalOrDelay(MV_TIMEOUT_ACOE)
         return Map("ok", false, "erro", "Popup de confirmação não apareceu.")
     if !RP_ClickNaoModal()
@@ -619,14 +658,14 @@ GerarXML(numRemessa) {
     if !RP_AbrirTelaTISS()
         return Notify("Erro: tela XML/TISS não abriu.")
 
-    Send "{Tab 5}"
-    Sleep MV_DELAY_INPUT
-    SendText numRemessa
+    if !MV_SetTextEditAtPoint(WIN_XML, XML_CAMPO_REMESSA_X, XML_CAMPO_REMESSA_Y, numRemessa)
+        return RP_Abort("Não consegui preencher a remessa na tela XML/TISS.")
     Sleep MV_DELAY_INPUT
     Send "{F8}"
     RP_WaitFFCVLoad()
 
-    Send "!1"
+    if !MV_ClickControlAt(WIN_XML, XML_BTN_FATURAMENTO, XML_BTN_FATURAMENTO_X, XML_BTN_FATURAMENTO_Y)
+        return RP_Abort("Não consegui acionar o botão Faturamento na tela XML/TISS.")
     if !MV_Poll(() => WinExist(WIN_XML_PATH_FORM), MV_TIMEOUT_LOAD)
         return Notify("Erro: tela de XML gerado não abriu.")
 
