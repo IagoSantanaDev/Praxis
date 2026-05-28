@@ -14,13 +14,16 @@ Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão
 | Interface UI | WebView2 (Chromium) + HTML/CSS/JS puro |
 | Comunicação JS↔AHK | `PostWebMessageAsJson` / `window.chrome.webview.postMessage` |
 | Automação do MV | AutoHotkey v2 — Send, ControlClick, ImageSearch + Clipboard |
-| Credenciais | Windows DPAPI via PowerShell |
+| Credenciais | Windows DPAPI nativo (`CryptProtectData` / `CryptUnprotectData`) |
 | Configuração | `config.ini` (IniRead/IniWrite) |
 
-**Dependências externas (baixar manualmente):**
-- `WebView2.ahk`, `JSON.ahk` → [github.com/thqby/ahk2_lib](https://github.com/thqby/ahk2_lib)
+**Dependências para desenvolvimento:**
 - AutoHotkey v2 → [autohotkey.com](https://autohotkey.com)
-- WebView2 Runtime → já presente no Windows 10/11 atualizado
+- Ahk2Exe → instalado junto ao AutoHotkey ou pelo instalador oficial
+- Inno Setup 6 → necessário para gerar instalador
+- WebView2 Runtime → necessário para executar a interface WebView2
+
+Para detalhes de build, assinatura, artefatos e validação, consulte [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
 
 ---
 
@@ -89,11 +92,17 @@ Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
 
 ## Instalação (Produção)
 
-Script Inno Setup 6 (`installer.iss`):
-- Instala em `%LOCALAPPDATA%\Praxis\` (sem admin)
-- Cria `%DOCUMENTS%\Praxis\XML\` automaticamente
-- Grava `WorkDir` no `config.ini`
-- Cria atalhos no Menu Iniciar e Área de Trabalho
+O pacote de produção é gerado pelo script de build e pelo instalador Inno Setup do projeto.
+
+Para gerar e validar builds, consulte [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
+
+O instalador:
+- instala em `%LOCALAPPDATA%\Programs\Praxis\` sem exigir privilégios elevados por padrão;
+- cria `%DOCUMENTS%\Praxis\` automaticamente;
+- grava `WorkDir` no `config.ini`;
+- cria atalhos no Menu Iniciar e, opcionalmente, na Área de Trabalho;
+- instala os recursos de runtime necessários do Praxis;
+- tenta instalar o Microsoft Edge WebView2 Runtime se ele não estiver presente.
 
 ---
 
@@ -139,6 +148,6 @@ MV_Poll(condFn, timeoutSecs)
 MV_ReadAt(winTitle, cx, cy)
 
 ; Credenciais DPAPI
-EncryptDPAPI(plainText)  ; PowerShell ConvertFrom-SecureString
-DecryptDPAPI(encrypted)
+EncryptDPAPI(plainText)  ; CryptProtectData do Windows
+DecryptDPAPI(encrypted)  ; CryptUnprotectData do Windows
 ```
