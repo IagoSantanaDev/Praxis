@@ -1,3 +1,8 @@
+; Praxis — software proprietário
+; Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
+; Licença: proprietária. Consulte LICENSE, COPYRIGHT e NOTICE.md na raiz do repositório.
+; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
+
 #Requires AutoHotkey v2.0
 
 SetTitleMatchMode 2
@@ -62,11 +67,14 @@ MV_EnsureMovDoc() {
         MV_ActivateModule(MV_WIN_MOVDOC_ANY)
         if MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
             return true
+        ; fallback to login if activation/stability failed
     }
 
-    if !MV_AbrirMovDoc()
-        return false
-    return MV_LoginOpenedModule(MV_WIN_MOVDOC_ANY, "MOV DOC")
+    if WinExist(MV_WIN_LOGIN)
+        return MV_LoginOpenedModule(MV_WIN_MOVDOC_ANY, "MOV DOC")
+
+    ; Não abrir novo MOV DOC via atalho. Se não estiver aberto, abortar.
+    return false
 }
 
 MV_EnsureFFCV() {
@@ -74,26 +82,24 @@ MV_EnsureFFCV() {
         MV_ActivateModule(MV_WIN_FFCV_ANY)
         if MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
             return true
-        ; fallback to open again if the existing FFCV window could not be activated/stabilized
+        ; fallback to login if activation/stability failed
     }
 
-    if !MV_AbrirFFCV()
-        return false
-    return MV_LoginOpenedModule(MV_WIN_FFCV_ANY, "FFCV")
+    if WinExist(MV_WIN_LOGIN)
+        return MV_LoginOpenedModule(MV_WIN_FFCV_ANY, "FFCV")
+
+    ; Não abrir novo FFCV via atalho. Se não estiver aberto, abortar.
+    return false
 }
 
 MV_AbrirMovDoc() {
-    if !FileExist(MV_MOVDOC_LNK)
-        return false
-    Run MV_MOVDOC_LNK, MV_SHORTCUT_DIR
-    return true
+    ; Abertura por atalho está desabilitada neste fluxo.
+    return false
 }
 
 MV_AbrirFFCV() {
-    if !FileExist(MV_FFCV_LNK)
-        return false
-    Run MV_FFCV_LNK, MV_SHORTCUT_DIR
-    return true
+    ; Abertura por atalho está desabilitada neste fluxo.
+    return false
 }
 
 ; ════════════════════════════════════════════════════════════════
@@ -178,9 +184,21 @@ MV_ClickLoginField(clientX, clientY) {
         return false
 
     CoordMode("Mouse", "Client")
-    Click(clientX, clientY, 1)
+    MouseMove(clientX, clientY, 0)
+    Sleep 50
+    Click
     Sleep 20
-    return true
+
+    if !WinActive(MV_WIN_LOGIN) {
+        if !MV_ActivateLoginWindow()
+            return false
+        MouseMove(clientX, clientY, 0)
+        Sleep 50
+        Click
+        Sleep 20
+    }
+
+    return WinActive(MV_WIN_LOGIN)
 }
 
 MV_SendLoginText(value) {
@@ -509,7 +527,7 @@ MV_Poll(condFn, timeoutSecs) {
     }
 }
 
-MV_WaitWindowStable(winTitle, stableMs := 800, timeoutSecs := 20) {
+MV_WaitWindowStable(winTitle, stableMs := 600, timeoutSecs := 20) {
     startedAt := A_TickCount
     stableSince := 0
     lastCount := -1

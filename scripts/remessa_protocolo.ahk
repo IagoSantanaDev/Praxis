@@ -1,3 +1,8 @@
+; Praxis — software proprietário
+; Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
+; Licença: proprietária. Consulte LICENSE, COPYRIGHT e NOTICE.md na raiz do repositório.
+; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
+
 #Requires AutoHotkey v2.0
 #Include mv_session.ahk
 #Include ..\lib\FFCV_ErrorTemplates.ahk
@@ -99,7 +104,7 @@ DATAS_BTN_CONFIRMAR_Y  := 426
 DATAS_BTN_VOLTAR       := "Button7"
 ; PENDENTE: Esc não sai da tela Entrega de Remessas. Quando descobrir o atalho correto,
 ; preencha aqui, ex.: RP_ENTREGA_SAIR_ATALHO := "!x" ou "{F4}".
-RP_ENTREGA_SAIR_ATALHO := "!{F4}"
+RP_ENTREGA_SAIR_ATALHO := "^q"
 
 ; ── Controles tela XML ────────────────────────────────────────
 ; Spy em Fluxos/Fluxo_XML: tela "Monitoração de Faturamento - TISS".
@@ -267,15 +272,17 @@ RunRemessaProtocolo(params) {
     gRunning := false
 
     if (erros.Length > 0) {
-        linhas := "Concluído com " erros.Length " pendência(s):`n"
+        linhas := "Remessa concluída com sucesso!`n`n" timingReport
+        linhas .= "`nConcluído com " erros.Length " pendência(s):`n"
         linhas .= "PROTOCOLO | CONTA | ERRO`n"
         for _, e in erros
             linhas .= "  [[red]]" e["protocolo"] " | " e["conta"] " | " e["descricao"] "[[/red]]`n"
-        Done(linhas "`n`n" timingReport)
+        Done(linhas)
     } else {
         Done("Remessa concluída com sucesso!`n`n" timingReport)
     }
 }
+
 
 ; ════════════════════════════════════════════════════════════════
 ;  FASE MOV DOC
@@ -560,7 +567,8 @@ RP_ReadMovDocGridField(x, y, campo := "", fastTimeoutMs := 150, fallbackTimeoutM
         return ""
 
     WinActivate WIN_MOVDOC_BAIXA
-    MV_Poll(() => WinActive(WIN_MOVDOC_BAIXA), 2)
+    if !MV_Poll(() => WinActive(WIN_MOVDOC_BAIXA), 2)
+        return ""
     CoordMode("Mouse", "Client")
 
     Click(x + 15, y + 8, 1)
@@ -749,7 +757,7 @@ RP_AbrirConfigurarPopupContas(tipoConta) {
     Notify("Popup Informações da Conta detectado em " popupReady["elapsed"] "ms.")
 
     if RP_ActiveModalTitle() != "" && !RP_FFCVContaPopupVisible() {
-        if !MV_Poll(() => RP_ActiveModalTitle() = "" || RP_FFCVContaPopupVisible(), 1200)
+        if !RP_PollMs(() => RP_ActiveModalTitle() = "" || RP_FFCVContaPopupVisible(), 1200)
             return RP_Abort("Modal apareceu antes do popup de conta e não foi resolvido: " RP_SafeWinGetText(RP_ActiveModalTitle()))
     }
 
@@ -770,6 +778,19 @@ RP_AbrirConfigurarPopupContas(tipoConta) {
 RP_WaitContaPopupAfterOpen(timeoutSecs := 5) {
     ready := RP_WaitContaPopupReady(timeoutSecs * 1000)
     return ready["ok"]
+}
+
+RP_PollMs(condFn, timeoutMs, intervalMs := 20) {
+    startedAt := A_TickCount
+    Loop {
+        if condFn()
+            return true
+
+        if (A_TickCount - startedAt >= timeoutMs)
+            return false
+
+        Sleep intervalMs
+    }
 }
 
 RP_FFCVContaPopupVisible() {
@@ -804,7 +825,7 @@ RP_WaitContaPopupReady(timeoutMs) {
             return Map("ok", true, "modal", false, "elapsed", A_TickCount - startedAt, "erro", "")
 
         if RP_ActiveModalTitle() != "" {
-            if MV_Poll(() => RP_ActiveModalTitle() = "" || RP_FFCVContaPopupVisible(), Min(800, timeoutMs))
+            if RP_PollMs(() => RP_ActiveModalTitle() = "" || RP_FFCVContaPopupVisible(), Min(800, timeoutMs))
                 continue
             return Map("ok", true, "modal", true, "elapsed", A_TickCount - startedAt, "erro", "")
         }
@@ -1043,13 +1064,9 @@ RP_WaitErrorModalAfterConta(timeoutSecs) {
 }
 
 RP_ActiveModalTitle() {
-    ; Modais de erro do Oracle Forms/FFCV têm título "Forms" conforme Window Spy.
-    ; Manter fallback genérico para confirmações "Mensagem ao Usuário do MV 2000".
-    if WinExist("Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE")
-        return "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
-    if WinExist("ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE")
-        return "ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
-    return ""
+    return WinExist("Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE")
+        ? "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+        : ""
 }
 
 RP_ActiveContaErrorModalTitle() {
@@ -1634,7 +1651,8 @@ RP_ClickBySpec(winTitle, classNN, x, y) {
 
     try {
         WinActivate winTitle
-        MV_Poll(() => WinActive(winTitle), 3)
+        if !MV_Poll(() => WinActive(winTitle), 3)
+            return false
         CoordMode("Mouse", "Client")
         Click(x, y, 1)
         return true
@@ -1712,5 +1730,12 @@ RP_Abort(msg) {
 }
 
 Notify(msg) => SendToUI(Map("type", "log", "message", msg))
-Progress(v)  => SendToUI(Map("type", "progress", "value", v))
+Progress(v) {
+    static lastProgress := ""
+    normalized := Max(0, Min(100, Round(v)))
+    if (lastProgress != "" && normalized = lastProgress)
+        return
+    lastProgress := normalized
+    SendToUI(Map("type", "progress", "value", normalized))
+}
 Done(msg)    => SendToUI(Map("type", "done", "message", msg))

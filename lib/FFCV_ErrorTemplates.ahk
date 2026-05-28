@@ -1,3 +1,8 @@
+; Praxis — software proprietário
+; Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
+; Licença: proprietária. Consulte LICENSE, COPYRIGHT e NOTICE.md na raiz do repositório.
+; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
+
 #Requires AutoHotkey v2.0
 
 ; Cadastro compartilhado de erros visuais do FFCV Inserir Conta.
@@ -20,6 +25,10 @@ FFCV_ErrorTemplates_ProjectRoot() {
 }
 
 FFCV_ErrorTemplates() {
+    static templates := ""
+    if IsObject(templates)
+        return templates
+
     root := FFCV_ErrorTemplates_ProjectRoot()
     templates := []
 
@@ -62,7 +71,7 @@ FFCV_ErrorTemplates() {
     tipoDiferente := root "\images\Erro_Conta_De_Tipo_Diferente_Texto.png"
     if FileExist(tipoDiferente) {
         templates.Push(Map(
-            "tipo", "conta_tipo_diferente,
+            "tipo", "conta_tipo_diferente",
             "descricao", "Conta de tipo diferente",
             "img", tipoDiferente
         ))
