@@ -35,6 +35,14 @@ MV_IMG_DIR            := A_ScriptDir "\Imagens_Debug"
 ; ── Controles de popups conhecidos ────────────────────────────
 MV_MODAL_OK_CLASS := "Button1"
 
+; ── Login Identificação em coordenadas Client ──────────────────
+; Window Spy validado nas capturas Tela Login Usuario/Senha.
+; Não usar ClassNN para diferenciar campos: usuário e senha aparecem como Edit2.
+MV_LOGIN_USER_X := 170
+MV_LOGIN_USER_Y := 118
+MV_LOGIN_PASS_X := 307
+MV_LOGIN_PASS_Y := 119
+
 ; ── Polling ───────────────────────────────────────────────────
 MV_POLL_MS      := 50
 MV_TIMEOUT_LOAD := 20
@@ -101,24 +109,24 @@ MV_LoginOpenedModule(moduleWin, moduleName) {
     return true
 }
 
-; Login principal: teclado somente.
-; O campo Usuário já abre focado no MV.
+; Login principal: ativar a janela e clicar nos campos por coordenada Client validada.
+; Não depender de foco inicial nem de ClassNN: usuário e senha podem aparecer ambos como Edit2.
 MV_DoLoginKeyboard(moduleWin, moduleName) {
     global gUser, gPass
 
     if (Trim(gUser) = "" || gPass = "")
         return MV_RequestNewCredentials("Credenciais não carregadas. Informe usuário e senha.")
 
-    WinActivate MV_WIN_LOGIN
-    if !MV_Poll(() => WinActive(MV_WIN_LOGIN), 5)
+    if !MV_ActivateLoginWindow()
         return false
 
-    SendText gUser
-    Sleep MV_DELAY_INPUT
-    Send "{Tab}"
-    Sleep MV_DELAY_INPUT
-    SendText gPass
-    Sleep MV_DELAY_INPUT
+    if !MV_ClickLoginField(MV_LOGIN_USER_X, MV_LOGIN_USER_Y)
+        return false
+    MV_SendLoginText(gUser)
+
+    if !MV_ClickLoginField(MV_LOGIN_PASS_X, MV_LOGIN_PASS_Y)
+        return false
+    MV_SendLoginText(gPass)
     Send "{Enter}"
 
     deadline := A_TickCount + MV_TIMEOUT_LOAD * 1000
@@ -142,6 +150,29 @@ MV_DoLoginKeyboard(moduleWin, moduleName) {
 
 MV_LoginErrorVisible() {
     return WinExist(MV_WIN_LOGIN_ERROR)
+}
+
+MV_ActivateLoginWindow() {
+    if !WinExist(MV_WIN_LOGIN)
+        return false
+
+    WinActivate MV_WIN_LOGIN
+    return MV_Poll(() => WinActive(MV_WIN_LOGIN), 5)
+}
+
+MV_ClickLoginField(clientX, clientY) {
+    if !MV_ActivateLoginWindow()
+        return false
+
+    CoordMode("Mouse", "Client")
+    Click(clientX, clientY, 1)
+    Sleep 20
+    return true
+}
+
+MV_SendLoginText(value) {
+    SendText value
+    Sleep 20
 }
 
 MV_DismissActivePopup() {
@@ -334,10 +365,11 @@ MV_SetTextEditAtPoint(winTitle, clientX, clientY, value, tolerance := 14) {
 
     WinActivate winTitle
     MV_Poll(() => WinActive(winTitle), 2)
-    ControlFocus hwnd
-    Sleep MV_DELAY_INPUT
-    Send "^a"
-    Sleep MV_DELAY_INPUT
+    CoordMode("Mouse", "Client")
+    Click(clientX + 15, clientY + 8, 1)
+    Sleep 20
+    Send "{Home}{Shift down}{End}{Shift up}{Backspace}"
+    Sleep 20
     SendText value
     return true
 }
