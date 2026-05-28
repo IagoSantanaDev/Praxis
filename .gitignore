@@ -12,9 +12,11 @@
 .kilocode/
 .copilot/
 .mcp.json
+.artifacts/
 
 # Debug e evidências locais
 Imagens_Debug/
+test_macros/ultimo_resultado.txt
 *.trace.zip
 *.har
 *.log
