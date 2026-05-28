@@ -43,7 +43,7 @@ RPA MV2000i/
 │   └── fechar_xml.ahk        # Stub
 ├── ui/
 │   └── index.html             # Interface completa (login + app)
-└── images/                    # Ícones e imagens da UI
+└── images/                    # Somente imagens realmente usadas pelos macros
 ```
 
 ---

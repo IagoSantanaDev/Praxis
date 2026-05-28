@@ -16,13 +16,20 @@ DO_GERAR_XML := false
 
 Use sempre coordenadas **Client** do Window Spy, nunca `Screen`.
 
+Imagens e crops usados pelos macros ficam em:
+
+```text
+images/
+```
+
 ## Arquivos atuais
 
 - `_mv_control_probe.ahk` — biblioteca comum para localizar controles por HWND/ClassNN/ponto Client e gerar relatório.
 - `02_movdoc_baixa.ahk` — testa o fluxo MOV DOC: detectar/abrir, navegar para Baixa de Documentos, ler protocolo/conta/convênio e validar checkbox Recebido.
-- `10_popup_text_capture.ahk` — captura diagnóstico de popup/modal ativo; enumera `WinGetText`, `WinGetControls`, HWNDs, `ClassNN`, retângulo e texto por controle.
 - `11_ffcv_remessa_inserir_imprimir.ahk` — fluxo FFCV integrado: criar/buscar remessa, inserir uma ou várias contas no popup embarcado e imprimir relatório de atendimentos.
 - `12_fechar_remessa_gerar_xml.ahk` — continuação do FFCV: entregar/fechar remessa com datas e gerar XML a partir da remessa deixada pelo macro 11.
+- `13_ffcv_error_popup_detect.ahk` — classifica o modal de erro de inserção FFCV por templates visuais cadastrados em `lib/FFCV_ErrorTemplates.ahk`.
+- `20_login_nav_movdoc_ffcv.ahk` — testa abertura por atalho, login e navegação pós-login para MOV DOC e FFCV; credenciais são solicitadas via `InputBox` e a senha não é gravada no relatório.
 
 ## Fluxo recomendado de teste
 
@@ -84,22 +91,28 @@ Edit2 @ Client 298,143
 
 Em modais Oracle Forms, a mensagem visual pode ser desenhada em `ui60Drawn_*`; `WinGetText` e Window Spy podem mostrar apenas `&OK`. Por isso o macro 11 classifica erros conhecidos por template visual.
 
-Template atual:
+Templates usados pelos macros ficam em:
 
 ```text
-Imagens_Debug/Erros_FFCV/Erro_Conta_Ja_Digitada_Texto.png
+images/
 ```
 
-Para adicionar outro erro, salve um crop da frase em `Imagens_Debug/Erros_FFCV/` e adicione ao array `ERROR_TEMPLATES` do macro 11.
+Cadastro compartilhado:
+
+```text
+lib/FFCV_ErrorTemplates.ahk
+```
+
+Para adicionar outro erro, salve um crop da frase direto em `images/`, adicione um `Map(...)` em `FFCV_ErrorTemplates()` e rode `13_ffcv_error_popup_detect.ahk` com o modal aberto para confirmar que `visível=SIM` e a classificação final ficou correta.
 
 ## Polling rápido no macro 11
 
 O envio em lote não usa `Sleep` longo. Ele faz polling subsegundo:
 
 ```ahk
-POLL_INTERVAL_MS := 20
-NO_MODAL_DECISION_MS := 450
-MODAL_WAIT_AFTER_ENTER_MS := 800
+POLL_INTERVAL_MS := 100
+NO_MODAL_DECISION_MS := 180
+MODAL_WAIT_AFTER_ENTER_MS := 650
 ```
 
 Se o modal aparecer, reage imediatamente. Se não aparecer e o popup estiver estável, libera a próxima conta em menos de 1 segundo.
@@ -116,6 +129,18 @@ O capturador de popup salva em:
 
 ```text
 test_macros\ultimo_popup.txt
+```
+
+O detector visual de erro FFCV salva em:
+
+```text
+test_macros\ultimo_erro_ffcv.txt
+```
+
+O teste de abertura/login/navegação salva em:
+
+```text
+test_macros\ultimo_login_nav.txt
 ```
 
 Cole esses arquivos na conversa quando precisar continuar a análise.

@@ -131,12 +131,12 @@ Isso já foi registrado em comentários em:
 7. `scripts/remessa_protocolo.ahk` agora usa a opção C de paginação: coleta 4 linhas visíveis, envia até 4 setas para baixo, coleta novamente, e para quando aparece popup ou quando nenhuma conta nova entra.
 8. `scripts/remessa_protocolo.ahk` agora escolhe o convênio majoritário e envia à remessa apenas as contas desse convênio; as demais entram em erros como `Convênio diferente: <convênio>`.
 9. `scripts/remessa_protocolo.ahk` teve as detecções por imagem removidas do fluxo principal; onde não houver janela/controle validado, o fluxo deve falhar explicitamente em vez de usar imagem/Enter como fallback.
-10. `test_macros/01_login_identificacao.ahk` e `test_macros/02_movdoc_baixa.ahk` foram alinhados com as regras novas: login por título de popup, abertura por atalho obrigatório e MOV DOC por região Client.
+10. `test_macros/20_login_nav_movdoc_ffcv.ahk` e `test_macros/02_movdoc_baixa.ahk` cobrem login/navegação e MOV DOC; os macros de teste atuais estão listados em `test_macros/README.md`.
 11. Verificação local executada: `git diff --check -- scripts/mv_session.ahk scripts/remessa_protocolo.ahk test_macros/02_movdoc_baixa.ahk docs/CONTEXTO_CONTINUAR.md .gsd/DECISIONS.md` passou sem erros. AutoHotkey não está disponível no PATH deste ambiente, então a validação executável ainda precisa ocorrer no PC da empresa.
 12. Usuário validou `test_macros/03_ffcv_manutencao_remessas.ahk`: funcionou tanto para criar nova remessa quanto para abrir remessa existente. Evidências salvas em `Fluxos/Fluxo_InserirConta/Relatorio_FFCV_Criando_Remessa.txt` e `Fluxos/Fluxo_InserirConta/Relatorio_FFCV_Buscando_Remessa.txt`.
 13. O popup `Informações da Conta` do fluxo Inserir Conta não altera o título da tela FFCV. A detecção deve usar o controle sentinela `ui60Drawn W323` dentro da janela `MV2000i - Faturamento ahk_exe ifrun60.EXE`, com ponto Client validado `x=432 y=109`, e confirmar o campo `Edit2` da conta em `x=298 y=143`, em vez de esperar um `WinTitle` novo.
 14. O modal de erro ao inserir conta é outro alvo: ele tem título próprio `Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE`, mas a mensagem visual é desenhada em `ui60Drawn_*`, então `WinGetText`/Window Spy podem expor apenas `&OK`. O macro 11 agora classifica erro conhecido por template visual dentro do modal.
-15. O envio de contas em lote no macro 11 usa polling subsegundo, não `Sleep` longo: `POLL_INTERVAL_MS := 20`, `NO_MODAL_DECISION_MS := 450`, `MODAL_WAIT_AFTER_ENTER_MS := 800`. Se o modal aparecer, reage imediatamente; se não aparecer e o popup estiver estável, libera a próxima conta em menos de 1s.
+15. O envio de contas em lote no macro 11 usa polling subsegundo, não `Sleep` longo: `POLL_INTERVAL_MS := 100`, `NO_MODAL_DECISION_MS := 180`, `MODAL_WAIT_AFTER_ENTER_MS := 650`. Se o modal aparecer, reage imediatamente; se não aparecer e o popup estiver estável, libera a próxima conta em menos de 1s.
 
 ### `scripts/remessa_protocolo.ahk`
 
@@ -289,22 +289,22 @@ Uso recomendado:
 4. ajustar controles pelo Window Spy se algum `ClassNN`/ponto Client não bater;
 5. ligar uma etapa por vez.
 
-#### `test_macros/10_popup_text_capture.ahk`
+#### `test_macros/13_ffcv_error_popup_detect.ahk`
 
-Arquivo novo criado para capturar texto de popup/modal.
+Arquivo atual usado para validar/classificar visualmente o modal de erro de inserção FFCV.
 
 Ele:
 
 - procura `ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE`;
-- captura `WinGetText`;
-- enumera `WinGetControls` e `WinGetControlsHwnd`, incluindo `ClassNN`, retângulo e `ControlGetText` por controle;
-- mostra em `MsgBox`;
-- salva em `test_macros\ultimo_popup.txt`;
-- copia para o clipboard com `A_Clipboard := content`.
+- captura `WinGetText` disponível;
+- enumera os templates cadastrados em `lib\FFCV_ErrorTemplates.ahk`;
+- verifica se cada imagem existe e se está visível no modal;
+- salva em `test_macros\ultimo_erro_ffcv.txt`;
+- copia o relatório para o clipboard.
 
-Observação importante: em modais do Oracle Forms, a mensagem pode ser desenhada em `ui60Drawn_*` sem texto acessível ao AHK. Nesse caso `WinGetText` e Window Spy podem mostrar apenas `&OK`, `&Sim` ou `&Não`; o fluxo deve usar a existência do modal como sinal de erro/aviso, não depender do texto para validar envio.
+Observação importante: em modais do Oracle Forms, a mensagem pode ser desenhada em `ui60Drawn_*` sem texto acessível ao AHK. Nesse caso `WinGetText` e Window Spy podem mostrar apenas `&OK`, `&Sim` ou `&Não`; o fluxo deve usar a existência do modal como sinal de erro/aviso e os templates visuais para classificar mensagens conhecidas.
 
-Não clica, não fecha popup e não envia teclas para o MV.
+Por padrão não fecha o popup. Para validar fechamento pelo `Button1`, alterar `DO_DISMISS_MODAL := true`.
 
 ## Como levar para o PC da empresa
 
@@ -313,7 +313,7 @@ Copiar pelo menos:
 ```text
 scripts/
 test_macros/
-Imagens_Debug/
+images/ — somente assets efetivamente usados pelos macros.
 ```
 
 Idealmente copiar o projeto inteiro mantendo a estrutura:
@@ -322,7 +322,7 @@ Idealmente copiar o projeto inteiro mantendo a estrutura:
 RPA MV2000i/
   scripts/
   test_macros/
-  Imagens_Debug/
+  images/
 ```
 
 Precisa de **AutoHotkey v2** instalado.
@@ -405,12 +405,12 @@ Foi mantido como teste pontual. Para o fluxo completo de continuação, prefira 
 
 Já configurado com os dados enviados. Confirmar no PC da empresa se as coordenadas Client batem.
 
-### `10_popup_text_capture.ahk`
+### `13_ffcv_error_popup_detect.ahk`
 
-Normalmente não precisa configurar. Se quiser alvo específico, ajustar:
+Normalmente não precisa configurar. Deixe o modal de erro aberto e rode o macro. Se quiser validar também o fechamento pelo botão `OK`, ajustar:
 
 ```ahk
-POPUP_TITLE := "..."
+DO_DISMISS_MODAL := true
 ```
 
 ### `11_ffcv_remessa_inserir_imprimir.ahk`
@@ -428,12 +428,12 @@ DO_PRINT_RELATORIO := false
 
 Para inserir várias contas, cole em `TEST_CONTAS`. Aceita conta pura, lista separada por vírgula/ponto-e-vírgula/quebra de linha, ou linhas do MOV DOC no formato `protocolo | conta | convênio`; nesse formato o macro usa a segunda coluna numérica como conta. Se `TEST_CONTAS` estiver vazio, usa `TEST_CONTA`.
 
-O envio em lote é serializado para evitar corrida com modal Oracle Forms: depois de enviar cada conta, o macro faz polling a cada `POLL_INTERVAL_MS := 20`. Se o modal aparecer, reage imediatamente, classifica o tipo do erro por texto acessível ou template visual, clica `Button1`, espera fechar, fecha o popup da conta e classifica aquela conta como erro/modal. Se não aparecer modal e o popup estiver estável, libera a próxima conta após `NO_MODAL_DECISION_MS := 450`; o teto de observação é `MODAL_WAIT_AFTER_ENTER_MS := 800`, portanto fica abaixo de 1 segundo. Em bloqueio/incerteza, para o lote por padrão com `STOP_ON_ACCOUNT_BLOCKER := true`.
+O envio em lote é serializado para evitar corrida com modal Oracle Forms: depois de enviar cada conta, o macro faz polling a cada `POLL_INTERVAL_MS := 100`. Se o modal aparecer, reage imediatamente, classifica o tipo do erro por texto acessível ou template visual, clica `Button1`, espera fechar, fecha o popup da conta e classifica aquela conta como erro/modal. Se não aparecer modal e o popup estiver estável, libera a próxima conta após `NO_MODAL_DECISION_MS := 180`; o teto de observação é `MODAL_WAIT_AFTER_ENTER_MS := 650`, portanto fica abaixo de 1 segundo. Em bloqueio/incerteza, para o lote por padrão com `STOP_ON_ACCOUNT_BLOCKER := true`.
 
 Como o modal de erro `Forms ahk_class ui60Modal_W32` pode desenhar a mensagem em `ui60Drawn_*`, `WinGetText` pode mostrar só `&OK`. Para o erro já conhecido, foi criado o template visual:
 
 ```text
-Imagens_Debug/Erros_FFCV/Erro_Conta_Ja_Digitada_Texto.png
+images/Erro_Conta_Ja_Digitada_Texto.png
 ```
 
 Esse template classifica `Conta já digitada / redigite`. Para novos tipos de erro, criar novos crops de texto e adicionar em `ERROR_TEMPLATES` no macro 11.
@@ -513,7 +513,7 @@ Esses arquivos podem ser colados na próxima conversa para continuar.
 
 1. No PC da empresa, rodar `test_macros/11_ffcv_remessa_inserir_imprimir.ahk` com `DO_ACTION := false` para validar localização dos botões e, se o popup de inserir conta estiver aberto, validar o sentinela `ui60Drawn W323` e o campo `Edit2`.
 2. Preencher `TEST_CONTAS` no macro 11 com o resultado do MOV DOC e testar em etapas: primeiro `DO_INSERT_ACCOUNT := true` com poucas contas; conferir `test_macros\ultimo_resultado.txt`, especialmente o resumo `ok`, `erro/modal` e `bloqueio`.
-3. Se aparecer erro modal novo que não seja `Conta já digitada / redigite`, tirar crop só da frase do erro, salvar em `Imagens_Debug/Erros_FFCV/Erro_<Nome>.png` e adicionar em `ERROR_TEMPLATES` no macro 11.
+3. Se aparecer erro modal novo que não seja `Conta já digitada / redigite`, tirar crop só da frase do erro, salvar em `images/Erro_<Nome>.png` e adicionar em `ERROR_TEMPLATES` no macro 11.
 4. Depois que o macro 11 inserir/imprimir corretamente, rodar `test_macros/12_fechar_remessa_gerar_xml.ahk` em modo seguro e ligar etapas uma por vez: `DO_OPEN_ENTREGA`, `DO_CONFIRM_ENTREGA`, `DO_OPEN_XML_TISS`, `DO_GERAR_XML`.
 5. Só depois de validar 11 e 12 no PC da empresa, aplicar eventuais ajustes finais ao fluxo principal `scripts/remessa_protocolo.ahk`.
 
