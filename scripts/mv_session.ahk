@@ -1,149 +1,293 @@
 #Requires AutoHotkey v2.0
 
-; ============================================================================
-; Projeto: Praxis
-; Arquivo: mv_session.ahk
-; Descrição: utilitários de sessão, login e interação inicial com o MV2000i.
-;
-; Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
-;
-; Este arquivo integra o software proprietário Praxis.
-; O acesso ao código-fonte não concede licença de uso, cópia, modificação,
-; redistribuição, engenharia reversa, criação de obras derivadas ou
-; exploração comercial sem autorização prévia e expressa por escrito.
-;
-; Consulte: LICENSE, COPYRIGHT, NOTICE.md, EULA.md, NDA.md,
-; PRIVACY_LGPD.md e THIRD_PARTY_NOTICES.md.
-; ============================================================================
+SetTitleMatchMode 2
+DetectHiddenText true
+SetControlDelay 0
+SetWinDelay 0
+SetKeyDelay 0, 0
 
 ; ════════════════════════════════════════════════════════════════
 ;  MV SESSION — módulo compartilhado
-;  Substitua os valores marcados com ; << pelo Window Spy
 ; ════════════════════════════════════════════════════════════════
 
 ; ── Executável e janelas ──────────────────────────────────────
-MV_EXE_PATH       := "C:\Caminho\Para\MV2000i.exe"   ; <<
-MV_WIN_LOGIN      := "Identificação"                  ; <<
-MV_WIN_PRINCIPAL  := "TÍTULO JANELA PRINCIPAL MV"     ; <<
-MV_WIN_MOVDOC     := "TÍTULO JANELA MOV DOC"          ; <<
-MV_WIN_FFCV       := "TÍTULO JANELA FFCV"             ; <<
+MV_RUN_FFCV       := 'C:\orant\BIN\ifrun60.EXE E:\Mv2000\ffcv\ffcv.fmx'
+MV_RUN_MOVDOC     := 'C:\orant\BIN\ifrun60.EXE E:\Mv2000\movdoc\movdoc.fmx'
+MV_WIN_LOGIN      := "Identificação ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
 
-; ── Controles da tela de login ────────────────────────────────
-MV_LOGIN_USUARIO  := "CLASSNN_CAMPO_USUARIO"          ; <<
-MV_LOGIN_SENHA    := "CLASSNN_CAMPO_SENHA"            ; <<
-MV_LOGIN_BANCO    := "CLASSNN_CAMPO_BANCO"            ; << (se houver)
-MV_LOGIN_CONFIRMA := "CLASSNN_BTN_CONFIRMAR"          ; <<
+; Atenção: para detecção inicial, nunca exigir subtela exata.
+; O usuário pode ter deixado MOV DOC/FFCV aberto em qualquer tela interna.
+MV_WIN_MOVDOC_ANY := "Movimentação de Documentos ahk_exe ifrun60.EXE"
+MV_WIN_FFCV_ANY   := "MV2000i - Faturamento ahk_exe ifrun60.EXE"
 
-; ── Como abrir cada módulo a partir da janela principal ───────
-; Preencha com Send, ControlClick, MenuSelect, etc.
-; Deixe como função para facilitar a manutenção.
+; Títulos específicos só devem ser usados depois de navegar para a tela esperada.
+MV_WIN_MOVDOC_BAIXA := "Protocolação de Baixa de Documentos ahk_exe ifrun60.EXE"
+MV_WIN_FFCV_REMESSA := "Manutenção de Remessa ahk_exe ifrun60.EXE"
+MV_WIN_FFCV         := MV_WIN_FFCV_ANY
+MV_WIN_MOVDOC       := MV_WIN_MOVDOC_ANY
+
+; ── Imagens de referência ─────────────────────────────────────
+MV_IMG_DIR            := A_ScriptDir "\Imagens_Debug"
+MV_IMG_ERROR_ICON     := MV_IMG_DIR "\Erro_Icone.png"
+
+; ── Polling ───────────────────────────────────────────────────
+MV_POLL_MS      := 50
+MV_TIMEOUT_LOAD := 20
+MV_TIMEOUT_ACOE := 10
+MV_DELAY_INPUT  := 80
+
+; ════════════════════════════════════════════════════════════════
+;  API PÚBLICA
+; ════════════════════════════════════════════════════════════════
+
+MV_EnsureMovDoc() {
+    if MV_ModuleReady(MV_WIN_MOVDOC_ANY) {
+        MV_ActivateModule(MV_WIN_MOVDOC_ANY)
+        return true
+    }
+
+    MV_AbrirMovDoc()
+    return MV_LoginOpenedModule(MV_WIN_MOVDOC_ANY, "MOV DOC")
+}
+
+MV_EnsureFFCV() {
+    if MV_ModuleReady(MV_WIN_FFCV_ANY) {
+        MV_ActivateModule(MV_WIN_FFCV_ANY)
+        return true
+    }
+
+    MV_AbrirFFCV()
+    return MV_LoginOpenedModule(MV_WIN_FFCV_ANY, "FFCV")
+}
+
 MV_AbrirMovDoc() {
-    ; << Ex: MenuSelect(MV_WIN_PRINCIPAL, , "Módulos", "MOV DOC")
-    ; << Ex: Send "!m" seguido da tecla do item
-    ; << Ex: ControlClick "CLASSNN_BTN_MOVDOC", MV_WIN_PRINCIPAL
+    Run MV_RUN_MOVDOC
 }
 
 MV_AbrirFFCV() {
-    ; << Ex: MenuSelect(MV_WIN_PRINCIPAL, , "Módulos", "FFCV")
-}
-
-; ── Polling ───────────────────────────────────────────────────
-MV_POLL_MS      := 50    ; intervalo de checagem — não altere
-MV_TIMEOUT_LOAD := 20    ; segundos para telas/módulos carregarem
-MV_TIMEOUT_ACOE := 10    ; segundos para ações (popups, confirmações)
-MV_DELAY_INPUT  := 80    ; ms obrigatório após input antes de checar resultado
-
-; ════════════════════════════════════════════════════════════════
-;  API PÚBLICA — use estas funções nos scripts
-; ════════════════════════════════════════════════════════════════
-
-; Garante que o MOV DOC está aberto e ativo.
-; Retorna true se pronto, false se falhou.
-MV_EnsureMovDoc() {
-    if MV_WinReady(MV_WIN_MOVDOC) {
-        WinActivate MV_WIN_MOVDOC
-        return true
-    }
-    if !MV_EnsurePrincipal()
-        return false
-    MV_AbrirMovDoc()
-    return MV_Poll(() => WinExist(MV_WIN_MOVDOC), MV_TIMEOUT_LOAD)
-}
-
-; Garante que o FFCV está aberto e ativo.
-MV_EnsureFFCV() {
-    if MV_WinReady(MV_WIN_FFCV) {
-        WinActivate MV_WIN_FFCV
-        return true
-    }
-    if !MV_EnsurePrincipal()
-        return false
-    MV_AbrirFFCV()
-    return MV_Poll(() => WinExist(MV_WIN_FFCV), MV_TIMEOUT_LOAD)
+    Run MV_RUN_FFCV
 }
 
 ; ════════════════════════════════════════════════════════════════
-;  INTERNO — não chame diretamente nos scripts
+;  LOGIN
 ; ════════════════════════════════════════════════════════════════
 
-; Garante que a janela principal do MV está aberta (faz login se necessário).
-MV_EnsurePrincipal() {
-    if MV_WinReady(MV_WIN_PRINCIPAL)
-        return true
+MV_LoginOpenedModule(moduleWin, moduleName) {
+    if !MV_Poll(() => WinExist(MV_WIN_LOGIN) || MV_ModuleReady(moduleWin), MV_TIMEOUT_LOAD)
+        return MV_RequestNewCredentials("Não consegui abrir a tela de login do " moduleName ".")
 
-    ; MV não está aberto — inicia
-    if !MV_WinReady(MV_WIN_LOGIN) {
-        Run MV_EXE_PATH
-        if !MV_Poll(() => WinExist(MV_WIN_LOGIN), MV_TIMEOUT_LOAD)
+    if WinExist(MV_WIN_LOGIN) {
+        if !MV_DoLoginKeyboard(moduleWin, moduleName)
             return false
     }
 
-    return MV_DoLogin()
+    if !MV_Poll(() => MV_ModuleReady(moduleWin), MV_TIMEOUT_LOAD)
+        return MV_RequestNewCredentials("Login enviado, mas o " moduleName " não ficou disponível.")
+
+    MV_ActivateModule(moduleWin)
+    return true
 }
 
-; Executa o login com as credenciais salvas em memória (gUser / gPass).
-MV_DoLogin() {
+; Login principal: teclado somente.
+; O campo Usuário já abre focado no MV.
+MV_DoLoginKeyboard(moduleWin, moduleName) {
     global gUser, gPass
+
+    if (Trim(gUser) = "" || gPass = "")
+        return MV_RequestNewCredentials("Credenciais não carregadas. Informe usuário e senha.")
 
     WinActivate MV_WIN_LOGIN
     if !MV_Poll(() => WinActive(MV_WIN_LOGIN), 5)
         return false
 
-    ControlSetText gUser, MV_LOGIN_USUARIO, MV_WIN_LOGIN
-    ControlSetText "",    MV_LOGIN_SENHA,   MV_WIN_LOGIN
-    ControlSetText gPass, MV_LOGIN_SENHA,   MV_WIN_LOGIN
-
-    ; Pequeno delay obrigatório — garante que o MV registrou o input
-    ; antes do clique (não é espera de resultado, é estabilização de UI)
+    SendText gUser
     Sleep MV_DELAY_INPUT
+    Send "{Tab}"
+    Sleep MV_DELAY_INPUT
+    SendText gPass
+    Sleep MV_DELAY_INPUT
+    Send "{Enter}"
 
-    ControlClick MV_LOGIN_CONFIRMA, MV_WIN_LOGIN,,,, "NA"
-
-    ; Polling até a janela principal aparecer OU o login falhar
-    ; (janela de login sumindo sem a principal = erro de credencial)
     deadline := A_TickCount + MV_TIMEOUT_LOAD * 1000
     Loop {
-        if WinExist(MV_WIN_PRINCIPAL)
+        if MV_LoginErrorVisible() {
+            MV_DismissActivePopup()
+            Sleep MV_DELAY_INPUT
+            MV_CloseModule(moduleWin)
+            return MV_RequestNewCredentials("O MV recusou o login. Informe novas credenciais.")
+        }
+
+        if MV_ModuleReady(moduleWin)
             return true
-        if !WinExist(MV_WIN_LOGIN)
-            return false   ; login sumiu sem abrir principal = estado inesperado
-        if A_TickCount > deadline
+
+        if (A_TickCount > deadline)
             return false
+
         Sleep MV_POLL_MS
     }
 }
 
-; Checa se uma janela existe e não está minimizada.
+MV_LoginErrorVisible() {
+    return MV_ImageVisible(MV_IMG_ERROR_ICON)
+}
+
+MV_DismissActivePopup() {
+    try {
+        if WinExist("ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE") {
+            WinActivate "ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+            Sleep MV_DELAY_INPUT
+            Send "{Enter}"
+        }
+    }
+}
+
+MV_RequestNewCredentials(message) {
+    global gUser, gPass, gRunning
+    gUser := ""
+    gPass := ""
+    gRunning := false
+
+    try SendToUI(Map("type", "login_failed", "message", message))
+    catch {
+        try SendToUI(Map("type", "show_login", "message", message))
+    }
+    return false
+}
+
+MV_CloseModule(moduleWin) {
+    try {
+        if WinExist(moduleWin) {
+            WinActivate moduleWin
+            WinClose moduleWin
+        }
+    }
+}
+
+; ════════════════════════════════════════════════════════════════
+;  DETECÇÃO / IMAGEM / CONTROLES
+; ════════════════════════════════════════════════════════════════
+
+MV_ModuleReady(moduleWin) {
+    return MV_WinReady(moduleWin)
+}
+
+MV_ActivateModule(moduleWin) {
+    if WinExist(moduleWin) {
+        WinActivate moduleWin
+        MV_Poll(() => WinActive(moduleWin), 3)
+    }
+}
+
 MV_WinReady(title) {
     if !WinExist(title)
         return false
     return WinGetMinMax(title) != -1
 }
 
-; ── Polling genérico ─────────────────────────────────────────
-; Executa condFn a cada MV_POLL_MS ms até retornar true ou timeout.
-; condFn é uma função sem parâmetros: () => expressão_booleana
-; Retorna true se a condição foi satisfeita, false se timeout.
+MV_ImageVisible(imagePath, variation := 10) {
+    if !FileExist(imagePath)
+        return false
+
+    CoordMode "Pixel", "Screen"
+    try return ImageSearch(&x, &y, 0, 0, A_ScreenWidth, A_ScreenHeight, "*" variation " " imagePath)
+    catch
+        return false
+}
+
+MV_ClickImage(imagePath, variation := 10, offsetX := 8, offsetY := 8) {
+    if !FileExist(imagePath)
+        return false
+
+    CoordMode "Pixel", "Screen"
+    CoordMode "Mouse", "Screen"
+    try {
+        if ImageSearch(&x, &y, 0, 0, A_ScreenWidth, A_ScreenHeight, "*" variation " " imagePath) {
+            Click x + offsetX, y + offsetY
+            return true
+        }
+    }
+    return false
+}
+
+MV_DoubleClickControlAt(winTitle, classNN, clientX, clientY, tolerance := 14) {
+    hwnd := MV_FindControlByClientPoint(winTitle, classNN, clientX, clientY, tolerance)
+    if !hwnd
+        return false
+    ControlClick hwnd,,,, 2, "NA"
+    return true
+}
+
+MV_ClickControlAt(winTitle, classNN, clientX, clientY, tolerance := 14) {
+    hwnd := MV_FindControlByClientPoint(winTitle, classNN, clientX, clientY, tolerance)
+    if !hwnd
+        return false
+    ControlClick hwnd,,,,, "NA"
+    return true
+}
+
+MV_FocusControlAt(winTitle, classNN, clientX, clientY, tolerance := 14) {
+    hwnd := MV_FindControlByClientPoint(winTitle, classNN, clientX, clientY, tolerance)
+    if !hwnd
+        return false
+    ControlFocus hwnd
+    return true
+}
+
+MV_SetTextControlAt(winTitle, classNN, clientX, clientY, value, tolerance := 14) {
+    hwnd := MV_FindControlByClientPoint(winTitle, classNN, clientX, clientY, tolerance)
+    if !hwnd
+        return false
+    ControlFocus hwnd
+    Sleep MV_DELAY_INPUT
+    SendText value
+    return true
+}
+
+MV_ReadTextControlAt(winTitle, classNN, clientX, clientY, tolerance := 14) {
+    A_Clipboard := ""
+    if !MV_DoubleClickControlAt(winTitle, classNN, clientX, clientY, tolerance)
+        return ""
+    Sleep MV_DELAY_INPUT
+    Send "^c"
+    MV_Poll(() => A_Clipboard != "", 3)
+    return Trim(A_Clipboard)
+}
+
+MV_FindControlByClientPoint(winTitle, classNN, targetX, targetY, tolerance := 14) {
+    try hwnds := WinGetControlsHwnd(winTitle)
+    catch
+        return 0
+
+    bestHwnd := 0
+    bestDist := 999999
+
+    for hwnd in hwnds {
+        try ctrlClass := ControlGetClassNN(hwnd)
+        catch
+            continue
+
+        if (ctrlClass != classNN)
+            continue
+
+        try ControlGetPos &cx, &cy, &cw, &ch, hwnd
+        catch
+            continue
+
+        if (targetX >= cx && targetX <= cx + cw && targetY >= cy && targetY <= cy + ch)
+            return hwnd
+
+        centerX := cx + (cw / 2)
+        centerY := cy + (ch / 2)
+        dist := Sqrt((targetX - centerX) ** 2 + (targetY - centerY) ** 2)
+        if (dist < bestDist) {
+            bestDist := dist
+            bestHwnd := hwnd
+        }
+    }
+
+    return (bestHwnd && bestDist <= tolerance) ? bestHwnd : 0
+}
+
 MV_Poll(condFn, timeoutSecs) {
     deadline := A_TickCount + timeoutSecs * 1000
     Loop {
@@ -155,8 +299,6 @@ MV_Poll(condFn, timeoutSecs) {
     }
 }
 
-; Versão que aguarda qualquer uma de uma lista de janelas.
-; Retorna o título que apareceu, ou "" se timeout.
 MV_WaitAnyWindow(titles, timeoutSecs) {
     deadline := A_TickCount + timeoutSecs * 1000
     Loop {
