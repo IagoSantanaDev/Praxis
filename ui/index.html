@@ -206,6 +206,7 @@ body {
 .li { color: var(--log-info); }
 .lw { color: var(--log-warn); }
 .le { color: var(--log-err); }
+.lred { color: #CC0000; }
 
 /* Status bar */
 #sbar { background: var(--win-bg); border-top: 1px solid var(--win-bdr-dk); padding: 2px 8px; display: flex; align-items: center; gap: 12px; font-size: 10px; color: #333; flex-shrink: 0; }
@@ -511,7 +512,10 @@ function appendLog(msg, type) {
   const now  = new Date().toLocaleTimeString('pt-BR');
   const el   = document.createElement('div');
   el.className = 'll';
-  el.innerHTML = `<span class="lt">[${now}]</span><span class="l${type}">${esc(msg)}</span>`;
+  let safe = esc(msg)
+    .replace(/\r\n|\r|\n/g, '<br>');
+  safe = safe.replace(/\[\[red\]\]([\s\S]*?)\[\[\/red\]\]/g, '<span class="lred">$1</span>');
+  el.innerHTML = `<span class="lt">[${now}]</span><span class="l${type}">${safe}</span>`;
   area.appendChild(el);
   area.scrollTop = area.scrollHeight;
 }
