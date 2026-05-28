@@ -18,6 +18,7 @@ Exemplos:
   powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -InstallAhk2Exe
   powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -SkipInstaller
   powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -RequireCodeSigning
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -Release
 #>
 
 [CmdletBinding()]
@@ -32,6 +33,8 @@ param(
     [switch]$InstallAhk2Exe,
     [switch]$SkipInstaller,
     [switch]$Compress,
+    [switch]$Release,
+    [switch]$AllowDirty,
 
     [string]$SignToolPath,
     [string]$CertificateThumbprint,
@@ -48,15 +51,27 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $MainScript = Join-Path $ProjectRoot 'main.ahk'
 $InstallerScript = Join-Path $ProjectRoot 'installer\Praxis.iss'
+$ImagesDir = Join-Path $ProjectRoot 'images'
+$InstallerAssetsDir = Join-Path $ProjectRoot 'installer\assets'
+$AppIconPath = Join-Path $InstallerAssetsDir 'icon.ico'
+$WizardBannerPath = Join-Path $InstallerAssetsDir 'wizard-large.bmp'
+$WizardSmallPath = Join-Path $InstallerAssetsDir 'wizard-small.bmp'
 $DistRoot = Join-Path $ProjectRoot 'dist'
 $ReleaseRoot = Join-Path $DistRoot "Praxis-$Version"
 $StageDir = Join-Path $ReleaseRoot 'stage'
 $InstallerOutDir = Join-Path $ReleaseRoot 'installer'
 $ManifestPath = Join-Path $ReleaseRoot 'Praxis-build-manifest.json'
+$IntegrityManifestSourcePath = Join-Path $ProjectRoot 'build\generated\Praxis_IntegrityManifest.ahk'
 $ExePath = Join-Path $StageDir 'Praxis.exe'
+$VersionInfoVersion = $null
 $ResolvedSignToolPath = $null
 $NormalizedCertificateThumbprint = $null
 $CodeSigningEnabled = $false
+$ReleaseMode = [bool]$Release
+$EffectiveCompress = [bool]$Compress
+$EffectiveRequireCodeSigning = [bool]$RequireCodeSigning
+$SourceCommit = $null
+$SourceDirty = $null
 
 function Write-Step {
     param([string]$Message)
@@ -206,6 +221,52 @@ function Assert-NativeCommandSucceeded {
     if ($exitCode -ne 0) { throw "$FailureMessage Exit code: $exitCode" }
 }
 
+function Convert-ToWindowsVersionInfoVersion {
+    param([string]$SemanticVersion)
+
+    if ([string]::IsNullOrWhiteSpace($SemanticVersion)) {
+        return '1.0.0.0'
+    }
+
+    $coreVersion = ($SemanticVersion -split '[-+]')[0]
+    $parts = @($coreVersion -split '\.')
+    while ($parts.Count -lt 4) { $parts += '0' }
+    if ($parts.Count -gt 4) { $parts = $parts[0..3] }
+
+    $normalizedParts = foreach ($part in $parts) {
+        if ($part -notmatch '^\d+$') { '0' } else { [int]$part }
+    }
+
+    return ($normalizedParts -join '.')
+}
+
+function Get-GitBuildState {
+    param([string]$RepositoryRoot)
+
+    $state = [ordered]@{
+        Commit = $null
+        Dirty = $null
+        StatusLines = @()
+    }
+
+    try {
+        $commit = (& git -C $RepositoryRoot rev-parse --short HEAD 2>$null)
+        if ((Get-NativeExitCode) -eq 0) {
+            $state.Commit = [string]$commit
+        }
+
+        $status = @(& git -C $RepositoryRoot status --porcelain 2>$null)
+        if ((Get-NativeExitCode) -eq 0) {
+            $state.StatusLines = $status
+            $state.Dirty = $status.Count -gt 0
+        }
+    } catch {
+        $state.Dirty = $null
+    }
+
+    return $state
+}
+
 function Wait-ForFile {
     param(
         [string]$Path,
@@ -297,22 +358,111 @@ function New-HashManifest {
         version = $Metadata.Version
         builtAtUtc = (Get-Date).ToUniversalTime().ToString('o')
         sourceCommit = $Metadata.SourceCommit
+        sourceDirty = $Metadata.SourceDirty
+        releaseMode = $Metadata.ReleaseMode
+        allowDirty = $Metadata.AllowDirty
+        compress = $Metadata.Compress
         codeSigning = $Metadata.CodeSigning
-        protectionNotice = 'Build compilado e empacotado sem arquivos .ahk. Não é criptografia forte; preserve contratos, hashes e controle de distribuição.'
+        protectionNotice = 'Build compilado e empacotado sem arquivos .ahk. Assinatura, compressão, DPAPI e manifesto elevam o custo de adulteração/inspeção casual, mas não são criptografia forte contra engenharia reversa profissional.'
         files = @($files)
     }
 
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $OutputPath -Encoding UTF8
 }
 
+function New-AhkIntegrityManifest {
+    param(
+        [string]$RepositoryRoot,
+        [string]$OutputPath,
+        [string]$UiDir,
+        [string]$ImagesDir,
+        [string]$WebView2LoaderPath
+    )
+
+    $protectedFiles = @()
+    if (Test-Path -LiteralPath $UiDir) {
+        $protectedFiles += Get-ChildItem -LiteralPath $UiDir -File -Recurse
+    }
+    if (Test-Path -LiteralPath $ImagesDir) {
+        $protectedFiles += Get-ChildItem -LiteralPath $ImagesDir -File -Recurse
+    }
+    if (Test-Path -LiteralPath $WebView2LoaderPath) {
+        $protectedFiles += Get-Item -LiteralPath $WebView2LoaderPath
+    }
+
+    $entries = $protectedFiles |
+        Sort-Object FullName |
+        ForEach-Object {
+            $relative = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            [ordered]@{
+                path = $relative
+                sha256 = $hash
+            }
+        }
+
+    if (!$entries -or $entries.Count -eq 0) {
+        throw 'Nenhum recurso externo foi encontrado para gerar o manifesto de integridade embutido.'
+    }
+
+    $lines = @(
+        '; Gerado automaticamente por tools/build-praxis.ps1.',
+        '; Não edite manualmente. Este arquivo é embutido no Praxis.exe pelo Ahk2Exe.',
+        'gIntegrityExpectedFiles := Map('
+    )
+
+    for ($i = 0; $i -lt $entries.Count; $i++) {
+        $entry = $entries[$i]
+        $suffix = if ($i -lt ($entries.Count - 1)) { ',' } else { '' }
+        $lines += "    `"$($entry.path)`", `"$($entry.sha256)`"$suffix"
+    }
+    $lines += ')'
+
+    $outputDir = Split-Path -Parent $OutputPath
+    New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+    Set-Content -LiteralPath $OutputPath -Value ($lines -join [Environment]::NewLine) -Encoding UTF8
+}
+
 Write-Step 'Validando arquivos do projeto'
+$VersionInfoVersion = Convert-ToWindowsVersionInfoVersion -SemanticVersion $Version
 foreach ($required in @(
     $MainScript,
     (Join-Path $ProjectRoot 'ui\index.html'),
+    $ImagesDir,
     (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll'),
-    (Join-Path $ProjectRoot 'LICENSE')
+    (Join-Path $ProjectRoot 'LICENSE'),
+    $AppIconPath
 )) {
     if (!(Test-Path -LiteralPath $required)) { throw "Arquivo obrigatório não encontrado: $required" }
+}
+
+if (!$SkipInstaller) {
+    foreach ($installerAsset in @($AppIconPath, $WizardBannerPath, $WizardSmallPath)) {
+        if (!(Test-Path -LiteralPath $installerAsset)) { throw "Asset visual obrigatório do instalador não encontrado: $installerAsset" }
+    }
+}
+
+if ($ReleaseMode) {
+    if ($SkipInstaller) {
+        throw 'Release endurecido não permite -SkipInstaller. Gere e valide o instalador.'
+    }
+    $EffectiveCompress = $true
+    $EffectiveRequireCodeSigning = $true
+    Write-Step 'Modo release endurecido habilitado: assinatura, compressão, instalador e Git limpo obrigatórios'
+}
+
+$gitState = Get-GitBuildState -RepositoryRoot $ProjectRoot
+$SourceCommit = $gitState['Commit']
+$SourceDirty = $gitState['Dirty']
+if ($ReleaseMode -and $SourceDirty -eq $null) {
+    throw 'Release endurecido requer repositório Git legível para registrar commit e estado da árvore.'
+}
+if ($ReleaseMode -and $SourceDirty -and !$AllowDirty) {
+    $dirtyPreview = ($gitState['StatusLines'] | Select-Object -First 20) -join [Environment]::NewLine
+    throw "Release endurecido bloqueado: working tree sujo. Commit/stash antes de gerar release ou use -AllowDirty para registrar exceção explícita.$([Environment]::NewLine)$dirtyPreview"
+}
+if ($SourceDirty) {
+    Write-Warning 'Working tree sujo. O manifesto registrará sourceDirty=true.'
 }
 
 $AutoHotkey64 = Find-AutoHotkey64 -ExplicitPath $AutoHotkeyBasePath
@@ -349,7 +499,7 @@ if (!$SkipInstaller) {
 }
 
 $NormalizedCertificateThumbprint = Normalize-CertificateThumbprint -Thumbprint $CertificateThumbprint
-if ($RequireCodeSigning -and [string]::IsNullOrWhiteSpace($NormalizedCertificateThumbprint)) {
+if ($EffectiveRequireCodeSigning -and [string]::IsNullOrWhiteSpace($NormalizedCertificateThumbprint)) {
     throw 'Assinatura digital obrigatória: informe -CertificateThumbprint com o thumbprint do certificado de code signing.'
 }
 
@@ -362,7 +512,7 @@ if (![string]::IsNullOrWhiteSpace($NormalizedCertificateThumbprint)) {
     $cert = Get-CodeSigningCertificate -Thumbprint $NormalizedCertificateThumbprint -StoreLocation $CertificateStoreLocation -StoreName $CertificateStoreName
     $CodeSigningEnabled = $true
     Write-Step "Assinatura digital habilitada: $($cert.Subject) [$CertificateStoreLocation\\$CertificateStoreName]"
-} elseif ($RequireCodeSigning) {
+} elseif ($EffectiveRequireCodeSigning) {
     throw 'Assinatura digital obrigatória, mas nenhum certificado foi configurado.'
 } else {
     Write-Warning 'Assinatura digital desabilitada. Use -CertificateThumbprint ou -RequireCodeSigning para bloquear releases sem assinatura.'
@@ -375,8 +525,14 @@ if (Test-Path -LiteralPath $ReleaseRoot) {
 New-Item -ItemType Directory -Path $StageDir, $InstallerOutDir | Out-Null
 
 Write-Step 'Compilando AutoHotkey para EXE'
+Write-Step 'Gerando manifesto de integridade embutido no EXE'
+New-AhkIntegrityManifest -RepositoryRoot $ProjectRoot -OutputPath $IntegrityManifestSourcePath -UiDir (Join-Path $ProjectRoot 'ui') -ImagesDir $ImagesDir -WebView2LoaderPath (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll')
+
 $compileArgs = @('/in', $MainScript, '/out', $ExePath, '/base', $AutoHotkey64)
-if ($Compress) {
+if (Test-Path -LiteralPath $AppIconPath) {
+    $compileArgs += @('/icon', $AppIconPath)
+}
+if ($EffectiveCompress) {
     # Compressão dificulta inspeção casual, mas não é criptografia.
     $compileArgs += @('/compress', '2')
 }
@@ -388,6 +544,7 @@ Invoke-SignFile -Path $ExePath
 
 Write-Step 'Copiando recursos distribuíveis sem código-fonte AHK'
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ui') -Destination (Join-Path $StageDir 'ui') -Recurse
+Copy-Item -LiteralPath $ImagesDir -Destination (Join-Path $StageDir 'images') -Recurse
 New-Item -ItemType Directory -Path (Join-Path $StageDir 'lib\64bit') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll') -Destination (Join-Path $StageDir 'lib\64bit\WebView2Loader.dll')
 foreach ($legalFile in @('LICENSE','COPYRIGHT','NOTICE.md','EULA.md','NDA.md','PRIVACY_LGPD.md','THIRD_PARTY_NOTICES.md','README.md')) {
@@ -404,14 +561,9 @@ if ($leakedSources) {
     throw "O staging contém arquivos de fonte/script que não devem ser distribuídos:$([Environment]::NewLine)$leakedList"
 }
 
-$sourceCommit = $null
-try {
-    $sourceCommit = (& git -C $ProjectRoot rev-parse --short HEAD 2>$null)
-    if ((Get-NativeExitCode) -ne 0) { $sourceCommit = $null }
-} catch { $sourceCommit = $null }
-
 $codeSigningMetadata = [ordered]@{
     enabled = $CodeSigningEnabled
+    required = $EffectiveRequireCodeSigning
     certificateThumbprint = if ($CodeSigningEnabled) { $NormalizedCertificateThumbprint } else { $null }
     certificateStore = if ($CodeSigningEnabled) { "$CertificateStoreLocation\\$CertificateStoreName" } else { $null }
     signTool = if ($CodeSigningEnabled -and $ResolvedSignToolPath) { $ResolvedSignToolPath } else { $null }
@@ -420,12 +572,20 @@ $codeSigningMetadata = [ordered]@{
 }
 
 Write-Step 'Gerando manifesto de hashes do pacote'
-New-HashManifest -RootPath $StageDir -OutputPath $ManifestPath -Metadata @{ Version = $Version; SourceCommit = $sourceCommit; CodeSigning = $codeSigningMetadata }
+New-HashManifest -RootPath $StageDir -OutputPath $ManifestPath -Metadata @{
+    Version = $Version
+    SourceCommit = $SourceCommit
+    SourceDirty = $SourceDirty
+    ReleaseMode = $ReleaseMode
+    AllowDirty = [bool]$AllowDirty
+    Compress = $EffectiveCompress
+    CodeSigning = $codeSigningMetadata
+}
 Copy-Item -LiteralPath $ManifestPath -Destination (Join-Path $StageDir 'Praxis-build-manifest.json')
 
 if (!$SkipInstaller) {
     Write-Step 'Gerando instalador Inno Setup'
-    & $InnoSetup "/DAppVersion=$Version" "/DSourceDir=$StageDir" "/DOutputDir=$InstallerOutDir" $InstallerScript
+    & $InnoSetup "/DAppVersion=$Version" "/DAppVersionInfoVersion=$VersionInfoVersion" "/DSourceDir=$StageDir" "/DOutputDir=$InstallerOutDir" "/DAssetsDir=$InstallerAssetsDir" $InstallerScript
     Assert-NativeCommandSucceeded 'Falha ao gerar instalador Inno Setup.'
 
     $setupPath = Join-Path $InstallerOutDir "Praxis-Setup-$Version.exe"
@@ -439,6 +599,11 @@ if (!$SkipInstaller) {
         version = $Version
         builtAtUtc = (Get-Date).ToUniversalTime().ToString('o')
         codeSigning = $codeSigningMetadata
+        sourceCommit = $SourceCommit
+        sourceDirty = $SourceDirty
+        releaseMode = $ReleaseMode
+        allowDirty = [bool]$AllowDirty
+        compress = $EffectiveCompress
         installer = [ordered]@{
             path = (Get-PortableRelativePath -BasePath $ReleaseRoot -TargetPath $setupPath).Replace('\', '/')
             sha256 = $installerHash.Hash.ToLowerInvariant()
