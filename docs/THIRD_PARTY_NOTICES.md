@@ -13,43 +13,86 @@ A licença proprietária do Praxis aplica-se ao código, documentação, interfa
 
 ## Componentes de terceiros identificados
 
-### AutoHotkey
+### AutoHotkey v2 / Ahk2Exe
 
-O projeto é desenvolvido para AutoHotkey v2. AutoHotkey é um software de terceiros e permanece sujeito à sua própria licença, termos e avisos oficiais.
+O projeto é desenvolvido para AutoHotkey v2 e o executável de distribuição pode ser gerado por Ahk2Exe usando o binário base do AutoHotkey.
 
-A licença proprietária do Praxis não altera os direitos e obrigações aplicáveis ao AutoHotkey.
+- Projeto upstream: AutoHotkey
+- Site/repositório: <https://www.autohotkey.com/> / <https://github.com/AutoHotkey/AutoHotkey>
+- Licença identificada no repositório oficial da série v2: GNU General Public License v2, com avisos de componentes adicionais como PCRE/BSD no arquivo de licença upstream.
+
+A licença proprietária do Praxis não altera os direitos e obrigações aplicáveis ao AutoHotkey, Ahk2Exe, ao binário base incorporado no executável compilado ou a componentes de terceiros distribuídos com o AutoHotkey.
+
+Ao distribuir builds compilados, preserve os avisos exigidos pelo AutoHotkey e disponibilize aos destinatários os termos de licença aplicáveis ao componente AutoHotkey usado na geração do executável.
 
 ### Microsoft Edge WebView2 / WebView2Loader.dll
 
 O projeto utiliza Microsoft Edge WebView2 e/ou `WebView2Loader.dll` para carregar a interface HTML em ambiente desktop.
 
-Esses componentes são de titularidade de seus respectivos proprietários e permanecem sujeitos aos termos, licenças e condições da Microsoft.
+- Titular: Microsoft Corporation.
+- Componentes no projeto: `lib/64bit/WebView2Loader.dll` e, quando presente, `lib/32bit/WebView2Loader.dll`.
+- Documentação/termos oficiais: <https://developer.microsoft.com/microsoft-edge/webview2/>
 
-### Bibliotecas AutoHotkey em `lib/`
+Esses componentes são de titularidade de seus respectivos proprietários e permanecem sujeitos aos termos, licenças e condições da Microsoft. A licença proprietária do Praxis não concede direitos sobre Microsoft Edge, WebView2 Runtime, SDK, loader ou demais componentes Microsoft.
 
-O diretório `lib/` contém ou pode conter bibliotecas AutoHotkey de terceiros, como bibliotecas relacionadas a WebView2, JSON, Promise, ComVar ou outras utilidades.
+Antes de distribuição externa, confirme se a forma de empacotamento escolhida usa runtime evergreen, bootstrapper, fixed version runtime ou apenas loader, e preserve os avisos/licenças exigidos pela Microsoft para esse modelo.
 
-Antes de distribuir o projeto, verifique os cabeçalhos de cada arquivo e preserve os avisos de autoria, copyright e licença dos respectivos autores originais.
+### Bibliotecas AutoHotkey de `thqby/ahk2_lib`
 
-Arquivos identificados neste projeto:
+O diretório `lib/` contém bibliotecas AutoHotkey de terceiros provenientes ou derivadas do projeto `thqby/ahk2_lib`.
 
-- `lib/WebView2.ahk` — biblioteca de terceiros com cabeçalho de autoria original preservado.
-- `lib/JSON.ahk` — biblioteca de terceiros com cabeçalho de autoria original preservado.
-- `lib/Promise.ahk` — biblioteca de terceiros com cabeçalho de autoria original preservado.
-- `lib/ComVar.ahk` — biblioteca de terceiros/utilidade COM; licença de origem a confirmar antes de distribuição externa.
-- `lib/64bit/WebView2Loader.dll` — componente relacionado ao Microsoft Edge WebView2.
+- Projeto upstream: <https://github.com/thqby/ahk2_lib>
+- Licença identificada: MIT License
+- Componentes identificados neste projeto:
+  - `lib/WebView2.ahk`
+  - `lib/JSON.ahk`
+  - `lib/Promise.ahk`
+  - `lib/ComVar.ahk`
+
+Os cabeçalhos de autoria preservados nos arquivos indicam autoria de `thqby` e, em `JSON.ahk`, também derivação/modificação de trabalho de HotKeyIt/Yaml. A licença MIT permite uso, cópia, modificação e distribuição, inclusive junto de software proprietário, desde que o aviso de copyright e a permissão sejam incluídos em todas as cópias ou porções substanciais do software.
+
+#### Texto da licença MIT aplicável a `thqby/ahk2_lib`
+
+```text
+MIT License
+
+Copyright (c) 2023 thqby
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Obrigação de preservação
 
 Ao copiar, distribuir internamente, empacotar ou preparar build do Praxis, preserve todos os avisos de copyright, licença e atribuição de terceiros exigidos pelas respectivas licenças.
 
-## Pendências
+Em especial:
 
-Antes de qualquer distribuição comercial ou externa, confirme:
+- não remova cabeçalhos de autoria dos arquivos em `lib/`;
+- inclua este documento ou equivalente nos pacotes distribuídos quando houver componentes de terceiros;
+- mantenha claro que a licença proprietária do Praxis cobre apenas o código e materiais próprios;
+- confirme as obrigações do AutoHotkey/Ahk2Exe e WebView2 conforme o formato real do build distribuído.
 
-- licença exata de cada arquivo em `lib/`;
-- obrigações de atribuição;
-- obrigação ou não de incluir cópia da licença original;
-- possibilidade de distribuição junto com software proprietário;
-- requisitos de distribuição do WebView2 Runtime/WebView2Loader;
-- obrigações aplicáveis ao uso/distribuição do AutoHotkey.
+## Pendências antes de distribuição comercial ou externa
+
+Antes de qualquer distribuição comercial ou externa, confirme com revisão técnica/jurídica:
+
+- obrigações exatas da licença AutoHotkey/Ahk2Exe no modelo de executável gerado;
+- requisitos de distribuição do Microsoft Edge WebView2 Runtime/WebView2Loader;
+- se o pacote final inclui todos os notices e textos de licença exigidos;
+- se o instalador apresenta ou disponibiliza adequadamente os avisos de terceiros.

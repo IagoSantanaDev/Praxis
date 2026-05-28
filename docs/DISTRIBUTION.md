@@ -56,6 +56,59 @@ O build:
 
 Se `signtool.exe` não estiver instalado, o script usa `Set-AuthenticodeSignature` como fallback local.
 
+## Perfil de build endurecido
+
+Para releases distribuídos fora da máquina de desenvolvimento, use sempre assinatura obrigatória e compressão do Ahk2Exe:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 `
+  -Version 1.0.0 `
+  -CertificateThumbprint "THUMBPRINT_DO_CERTIFICADO" `
+  -RequireCodeSigning `
+  -Compress
+```
+
+Esse perfil:
+
+- bloqueia release sem assinatura digital;
+- reduz exposição casual com compressão do executável;
+- mantém o stage sem `.ahk`, `.ps1` ou `.iss`;
+- gera manifestos SHA-256 para auditoria;
+- não inclui segredos no pacote.
+
+Compressão e assinatura aumentam o custo de adulteração/inspeção casual, mas não impedem engenharia reversa por atacante determinado. Não coloque códigos de acesso aceitos, chaves privadas, tokens de API ou regras comerciais críticas dentro do cliente.
+
+## Criptografia local do `config.ini`
+
+O Praxis armazena dados sensíveis do `config.ini` usando DPAPI do Windows no contexto do usuário atual:
+
+- `[Access] EncCode` — código de acesso validado na Praxis API;
+- `[Auth] EncPass` — senha do MV informada pelo operador.
+
+Esses valores:
+
+- não ficam em texto claro;
+- não devem ser copiados entre usuários/máquinas;
+- devem ser revalidados contra a API quando aplicável;
+- podem ser revogados no servidor removendo/trocando `ACCESS_CODES`.
+
+A DPAPI protege contra leitura casual do arquivo, mas não protege contra malware rodando como o mesmo usuário nem contra um atacante que controle a sessão Windows. Por isso, a autorização real deve continuar no servidor (`https://praxis.squareweb.app/v1/access/validate`).
+
+## Engenharia reversa: limites e postura
+
+O cliente desktop deve ser tratado como ambiente não confiável. Medidas locais são barreiras, não garantias.
+
+O que o projeto faz ou deve fazer:
+
+- distribuir apenas `Praxis.exe` e recursos necessários, nunca os `.ahk` fonte;
+- assinar o executável e o instalador;
+- preservar manifesto de hashes para detectar adulteração;
+- validar código de acesso na API, não em segredo hardcoded local;
+- armazenar segredos locais com DPAPI;
+- manter logs sem código de acesso, senha, XML real, prints sensíveis ou dados de paciente.
+
+Se a ameaça for engenharia reversa profissional, considere uma camada comercial de proteção/empacotamento para Windows, como VMProtect/Themida/WinLicense ou equivalente. Mesmo essas soluções não tornam o cliente inviolável; elas apenas aumentam o custo. A proteção mais forte continua sendo manter decisões comerciais e validações revogáveis no servidor.
+
 ## Limites do certificado autoassinado
 
 - Não cria reputação SmartScreen pública.

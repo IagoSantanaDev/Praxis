@@ -1,4 +1,4 @@
-# RPA MV2000i
+# Praxis
 
 Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão Hospitalar)**. Desenvolvido em AutoHotkey v2 com interface gráfica WebView2 (HTML/CSS/JS).
 
@@ -27,7 +27,7 @@ Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão
 ## Estrutura de Arquivos
 
 ```
-RPA MV2000i/
+Praxis/
 ├── main.ahk                   # Entry point: GUI, login, dispatcher
 ├── config.ini                 # Configuração e credenciais criptografadas
 ├── lib/
@@ -35,6 +35,7 @@ RPA MV2000i/
 │   ├── JSON.ahk               # Lib externa (thqby)
 │   ├── Promise.ahk            # Dependência da WebView2.ahk
 │   ├── ComVar.ahk             # Dependência da WebView2.ahk
+│   ├── 32bit/WebView2Loader.dll
 │   └── 64bit/WebView2Loader.dll
 ├── scripts/
 │   ├── mv_session.ahk         # Login MV, abertura de módulos, polling
@@ -73,13 +74,13 @@ Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
 
 ## Instalação (Desenvolvimento)
 
-1. Copiar pasta `RPA MV2000i/` para o computador
+1. Copiar pasta `Praxis/` para o computador
 2. Criar `config.ini` com:
    ```ini
    [Paths]
-   WorkDir=C:\Users\<usuario>\Documents\RPA MV2000i
+   WorkDir=C:\Users\<usuario>\Documents\Praxis
    ```
-3. Criar pasta `%DOCUMENTS%\RPA MV2000i\XML\`
+3. Criar pasta `%DOCUMENTS%\Praxis\XML\`
 4. Baixar libs AHK em `lib\`:
    - `WebView2.ahk`, `JSON.ahk`, `Promise.ahk`, `ComVar.ahk`
 5. Duplo clique em `main.ahk`
@@ -89,8 +90,8 @@ Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
 ## Instalação (Produção)
 
 Script Inno Setup 6 (`installer.iss`):
-- Instala em `%LOCALAPPDATA%\RPA MV2000i\` (sem admin)
-- Cria `%DOCUMENTS%\RPA MV2000i\XML\` automaticamente
+- Instala em `%LOCALAPPDATA%\Praxis\` (sem admin)
+- Cria `%DOCUMENTS%\Praxis\XML\` automaticamente
 - Grava `WorkDir` no `config.ini`
 - Cria atalhos no Menu Iniciar e Área de Trabalho
 
