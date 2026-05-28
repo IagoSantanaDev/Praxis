@@ -133,21 +133,35 @@ Isso já foi registrado em comentários em:
 9. `scripts/remessa_protocolo.ahk` teve as detecções por imagem removidas do fluxo principal; onde não houver janela/controle validado, o fluxo deve falhar explicitamente em vez de usar imagem/Enter como fallback.
 10. `test_macros/01_login_identificacao.ahk` e `test_macros/02_movdoc_baixa.ahk` foram alinhados com as regras novas: login por título de popup, abertura por atalho obrigatório e MOV DOC por região Client.
 11. Verificação local executada: `git diff --check -- scripts/mv_session.ahk scripts/remessa_protocolo.ahk test_macros/02_movdoc_baixa.ahk docs/CONTEXTO_CONTINUAR.md .gsd/DECISIONS.md` passou sem erros. AutoHotkey não está disponível no PATH deste ambiente, então a validação executável ainda precisa ocorrer no PC da empresa.
+12. Usuário validou `test_macros/03_ffcv_manutencao_remessas.ahk`: funcionou tanto para criar nova remessa quanto para abrir remessa existente. Evidências salvas em `Fluxos/Fluxo_InserirConta/Relatorio_FFCV_Criando_Remessa.txt` e `Fluxos/Fluxo_InserirConta/Relatorio_FFCV_Buscando_Remessa.txt`.
+13. O popup `Informações da Conta` do fluxo Inserir Conta não altera o título da tela FFCV. A detecção deve usar o controle sentinela `ui60Drawn W323` dentro da janela `MV2000i - Faturamento ahk_exe ifrun60.EXE`, com ponto Client validado `x=432 y=109`, e confirmar o campo `Edit2` da conta em `x=298 y=143`, em vez de esperar um `WinTitle` novo.
+14. O modal de erro ao inserir conta é outro alvo: ele tem título próprio `Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE`, mas a mensagem visual é desenhada em `ui60Drawn_*`, então `WinGetText`/Window Spy podem expor apenas `&OK`. O macro 11 agora classifica erro conhecido por template visual dentro do modal.
+15. O envio de contas em lote no macro 11 usa polling subsegundo, não `Sleep` longo: `POLL_INTERVAL_MS := 20`, `NO_MODAL_DECISION_MS := 450`, `MODAL_WAIT_AFTER_ENTER_MS := 800`. Se o modal aparecer, reage imediatamente; se não aparecer e o popup estiver estável, libera a próxima conta em menos de 1s.
 
 ### `scripts/remessa_protocolo.ahk`
 
-1. Botão **Fechar contas sem imprimir faturas** deixou de usar imagem e passou a usar controle:
+1. Botão **Fechar contas sem imprimir faturas** deixou de usar imagem e passou a usar controle validado na tela de datas:
 
 ```ahk
-FFCV_BTN_FINALIZAR     := "Button3"
-FFCV_BTN_FINALIZAR_X   := 541
-FFCV_BTN_FINALIZAR_Y   := 242
+DATAS_CHECKBOX   := "Button3"
+DATAS_CHECKBOX_X := 541
+DATAS_CHECKBOX_Y := 242
 ```
 
 Uso no fluxo:
 
 ```ahk
-MV_ClickControlAt(WIN_FFCV_DATAS, FFCV_BTN_FINALIZAR, FFCV_BTN_FINALIZAR_X, FFCV_BTN_FINALIZAR_Y)
+MV_ClickControlAt(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y)
+```
+
+1.1. A tela **Entrega de Remessas** foi atualizada no principal com os spies de `Fluxos/Fluxo_FecharRemessa`:
+
+```ahk
+DATAS_CAMPO_REMESSA      → Edit5,    x 59,  y 101
+DATAS_CAMPO_ENTREGA      → Edit1,    x 146, y 101
+DATAS_CAMPO_VENCIMENTO   → Edit1,    x 244, y 227
+DATAS_CHECKBOX           → Button3,  x 541, y 242
+DATAS_BTN_CONFIRMAR      → Button10, x 30,  y 426
 ```
 
 2. Tela **XML gerado** deixou de usar imagem para caminho/salvar/voltar e passou a usar controles:
@@ -166,6 +180,14 @@ XML_FORM_BTN_VOLTAR_X := 731
 XML_FORM_BTN_VOLTAR_Y := 470
 ```
 
+2.1. A tela **Monitoração de Faturamento - TISS** também foi atualizada no principal com os spies de `Fluxos/Fluxo_XML`:
+
+```ahk
+XML_CAMPO_REMESSA     → Edit1,   x 272, y 89
+XML_BTN_FATURAMENTO   → Button7, x 12,  y 446
+XML_BTN_NAO           → Button2, x 152, y 76 em modal "Mensagem ao Usuário do MV 2000"
+```
+
 3. Removidas referências mortas às imagens de controle:
 
 ```text
@@ -181,39 +203,39 @@ RP_IMG_VOLTAR_XML
 
 #### `test_macros/05_entrega_datas.ahk`
 
-Foi configurado parcialmente com dados já enviados pelo usuário:
+Foi configurado com os spies disponíveis e aplicado ao principal:
 
 ```ahk
-DATAS_CHECKBOX      → Button3,  x 541, y 242
-DATAS_BTN_CONFIRMAR → Button10, x 30,  y 426
+DATAS_CAMPO_REMESSA      → Edit5,    x 59,  y 101
+DATAS_CAMPO_ENTREGA      → Edit1,    x 146, y 101
+DATAS_CAMPO_VENCIMENTO   → Edit1,    x 244, y 227
+DATAS_CHECKBOX           → Button3,  x 541, y 242
+DATAS_BTN_CONFIRMAR      → Button10, x 30,  y 426
 ```
 
-Ainda podem ficar pendentes/por teclado:
+Ainda pendente apenas se quiser robustez maior:
 
 ```text
-DATAS_CAMPO_REMESSA
-DATAS_CAMPO_ENTREGA
-DATAS_CAMPO_VENCIMENTO
 DATAS_BTN_VOLTAR
 ```
 
 #### `test_macros/06_xml_monitoracao_tiss.ahk`
 
-Foi configurado:
+Foi configurado e aplicado ao principal:
 
 ```ahk
-XML_BTN_FATURAMENTO → Button7, x 55, y 458
+XML_CAMPO_REMESSA   → Edit1,   x 272, y 89
+XML_BTN_FATURAMENTO → Button7, x 12,  y 446
 ```
 
 Ainda pendentes se quiser robustez maior:
 
 ```text
-XML_CAMPO_REMESSA
 XML_BTN_BUSCAR
 XML_BTN_SAIR_TELA
 ```
 
-Mas o fluxo atual pode continuar por teclado (`Tab x5 → remessa → F8`) se estiver funcionando.
+O fluxo atual preenche a remessa por controle e consulta com `F8`.
 
 #### `test_macros/07_xml_gerado.ahk`
 
@@ -234,7 +256,8 @@ XML_BTN_SAIR_FORM
 
 #### `test_macros/04_popup_inserir_contas_fluxo.ahk`
 
-Arquivo novo criado para testar o fluxo do popup de inserir contas de forma simples e editável.
+Arquivo criado para testar o fluxo do popup de inserir contas de forma simples e editável.
+Atualização posterior: o popup **Informações da Conta** é embarcado na janela principal do FFCV e não muda o título da tela. O macro agora resolve o alvo pelo sentinela `ui60Drawn W323` dentro de `MV2000i - Faturamento ahk_exe ifrun60.EXE`, usando ponto Client `x=432 y=109`.
 
 Flags principais:
 
@@ -249,7 +272,8 @@ DO_CLOSE_POPUP      := false
 Campos que o usuário deve configurar com Window Spy:
 
 ```ahk
-WIN_POPUP
+POPUP_HOST_WIN
+POPUP_SENTINEL_CLASS / X / Y
 POPUP_DROPDOWN_1_CLASS / X / Y
 POPUP_DROPDOWN_2_CLASS / X / Y
 POPUP_CAMPO_CONTA_CLASS / X / Y
@@ -260,9 +284,9 @@ MODAL_BTN_OK_CLASS / X / Y
 Uso recomendado:
 
 1. abrir popup manualmente;
-2. configurar `WIN_POPUP`;
+2. manter `POPUP_HOST_WIN` como a janela principal do FFCV e validar o sentinela;
 3. rodar com `DO_ACTION := false`;
-4. configurar controles pelo Window Spy;
+4. ajustar controles pelo Window Spy se algum `ClassNN`/ponto Client não bater;
 5. ligar uma etapa por vez.
 
 #### `test_macros/10_popup_text_capture.ahk`
@@ -273,9 +297,12 @@ Ele:
 
 - procura `ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE`;
 - captura `WinGetText`;
+- enumera `WinGetControls` e `WinGetControlsHwnd`, incluindo `ClassNN`, retângulo e `ControlGetText` por controle;
 - mostra em `MsgBox`;
 - salva em `test_macros\ultimo_popup.txt`;
 - copia para o clipboard com `A_Clipboard := content`.
+
+Observação importante: em modais do Oracle Forms, a mensagem pode ser desenhada em `ui60Drawn_*` sem texto acessível ao AHK. Nesse caso `WinGetText` e Window Spy podem mostrar apenas `&OK`, `&Sim` ou `&Não`; o fluxo deve usar a existência do modal como sinal de erro/aviso, não depender do texto para validar envio.
 
 Não clica, não fecha popup e não envia teclas para o MV.
 
@@ -324,6 +351,13 @@ RECEB_Y := 359
 
 ### `03_ffcv_manutencao_remessas.ahk`
 
+Validado pelo usuário em 2026-05-19: funcionou para criar nova remessa e para buscar remessa existente. Evidências:
+
+```text
+Fluxos/Fluxo_InserirConta/Relatorio_FFCV_Criando_Remessa.txt
+Fluxos/Fluxo_InserirConta/Relatorio_FFCV_Buscando_Remessa.txt
+```
+
 Não mapear os campos variáveis por `ClassNN` fixo. Ajustar apenas dados de teste e flags:
 
 ```ahk
@@ -337,10 +371,21 @@ DO_SELECT_OR_CREATE_REMESSA
 
 ### `04_popup_inserir_contas_fluxo.ahk` — importante
 
-Configurar:
+Configuração atual já inclui a estratégia correta para o popup embarcado:
 
 ```ahk
-WIN_POPUP
+POPUP_HOST_WIN := "MV2000i - Faturamento ahk_exe ifrun60.EXE"
+POPUP_SENTINEL_CLASS := "ui60Drawn W323"
+POPUP_SENTINEL_X := "432"
+POPUP_SENTINEL_Y := "109"
+POPUP_CAMPO_CONTA_CLASS := "Edit2"
+POPUP_CAMPO_CONTA_X := "298"
+POPUP_CAMPO_CONTA_Y := "143"
+```
+
+Configurar/confirmar:
+
+```ahk
 POPUP_DROPDOWN_1_CLASS / X / Y
 POPUP_DROPDOWN_2_CLASS / X / Y
 POPUP_CAMPO_CONTA_CLASS / X / Y
@@ -350,11 +395,11 @@ MODAL_BTN_OK_CLASS / X / Y, se houver modal de erro/aviso
 
 ### `05_entrega_datas.ahk`
 
-Já tem checkbox e confirmar. Se necessário, configurar campos de data e voltar.
+Foi mantido como teste pontual. Para o fluxo completo de continuação, prefira `12_fechar_remessa_gerar_xml.ahk`.
 
 ### `06_xml_monitoracao_tiss.ahk`
 
-Já tem botão Faturamento. Se necessário, configurar campo remessa/buscar/sair.
+Foi mantido como teste pontual. Para o fluxo completo de continuação, prefira `12_fechar_remessa_gerar_xml.ahk`.
 
 ### `07_xml_gerado.ahk`
 
@@ -366,6 +411,74 @@ Normalmente não precisa configurar. Se quiser alvo específico, ajustar:
 
 ```ahk
 POPUP_TITLE := "..."
+```
+
+### `11_ffcv_remessa_inserir_imprimir.ahk`
+
+Macro integrado para testar o FFCV desde Manutenção de Remessa até inserir uma ou várias contas e imprimir relatório. Por padrão fica em modo seguro:
+
+```ahk
+DO_ACTION := false
+DO_NAV := false
+DO_LOAD_CONVENIO := false
+DO_SELECT_OR_CREATE_REMESSA := false
+DO_INSERT_ACCOUNT := false
+DO_PRINT_RELATORIO := false
+```
+
+Para inserir várias contas, cole em `TEST_CONTAS`. Aceita conta pura, lista separada por vírgula/ponto-e-vírgula/quebra de linha, ou linhas do MOV DOC no formato `protocolo | conta | convênio`; nesse formato o macro usa a segunda coluna numérica como conta. Se `TEST_CONTAS` estiver vazio, usa `TEST_CONTA`.
+
+O envio em lote é serializado para evitar corrida com modal Oracle Forms: depois de enviar cada conta, o macro faz polling a cada `POLL_INTERVAL_MS := 20`. Se o modal aparecer, reage imediatamente, classifica o tipo do erro por texto acessível ou template visual, clica `Button1`, espera fechar, fecha o popup da conta e classifica aquela conta como erro/modal. Se não aparecer modal e o popup estiver estável, libera a próxima conta após `NO_MODAL_DECISION_MS := 450`; o teto de observação é `MODAL_WAIT_AFTER_ENTER_MS := 800`, portanto fica abaixo de 1 segundo. Em bloqueio/incerteza, para o lote por padrão com `STOP_ON_ACCOUNT_BLOCKER := true`.
+
+Como o modal de erro `Forms ahk_class ui60Modal_W32` pode desenhar a mensagem em `ui60Drawn_*`, `WinGetText` pode mostrar só `&OK`. Para o erro já conhecido, foi criado o template visual:
+
+```text
+Imagens_Debug/Erros_FFCV/Erro_Conta_Ja_Digitada_Texto.png
+```
+
+Esse template classifica `Conta já digitada / redigite`. Para novos tipos de erro, criar novos crops de texto e adicionar em `ERROR_TEMPLATES` no macro 11.
+
+Separação importante:
+
+```text
+Popup de inserir conta: área embarcada "Informações da Conta" dentro da janela FFCV, detectada por ui60Drawn W323 + Edit2.
+Modal de erro ao inserir conta: janela própria "Forms ahk_class ui60Modal_W32", fechada por Button1 e classificada por texto acessível ou template visual.
+```
+
+Controles aplicados a partir dos prints `ClassNN_*.png`:
+
+```ahk
+BTN_INSERIR_CONTA → Button10, x 24,  y 458
+BTN_IMPRIMIR      → Button7,  x 567, y 458
+BTN_ENTREGAR      → Button6,  x 464, y 458
+```
+
+### `12_fechar_remessa_gerar_xml.ahk`
+
+Macro de continuação a partir do ponto em que o macro 11 deixou a remessa. Testa Entrega de Remessas, fechamento com datas e geração do XML. Por padrão fica em modo seguro:
+
+```ahk
+DO_ACTION := false
+DO_OPEN_ENTREGA := false
+DO_CONFIRM_ENTREGA := false
+DO_OPEN_XML_TISS := false
+DO_GERAR_XML := false
+```
+
+Usa os controles validados de Fechar Remessa e XML:
+
+```ahk
+BTN_ENTREGAR             → Button6,  x 464, y 458
+DATAS_CAMPO_REMESSA      → Edit5,    x 59,  y 101
+DATAS_CAMPO_ENTREGA      → Edit1,    x 146, y 101
+DATAS_CAMPO_VENCIMENTO   → Edit1,    x 244, y 227
+DATAS_CHECKBOX           → Button3,  x 541, y 242
+DATAS_BTN_CONFIRMAR      → Button10, x 30,  y 426
+XML_CAMPO_REMESSA        → Edit1,    x 272, y 89
+XML_BTN_FATURAMENTO      → Button7,  x 12,  y 446
+XML_FORM_CAMPO_PATH      → Edit1,    x 267, y 467
+XML_FORM_BTN_SALVAR      → Button4,  x 623, y 471
+XML_FORM_BTN_VOLTAR      → Button7,  x 731, y 470
 ```
 
 ## Regra para Window Spy
@@ -398,11 +511,11 @@ Esses arquivos podem ser colados na próxima conversa para continuar.
 
 ## Próxima ação concreta ao retomar
 
-1. No PC da empresa, rodar `test_macros/10_popup_text_capture.ahk` com um popup aberto para validar captura.
-2. Validar `test_macros/07_xml_gerado.ahk` porque já está quase todo configurado.
-3. Configurar e validar `test_macros/04_popup_inserir_contas_fluxo.ahk`, pois o popup de inserir contas é o trecho mais sensível.
-4. Configurar e validar `test_macros/02_movdoc_baixa.ahk`, pois MOV DOC é crítico para coletar protocolo/convênio/contas.
-5. Quando os mini macros estiverem configurados e funcionando, ler os `.ahk` validados e aplicar os valores ao principal `scripts/remessa_protocolo.ahk`.
+1. No PC da empresa, rodar `test_macros/11_ffcv_remessa_inserir_imprimir.ahk` com `DO_ACTION := false` para validar localização dos botões e, se o popup de inserir conta estiver aberto, validar o sentinela `ui60Drawn W323` e o campo `Edit2`.
+2. Preencher `TEST_CONTAS` no macro 11 com o resultado do MOV DOC e testar em etapas: primeiro `DO_INSERT_ACCOUNT := true` com poucas contas; conferir `test_macros\ultimo_resultado.txt`, especialmente o resumo `ok`, `erro/modal` e `bloqueio`.
+3. Se aparecer erro modal novo que não seja `Conta já digitada / redigite`, tirar crop só da frase do erro, salvar em `Imagens_Debug/Erros_FFCV/Erro_<Nome>.png` e adicionar em `ERROR_TEMPLATES` no macro 11.
+4. Depois que o macro 11 inserir/imprimir corretamente, rodar `test_macros/12_fechar_remessa_gerar_xml.ahk` em modo seguro e ligar etapas uma por vez: `DO_OPEN_ENTREGA`, `DO_CONFIRM_ENTREGA`, `DO_OPEN_XML_TISS`, `DO_GERAR_XML`.
+5. Só depois de validar 11 e 12 no PC da empresa, aplicar eventuais ajustes finais ao fluxo principal `scripts/remessa_protocolo.ahk`.
 
 ## Atenções / não fazer
 
@@ -410,6 +523,9 @@ Esses arquivos podem ser colados na próxima conversa para continuar.
 - Não usar `ClassNN_*.png` com `MV_ClickImage`.
 - Não usar coordenada `Screen`; usar sempre `Client` do Window Spy.
 - Não ligar `DO_ACTION := true` antes de rodar uma vez em modo seguro e conferir o relatório.
+- Não confundir o popup embarcado `Informações da Conta` com o modal de erro `Forms`; são alvos diferentes e têm estratégias diferentes.
+- Não depender de `WinGetText` para classificar mensagens desenhadas do Oracle Forms. Se o texto vier só como `&OK`, usar template visual/OCR/crop do erro.
+- Não reduzir `NO_MODAL_DECISION_MS` abaixo de ~300ms sem evidência no PC da empresa; abaixo disso aumenta o risco de avançar antes do modal renderizar.
 - Não assumir que todas as mudanças no `git status` foram feitas nesta conversa; já havia alterações não commitadas no projeto.
 
 ## Verificações feitas nesta sessão
