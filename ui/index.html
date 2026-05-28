@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>RPA MV2000i</title>
+<title>Praxis</title>
+<link rel="icon" href="data:,">
 <style>
 :root {
   --win-bg:      #D4D0C8;
@@ -40,6 +41,7 @@ body {
   justify-content: center; z-index: 100; gap: 20px;
 }
 #login-overlay.hidden { display: none; }
+.auth-box.hidden { display: none; }
 
 .login-brand { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .login-brand-logo {
@@ -51,7 +53,7 @@ body {
 .login-brand-name { font-size: 20px; font-weight: bold; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.4); }
 .login-brand-sub  { font-size: 11px; color: rgba(255,255,255,.8); }
 
-#login-box { background: #F0EEE8; border: 2px outset #E8E6E0; width: 320px; box-shadow: 4px 4px 12px rgba(0,0,0,.35); }
+.auth-box { background: #F0EEE8; border: 2px outset #E8E6E0; width: 320px; box-shadow: 4px 4px 12px rgba(0,0,0,.35); }
 .login-box-title {
   background: linear-gradient(90deg,var(--accent) 0%,#0077CC 100%);
   color: #fff; padding: 6px 10px; font-size: 11px; font-weight: bold;
@@ -67,11 +69,13 @@ body {
   background: var(--input-bg); outline: none; color: var(--txt);
 }
 .login-input:focus { border-color: var(--accent); background: #EEF5FF; }
-#login-error {
+#login-error,
+#access-error {
   font-size: 10px; color: #CC0000; background: #FFF0F0;
   border: 1px solid #FFAAAA; padding: 4px 8px; margin-bottom: 10px; display: none;
 }
-#login-error.visible { display: block; }
+#login-error.visible,
+#access-error.visible { display: block; }
 .login-btns {
   display: flex; justify-content: flex-end; gap: 6px;
   margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--win-bdr-mid);
@@ -199,7 +203,7 @@ body {
 #prog-fill { height: 100%; width: 0%; background: repeating-linear-gradient(90deg,#003B8C 0,#003B8C 9px,#0066CC 9px,#0066CC 18px); transition: width .3s ease; }
 
 /* Log */
-#log { height: 96px; background: var(--log-bg); overflow-y: auto; padding: 5px 8px; font-family: 'Courier New', monospace; font-size: 10px; flex-shrink: 0; border-top: 2px solid #000; }
+#log { height: 96px; background: var(--log-bg); overflow-y: auto; padding: 5px 8px; font-family: 'Courier New', monospace; font-size: 10px; flex-shrink: 0; border-top: 2px solid #000; user-select: text; white-space: pre-wrap; }
 .ll { margin-bottom: 1px; line-height: 1.4; }
 .lt { color: #4A5568; margin-right: 5px; }
 .lk { color: var(--log-ok); }
@@ -228,15 +232,34 @@ body {
 <div id="login-overlay">
   <div class="login-brand">
     <div class="login-brand-logo">MV</div>
-    <div class="login-brand-name">MV2000i · RPA</div>
+    <div class="login-brand-name">Praxis</div>
     <div class="login-brand-sub">Automação Hospitalar</div>
   </div>
-  <div id="login-box">
+
+  <div id="access-box" class="auth-box">
+    <div class="login-box-title">🔐 Acesso Praxis</div>
+    <div class="login-box-body">
+      <div class="login-box-head">Valide o acesso</div>
+      <div class="login-box-sub">Informe o código autorizado para liberar o Praxis.</div>
+      <div id="access-error" role="alert"></div>
+      <div class="login-field">
+        <label class="login-label" for="inp-access-code">Código de acesso</label>
+        <input class="login-input" type="password" id="inp-access-code" autocomplete="off" spellcheck="false"
+               onkeydown="if(event.key==='Enter') doValidateAccess()">
+      </div>
+      <div class="login-btns">
+        <button class="btn-mv" onclick="ahk.send({action:'exit'})">Cancelar</button>
+        <button class="btn-mv primary" id="btn-access" onclick="doValidateAccess()">Validar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="login-box" class="auth-box hidden">
     <div class="login-box-title">🔒 Identificação</div>
     <div class="login-box-body">
       <div class="login-box-head">Identifique-se</div>
       <div class="login-box-sub">Informe suas credenciais de acesso ao MV2000i.</div>
-      <div id="login-error"></div>
+      <div id="login-error" role="alert"></div>
       <div class="login-field">
         <label class="login-label" for="inp-user">Usuário</label>
         <input class="login-input" type="text" id="inp-user" autocomplete="off" spellcheck="false"
@@ -259,7 +282,7 @@ body {
 <div id="app" class="hidden">
   <div id="hdr">
     <div class="hdr-logo">MV</div>
-    <span class="hdr-title">MV2000i · RPA</span>
+    <span class="hdr-title">Praxis</span>
     <div class="hdr-sep"></div>
     <span style="font-size:10px;color:#7AADCC;">Automação Hospitalar</span>
     <div class="hdr-spacer"></div>
@@ -276,7 +299,7 @@ body {
 
   <div id="main">
     <div id="sidebar">
-      <div class="sb-hdr">📋 Módulos RPA</div>
+      <div class="sb-hdr">📋 Módulos Praxis</div>
       <div id="script-list"></div>
     </div>
     <div id="content">
@@ -316,11 +339,16 @@ let scripts = [], current = null, running = false;
 const ahk = {
   send(data) {
     if (window.chrome?.webview) window.chrome.webview.postMessage(JSON.stringify(data));
-    else { console.log('[→ AHK]', data); devSim(data); }
+    else {
+      const logData = data.action === 'validate_access' ? { ...data, code: '[redacted]' } : data;
+      console.log('[→ AHK]', logData);
+      devSim(data);
+    }
   },
   receive(data) {
     switch (data.type) {
-      case 'show_login': showLogin(data.message || '');              break;
+      case 'show_access': showAccess(data.message || '');            break;
+      case 'show_login':  showLogin(data.message || '');             break;
       case 'login_failed': showLogin(data.message || 'Login recusado pelo MV.'); break;
       case 'login_ok':   onLoginOk(data);                      break;
       case 'status':     onStatus(data.message, data.running); break;
@@ -341,9 +369,57 @@ if (window.chrome?.webview)
 
 document.addEventListener('DOMContentLoaded', () => ahk.send({ action: 'ready' }));
 
+// ─── Access gate ──────────────────────────────────────────────
+function showAccess(message = '') {
+  document.getElementById('login-overlay').classList.remove('hidden');
+  document.getElementById('access-box').classList.remove('hidden');
+  document.getElementById('login-box').classList.add('hidden');
+  document.getElementById('app').classList.add('hidden');
+  setAccessBusy(false);
+
+  const err = document.getElementById('access-error');
+  if (message) {
+    err.textContent = message;
+    err.classList.add('visible');
+  } else {
+    err.textContent = '';
+    err.classList.remove('visible');
+  }
+
+  document.getElementById('inp-access-code').value = '';
+  document.getElementById('inp-access-code').focus();
+}
+
+function doValidateAccess() {
+  const input = document.getElementById('inp-access-code');
+  const code = input.value.trim();
+  const err = document.getElementById('access-error');
+
+  if (!code) {
+    err.textContent = 'Digite o código de acesso.';
+    err.classList.add('visible');
+    input.focus();
+    return;
+  }
+
+  err.textContent = 'Validando acesso...';
+  err.classList.add('visible');
+  setAccessBusy(true);
+  ahk.send({ action: 'validate_access', code });
+}
+
+function setAccessBusy(isBusy) {
+  const button = document.getElementById('btn-access');
+  const input = document.getElementById('inp-access-code');
+  if (button) button.disabled = isBusy;
+  if (input) input.disabled = isBusy;
+}
+
 // ─── Login ────────────────────────────────────────────────────
 function showLogin(message = '') {
   document.getElementById('login-overlay').classList.remove('hidden');
+  document.getElementById('access-box').classList.add('hidden');
+  document.getElementById('login-box').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
   const err = document.getElementById('login-error');
   if (message) {
@@ -505,7 +581,11 @@ function setRunning(val) {
 
 function showProgress()  { setProgress(0); document.getElementById('progress').classList.add('on'); document.getElementById('prog-lbl').textContent='Processando...'; }
 function hideProgress()  { document.getElementById('progress').classList.remove('on'); }
-function setProgress(p)  { document.getElementById('prog-fill').style.width=p+'%'; if(p>0&&p<100) document.getElementById('prog-lbl').textContent=`Processando... ${p}%`; }
+function setProgress(p)  {
+  p = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
+  document.getElementById('prog-fill').style.width=p+'%';
+  if(p>0&&p<100) document.getElementById('prog-lbl').textContent=`Processando... ${p}%`;
+}
 
 function appendLog(msg, type) {
   const area = document.getElementById('log');
@@ -526,7 +606,10 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 // ─── Dev sim ──────────────────────────────────────────────────
 function devSim(data) {
   if (data.action === 'ready')
-    setTimeout(() => ahk.receive({ type:'show_login' }), 200);
+    setTimeout(() => ahk.receive({ type:'show_access' }), 200);
+
+  if (data.action === 'validate_access')
+    setTimeout(() => ahk.receive({ type:'show_login' }), 300);
 
   if (data.action === 'save_creds')
     setTimeout(() => ahk.receive({
