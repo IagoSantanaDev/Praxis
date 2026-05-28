@@ -161,7 +161,7 @@ MV_Test_ProjectRoot() {
 }
 
 MV_Test_ImagePath(fileName) {
-    return MV_Test_ProjectRoot() "\Imagens_Debug\" fileName
+    return MV_Test_ProjectRoot() "\images\" fileName
 }
 
 MV_Test_ImageVisible(imagePath, variation := 10) {

@@ -1,4 +1,4 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 #Include %A_ScriptDir%\_mv_control_probe.ahk
 
 ListLines(false)
@@ -11,14 +11,14 @@ SetControlDelay(-1)
 ; ==============================================================================
 ; CONFIGURAÇÕES E VARIÁVEIS GLOBAIS
 ; ==============================================================================
-DO_OPEN     := true
-DO_LOGIN    := true
-DO_NAV      := true
-DO_READ     := true
+DO_OPEN     := false
+DO_LOGIN    := false
+DO_NAV      := false
+DO_READ     := false
 
-TEST_USER      := "iagosantana"
-TEST_PASS      := "iago##hsr16"
-TEST_PROTOCOLOS := "3251014,3249741" ; Lote global unificado
+TEST_USER      := ""
+TEST_PASS      := ""
+TEST_PROTOCOLOS := "3250671" ; Lote global unificado
 
 MOVDOC_LNK      := MV_Test_ProjectRoot() "\atalhos\MOVDOC.lnk"
 WIN_LOGIN       := "Identificação ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
@@ -73,6 +73,12 @@ if DO_LOGIN
 if WinExist(WIN_LOGIN) {
     report .= "ℹ️ Janela Identificação detectada.`n"
     if DO_LOGIN {
+        if (Trim(TEST_USER) = "" || TEST_PASS = "") {
+            report .= "❌ DO_LOGIN ligado, mas TEST_USER/TEST_PASS estão vazios.`n"
+            MV_Test_ShowReport(report)
+            ExitApp
+        }
+
         WinActivate WIN_LOGIN
         if !WinWaitActive(WIN_LOGIN,, 5) {
             report .= "❌ Janela Identificação apareceu, mas não ficou ativa para receber login.`n"
@@ -82,14 +88,15 @@ if WinExist(WIN_LOGIN) {
 
         CoordMode("Mouse", "Client")
         Click(170, 118, 1)
-        Sleep 20
+        Sleep 100
         SendText TEST_USER
-        Sleep 20
+        Sleep 100
         Click(307, 119, 1)
-        Sleep 20
+        Sleep 100
         SendText TEST_PASS
-        Sleep 20
+        Sleep 100
         Send "{Enter}"
+        Sleep 100
         report .= "✅ Login de teste enviado por coordenadas Client validadas da Identificação.`n"
 
         if !T_Poll(() => WinExist(WIN_LOGIN_ERROR) || !WinExist(WIN_LOGIN) || WinExist(WIN_MOVDOC), 30)
@@ -117,21 +124,22 @@ if DO_READ {
     } else if (protocolos.Length = 0) {
         report .= "❌ Nenhum protocolo informado.`n"
     } else {
-        Sleep 50
+	Sleep 200
         for idx, protocolo in protocolos {
             report .= "`n── Protocolo " protocolo " (" idx "/" protocolos.Length ") ──`n"
+	    Sleep 200
             if !T_SetTextEditAtPoint(WIN_BAIXA, PROTO_X, PROTO_Y, protocolo) {
                 report .= "❌ Falha ao preencher protocolo por região Client.`n"
                 continue
             }
             report .= "✅ Protocolo preenchido; enviando F8.`n"
             Send "{F8}"
-            if !T_WaitAfterF8(protocolo, &report) {
+		if !T_WaitAfterF8(protocolo, &report, &primeiraLinhaValida) {
                 report .= "❌ A primeira linha da grid não ficou legível após F8; coleta ignorada para este protocolo.`n"
                 continue
             }
-            
-            linhas := T_ColetarLinhasMovDoc(protocolo, &report)
+
+            linhas := T_ColetarLinhasMovDoc(protocolo, &report, primeiraLinhaValida)
             if (linhas.Length = 0) {
                 report .= "❌ Nenhuma conta/convênio coletado para o protocolo.`n"
             } else {
@@ -140,7 +148,7 @@ if DO_READ {
                     report .= " conta=" linha["conta"] " | convenio=" linha["convenio"] "`n"
                 }
             }
-            
+
             if T_FinalizarBaixaProtocolo(&report)
                 report .= "✅ Recebido aplicado, F10 enviado e F7 preparado para próxima consulta.`n"
             else
@@ -157,10 +165,14 @@ report .= "Total de linhas coletadas: " linhasMovDoc.Length "`n"
 report .= "Convênio majoritário: " (convenioMajoritario = "" ? "não identificado" : convenioMajoritario) "`n`n"
 report .= "Contas válidas para remessa:`n"
 if (contasValidas.Length = 0) {
-    report .= " nenhuma`n"
+    report .= "    []`n"
 } else {
-    for _, linha in contasValidas
-        report .= " Prot. " linha["protocolo"] " | Conta " linha["conta"] " | Convênio " linha["convenio"] "`n"
+    for idx, linha in contasValidas {
+        ; Define se adiciona vírgula no final (todos recebem, exceto o último item)
+        virgula := (idx = contasValidas.Length ? "" : ",")
+
+        report .= '    "Prot. ' linha["protocolo"] ' | Conta ' linha["conta"] ' | Convênio ' linha["convenio"] '"' virgula "`n"
+    }
 }
 
 report .= "`nErros/pendências:`n"
@@ -176,45 +188,50 @@ MV_Test_ShowReport(report)
 ; ==============================================================================
 ; FUNÇÕES OPERACIONAIS FILTRADAS PARA VELOCIDADE E DINÂMICA DE ROLAGEM
 ; ==============================================================================
-T_ColetarLinhasMovDoc(protocolo, &report) {
+T_ColetarLinhasMovDoc(protocolo, &report, primeiraLinha := "") {
     linhas := []
     vistos := Map()
-    
+
     if (!(GRID_ROWS_Y is Array) || GRID_ROWS_Y.Length = 0) {
         report .= "❌ GRID_ROWS_Y precisa conter as coordenadas Y das linhas visíveis da Grid.`n"
         return linhas
     }
-    
+
     WinActivate(WIN_BAIXA)
     if !WinWaitActive(WIN_BAIXA,, 2)
         return linhas
-        
+
     MouseGetPos(&origX, &origY)
     CoordMode("Mouse", "Client")
-    
+
+    if (primeiraLinha is Map) {
+        keyInicial := primeiraLinha["protocolo"] "|" primeiraLinha["conta"] "|" primeiraLinha["convenio"]
+        vistos[keyInicial] := true
+        linhas.Push(primeiraLinha)
+    }
+
     maxIteracoes := 100
     tabelaEncerrada := false
-    
+
     Loop maxIteracoes {
         linhasAdicionadasNesteBloco := 0
-        
+
         for idx, rowY in GRID_ROWS_Y {
-            Sleep(20)
-            
+            Sleep(100)
             contaRaw := T_ReadFieldByPhysicalClick(CONTA_X, rowY, "conta")
             convenioRaw := T_ReadFieldByPhysicalClick(CONVENIO_X, rowY, "convenio")
-            
+
             conta := ""
             if RegExMatch(contaRaw, "\d+", &matchConta)
-                conta := matchConta[] 
-                
+                conta := matchConta[]
+
             convenio := ""
             if RegExMatch(convenioRaw, "\d+", &matchConvenio)
-                convenio := matchConvenio[] 
+                convenio := matchConvenio[]
 
             if (conta = protocolo || convenio = protocolo || conta = "" || convenio = "")
                 continue
-                
+
             if (conta = convenio) {
                 contaRaw := T_ReadFieldByPhysicalClick(CONTA_X, rowY, "conta")
                 if RegExMatch(contaRaw, "\d+", &matchConta)
@@ -222,66 +239,62 @@ T_ColetarLinhasMovDoc(protocolo, &report) {
             }
 
             key := protocolo "|" conta "|" convenio
-            
             if vistos.Has(key)
                 continue
-                
+
             vistos[key] := true
             linhas.Push(Map("protocolo", protocolo, "conta", conta, "convenio", convenio))
             linhasAdicionadasNesteBloco++
         }
-        
-        if (tabelaEncerrada || linhasAdicionadasNesteBloco = 0) {
+
+        if (tabelaEncerrada || (A_Index > 1 && linhasAdicionadasNesteBloco = 0)) {
             if (tabelaEncerrada)
                 report .= "ℹ️ Coleta concluída com sucesso após esvaziar o fim da Grid.`n"
             else
                 report .= "ℹ️ Fim da Grid alcançado por repetição de registros.`n"
             break
         }
-        
+
         ultimoY := GRID_ROWS_Y[GRID_ROWS_Y.Length]
         Click(CONTA_X + 15, ultimoY + 8, 1)
-        Sleep(50)
-        
+        Sleep(100)
+
         Loop GRID_ROWS_Y.Length {
             if WinExist(WIN_MOVDOC_POPUP) {
                 T_DismissMovDocPopup()
                 report .= "ℹ️ Popup de fim de registros detectado e fechado durante rolagem.`n"
-                tabelaEncerrada := true 
+                tabelaEncerrada := true
                 break
             }
-            
+
             Send("{Down}")
-            Sleep(90) 
+            Sleep(100)
         }
-        
+
         if WinExist(WIN_MOVDOC_POPUP) {
             T_DismissMovDocPopup()
             report .= "ℹ️ Popup de fim de registros detectado pós-rolagem.`n"
             tabelaEncerrada := true
         }
-        
+
         primeiroY := GRID_ROWS_Y[1]
         Click(CONTA_X + 15, primeiroY + 8, 1)
-        Sleep(50)
+        Sleep(100)
     }
-    
+
     MouseMove(origX, origY, 0)
     return linhas
 }
 
 T_ReadFieldByPhysicalClick(x, y, campo := "", fastTimeoutMs := 200, fallbackTimeoutMs := 300) {
     CoordMode("Mouse", "Client")
-    
+
     centroX := x + 15
     centroY := y + 8
-    
+
     Click(centroX, centroY, 1)
-    Sleep(40)
-    Send("{Home}")
-    Sleep(30)
-    Send("+{End}")
-    Sleep(30)
+    Sleep(100)
+    Send("{Home}{Shift down}{End}{Shift up}")
 
     valor := T_CopySelectedFieldText(campo, fastTimeoutMs)
     if T_ValorCampoValido(valor, campo)
@@ -290,7 +303,7 @@ T_ReadFieldByPhysicalClick(x, y, campo := "", fastTimeoutMs := 200, fallbackTime
     valor := T_CopySelectedFieldText(campo, fallbackTimeoutMs)
     if T_ValorCampoValido(valor, campo)
         return valor
-        
+
     return ""
 }
 
@@ -325,7 +338,7 @@ T_SetTextEditAtPoint(winTitle, x, y, value) {
         if WinExist("ahk_exe ifrun60.EXE") {
             winTitle := "ahk_exe ifrun60.EXE"
         } else {
-            return false 
+            return false
         }
     }
 
@@ -334,18 +347,19 @@ T_SetTextEditAtPoint(winTitle, x, y, value) {
         if !WinWaitActive(winTitle,, 2)
             return false
     } catch {
-        return false 
+        return false
     }
-        
+
     CoordMode("Mouse", "Client")
     centroProtoX := x + 40
     centroProtoY := y + 10
-    
+
     Click(centroProtoX, centroProtoY, 1)
-    Sleep(20)
-    
+    Sleep(100)
+
     if (value != "") {
         SendText(value)
+	Sleep(100)
     }
     return true
 }
@@ -355,7 +369,7 @@ T_FocusEditAtPoint(winTitle, x, y) {
     CoordMode("Mouse", "Client")
     centroProtoX := x + 40
     centroProtoY := y + 10
-    
+
     Click(centroProtoX, centroProtoY, 1)
     return true
 }
@@ -366,11 +380,11 @@ T_FinalizarBaixaProtocolo(&report) {
         report .= "❌ Botão Recebido não localizado pelas coordenadas.`n"
         return false
     }
-    
+
     try checked := ControlGetChecked(hwndReceb)
     catch
         checked := ""
-    
+
     if (checked = 0 || checked = "") {
         ControlClick(hwndReceb,,,,,"NA")
         report .= "✅ Recebido estava desmarcado/indefinido; click simples enviado.`n"
@@ -378,22 +392,22 @@ T_FinalizarBaixaProtocolo(&report) {
         ControlClick(hwndReceb,,, 2,,"NA")
         report .= "✅ Recebido já estava marcado; double click enviado.`n"
     }
-    
-    Sleep(20)
+
+    Sleep(100)
     Send("{F10}")
     report .= "✅ F10 enviado após checkbox Recebido.`n"
-    Sleep(20)
-    
+    Sleep(100)
+
     if !T_FocusEditAtPoint(WIN_BAIXA, PROTO_X, PROTO_Y) {
         report .= "❌ Não consegui clicar/focar o campo Protocolo após F10.`n"
         return false
     }
-    Sleep(20)
-    
+    Sleep(100)
+
     Send("{F7}")
-    Sleep(20)
+    Sleep(100)
     report .= "✅ Campo Protocolo clicado e F7 enviado para preparar nova consulta.`n"
-    
+
     return true
 }
 
@@ -421,39 +435,35 @@ T_Poll(condFn, timeoutSecs) {
     }
 }
 
-T_WaitAfterF8(protocolo, &report) {
+T_WaitAfterF8(protocolo, &report, &primeiraLinhaValida) {
     T_Poll(() => WinExist(WIN_BAIXA), 80)
-
     startedAt := A_TickCount
     deadline := startedAt + 12000
-
     Loop {
         if T_FirstGridLineReady(protocolo, &conta, &convenio) {
             elapsed := A_TickCount - startedAt
             report .= "ℹ️ Primeira linha legível após F8 em " elapsed "ms: conta=" conta " | convenio=" convenio "`n"
+
+            ; Salva a linha como um Map estruturado para o coletor
+            primeiraLinhaValida := Map("protocolo", protocolo, "conta", conta, "convenio", convenio)
             return true
         }
-
         if (A_TickCount >= deadline) {
             elapsed := A_TickCount - startedAt
             report .= "❌ Timeout aguardando primeira linha legível após F8 (" elapsed "ms).`n"
             return false
         }
-
-        Sleep(80)
+        Sleep(100)
     }
 }
 
 T_FirstGridLineReady(protocolo, &conta, &convenio) {
-    conta := T_ReadFieldByPhysicalClick(CONTA_X, GRID_ROWS_Y[1], "conta", 100, 200)
-    convenio := T_ReadFieldByPhysicalClick(CONVENIO_X, GRID_ROWS_Y[1], "convenio", 100, 200)
-
+    conta := T_ReadFieldByPhysicalClick(CONTA_X, GRID_ROWS_Y[1], "conta", 150, 300)
+    convenio := T_ReadFieldByPhysicalClick(CONVENIO_X, GRID_ROWS_Y[1], "convenio", 150, 300)
     if (conta = "" || convenio = "")
         return false
-
     if (conta = protocolo || convenio = protocolo)
         return false
-
     return true
 }
 
@@ -545,9 +555,9 @@ T_DismissMovDocPopup() {
     try {
         if WinExist(WIN_MOVDOC_POPUP) {
             WinActivate(WIN_MOVDOC_POPUP)
-            Sleep(50)
+            Sleep(100)
             if !T_ClickFirstControl(WIN_MOVDOC_POPUP, MODAL_OK_CLASS) {
-                Send("{Enter}") 
+                Send("{Enter}")
             }
             T_Poll(() => !WinExist(WIN_MOVDOC_POPUP), 3)
         }
