@@ -28,6 +28,7 @@ logs/
 *.bak
 *.swp
 *.swo
+Fluxos/
 
 # Configuração local e credenciais
 .env
