@@ -187,6 +187,61 @@ MV_Test_ClickImage(imagePath, variation := 10, offsetX := 8, offsetY := 8) {
     return false
 }
 
+MV_Test_ClickCachedImage(cacheKey, imagePath, winTitle, variation := 10, offsetX := 8, offsetY := 8) {
+    cfgPath := MV_Test_ProjectRoot() "\config.ini"
+
+    if (winTitle != "" && WinExist(winTitle)) {
+        WinGetPos &wx, &wy, &ww, &wh, winTitle
+        cachedX := IniRead(cfgPath, "ImageCache", cacheKey "_x", "")
+        cachedY := IniRead(cfgPath, "ImageCache", cacheKey "_y", "")
+
+        if (cachedX != "" && cachedY != "") {
+            CoordMode "Mouse", "Screen"
+            Click wx + (cachedX + 0), wy + (cachedY + 0)
+            return "cached [relX=" cachedX " relY=" cachedY "]"
+        }
+    }
+
+    if !FileExist(imagePath)
+        return "missing image"
+
+    CoordMode "Pixel", "Screen"
+    CoordMode "Mouse", "Screen"
+
+    x1 := 0, y1 := 0, x2 := A_ScreenWidth, y2 := A_ScreenHeight
+    hasWindow := (winTitle != "" && WinExist(winTitle))
+    if hasWindow {
+        WinGetPos &wx, &wy, &ww, &wh, winTitle
+        x1 := wx, y1 := wy, x2 := wx + ww, y2 := wy + wh
+    }
+
+    try {
+        if ImageSearch(&x, &y, x1, y1, x2, y2, "*" variation " " imagePath) {
+            clickX := x + offsetX
+            clickY := y + offsetY
+            Click clickX, clickY
+
+            if hasWindow {
+                relX := clickX - wx
+                relY := clickY - wy
+                IniWrite relX, cfgPath, "ImageCache", cacheKey "_x"
+                IniWrite relY, cfgPath, "ImageCache", cacheKey "_y"
+                return "image+saved [relX=" relX " relY=" relY "]"
+            }
+            return "image"
+        }
+    }
+    return "not found"
+}
+
+MV_Test_ClearImageCache(cacheKeys*) {
+    cfgPath := MV_Test_ProjectRoot() "\config.ini"
+    for _, key in cacheKeys {
+        try IniDelete cfgPath, "ImageCache", key "_x"
+        try IniDelete cfgPath, "ImageCache", key "_y"
+    }
+}
+
 MV_Test_ShowReport(report) {
     logPath := A_ScriptDir "\ultimo_resultado.txt"
     try FileDelete logPath

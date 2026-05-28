@@ -9,10 +9,10 @@ DO_ACTION := false
 WIN_TITLE := "Monitoração de Faturamento - TISS"
 
 controls := [
-    Map("name", "XML_CAMPO_REMESSA",   "class", "CLASSNN", "x", "", "y", "", "action", "setText", "value", "510794"),
-    Map("name", "XML_BTN_BUSCAR",      "class", "CLASSNN", "x", "", "y", "", "action", "click"),
-    Map("name", "XML_BTN_FATURAMENTO", "class", "Button7", "x", "", "y", "", "action", "locate"),
-    Map("name", "XML_BTN_SAIR_TELA",   "class", "CLASSNN", "x", "", "y", "", "action", "click")
+    Map("name", "XML_CAMPO_REMESSA",   "class", "CLASSNN", "x", "", "y", "",  "action", "setText", "value", "510794"),
+    Map("name", "XML_BTN_BUSCAR",      "class", "CLASSNN", "x", "", "y", "",  "action", "click"),
+    Map("name", "XML_BTN_FATURAMENTO", "class", "Button7", "x", 55, "y", 458, "action", "locate"),
+    Map("name", "XML_BTN_SAIR_TELA",   "class", "CLASSNN", "x", "", "y", "",  "action", "click")
 ]
 
 MV_Test_RunSuite("XML - Monitoração TISS", WIN_TITLE, controls, DO_ACTION)

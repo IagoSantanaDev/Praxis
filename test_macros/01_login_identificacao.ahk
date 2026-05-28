@@ -8,11 +8,11 @@
 ; DO_ACTION := false apenas confirma se a janela de login existe.
 ; DO_ACTION := true envia os valores abaixo. Use somente com usuário/senha de teste.
 
-DO_ACTION := false
+DO_ACTION := true
 WIN_TITLE := "Identificação ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
-TEST_USER := "TESTE_USUARIO"
-TEST_PASS := "TESTE_SENHA"
-IMG_ERRO_ICONE := MV_Test_ImagePath("Erro_Icone.png")
+WIN_LOGIN_ERROR := "Mensagem do MV2000 ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+TEST_USER := "iagosantana"
+TEST_PASS := "iago##hsr16"
 
 report := "SUÍTE: Login - teclado`n"
         . "Janela: " WIN_TITLE "`n"
@@ -41,11 +41,11 @@ if DO_ACTION {
     report .= "✅ Credenciais de teste enviadas por teclado.`n"
 
     Sleep 700
-    if MV_Test_ImageVisible(IMG_ERRO_ICONE)
-        report .= "⚠️ Popup de erro/login detectado via Erro_Icone.png.`n"
+    if WinExist(WIN_LOGIN_ERROR)
+        report .= "⚠️ Popup de erro/login detectado por título: " WIN_LOGIN_ERROR "`n"
     else
-        report .= "ℹ️ Popup de erro não detectado no intervalo curto.`n"
+        report .= "ℹ️ Popup de erro não detectado por título no intervalo curto.`n"
 }
 
-report .= "`nFallback ainda possível: HWND + ClassNN + Client quando o foco inicial não vier correto.`n"
+report .= "`nFallback de imagem removido: erro de login deve ser detectado por título/modal.`n"
 MV_Test_ShowReport(report)
