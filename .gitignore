@@ -1,5 +1,6 @@
 # Artefatos de IA / agentes
 .gsd/
+.gsd-id
 .bg-shell/
 .claude/
 .cursor/
@@ -13,6 +14,8 @@
 .copilot/
 .mcp.json
 .artifacts/
+.agents/
+.gsd-backups/
 
 # Debug e evidências locais
 Imagens_Debug/
@@ -33,13 +36,62 @@ logs/
 *.swo
 Fluxos/
 
+# Testes e debug locais AHK (não são parte do build)
+test-*.ahk
+test-*.err
+test-*.out
+test*.log
+debug-*.ahk
+debug-*.txt
+debug-test*.txt
+simple*.ahk
+simple*.log
+simple-*.ahk
+simple-*.log
+test[0-9]*.ahk
+test[0-9]*.err
+test[0-9]*.out
+cli-check-test.ahk
+cli-check-ps.ps1
+compile-check.ahk
+compile-check*.ahk
+simple[0-9]*.ahk
+simple[0-9]*.log
+simple2.ahk
+simple2.log
+simple3.ahk
+simple3.log
+nul
+dl/
+test-include*.ahk
+test-integrity-mini.ahk
+praxis-*.err
+test-logwrite*.ahk
+test-logwrite*.txt
+test-log*.ahk
+test-manifest.ahk
+test-mini*.ahk
+test-simple*.ahk
+test-exit.ahk
+test-exit.log
+test-min.ahk
+test-inc.ahk
+test-inc*.ahk
+praxis-integrity-manual.log
+
 # Configuração local e credenciais
 .env
 .env.*
 !.env.example
 config.ini
 *.local.ini
-secrets.*
+secrets.json
+secrets.ini
+secrets.txt
+secrets.yaml
+secrets.yml
+secrets.env
+secrets.local
 *.key
 *.pem
 *.pfx
@@ -65,6 +117,10 @@ desktop.ini
 .vscode/
 .idea/
 
+# Distribuídos (explícitos — não ignorar)
+!lib/vendor/32bit/
+!lib/vendor/64bit/
+
 # Dependências/cache comuns
 node_modules/
 .cache/
@@ -72,3 +128,8 @@ dist/
 build/
 out/
 coverage/
+
+# Testes e debug locais AHK (não são parte do build)
+test_macros/
+images/
+CONTEXTO_AUTOMACAO_MV_AHK_V2.md

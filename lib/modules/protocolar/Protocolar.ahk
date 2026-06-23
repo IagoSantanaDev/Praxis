@@ -4,6 +4,8 @@
 ; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
 
 #Requires AutoHotkey v2.0
+#Warn All, OutputDebug
+#Include ProtocolarParsers.ahk
 
 ; ════════════════════════════════════════════════════════════════
 ;  PROTOCOLAR
@@ -34,22 +36,4 @@ RunProtocolar(params) {
 
     SendToUI(Map("type", "log", "message", "Protocolar: " . remessas.Length . " remessa(s) do setor " . setorAtual . " para o setor " . setorEnvio . "."))
     return Protocolar_Abort("Parâmetros recebidos. Falta implementar a automação do MV para Protocolar com os controles do Window Spy.")
-}
-
-Protocolar_ParseRemessas(str) {
-    result := []
-    for _, item in StrSplit(str, ",") {
-        remessa := Trim(item)
-        if (remessa != "")
-            result.Push(remessa)
-    }
-    return result
-}
-
-Protocolar_Abort(msg) {
-    global gRunning
-    SendToUI(Map("type", "error", "message", msg))
-    SendToUI(Map("type", "status", "message", "Execução finalizada.", "running", false))
-    gRunning := false
-    return false
 }

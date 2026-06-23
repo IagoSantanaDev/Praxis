@@ -72,7 +72,8 @@ Name: "desktopicon"; Description: "Criar atalho na Área de Trabalho"; GroupDesc
 
 [Files]
 Source: "{#SourceDir}\Praxis.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\lib\64bit\WebView2Loader.dll"; DestDir: "{app}\lib\64bit"; Flags: ignoreversion
+Source: "{#SourceDir}\cli-check.ahk"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\lib\vendor\64bit\WebView2Loader.dll"; DestDir: "{app}\lib\vendor\64bit"; Flags: ignoreversion
 Source: "{#SourceDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 #ifexist SourceDir + "\COPYRIGHT"
 Source: "{#SourceDir}\COPYRIGHT"; DestDir: "{app}"; Flags: ignoreversion
