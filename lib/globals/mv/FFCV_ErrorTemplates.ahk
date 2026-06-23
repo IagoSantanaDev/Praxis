@@ -4,11 +4,12 @@
 ; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
 
 #Requires AutoHotkey v2.0
+#Warn All, OutputDebug
 
 global gEmbeddedOcrReferencesBase64 := ""
 global gEmbeddedOcrProbeBase64 := ""
-#Include *i ..\build\generated\Praxis_OcrReferences.ahk
-#Include *i ..\build\generated\Praxis_OcrProbe.ahk
+#Include *i ..\..\..\build\generated\Praxis_OcrReferences.ahk
+#Include *i ..\..\..\build\generated\Praxis_OcrProbe.ahk
 
 ; Cadastro compartilhado de erros do FFCV Inserir Conta por OCR.
 ;
@@ -17,7 +18,7 @@ global gEmbeddedOcrProbeBase64 := ""
 ; 2) Faça um crop APENAS da frase do erro e salve em:
 ;      images\Nome_Do_Erro_Texto.png
 ; 3) Adicione o texto canônico em tools\build-ocr-error-references.ps1.
-; 4) Rode tools\build-ocr-error-references.ps1 para atualizar lib\FFCV_ErrorReferences.json.
+; 4) Rode tools\build-ocr-error-references.ps1 para atualizar globals\mv\FFCV_ErrorReferences.json.
 ; 5) Rode o teste OCR contra images\ e depois test_macros\14_ocr_probe.ahk com o modal real aberto.
 ;
 ; Observação: WinGetText/Window Spy normalmente expõem só &OK nesses modais.
@@ -27,39 +28,34 @@ FFCV_OCR_LANGUAGE := "pt-BR"
 FFCV_OCR_SCALE := 2
 FFCV_OCR_MATCH_THRESHOLD := 0.35
 
+DirGetParent(dir) {
+    local parentDir
+    SplitPath dir, , &parentDir
+    return parentDir
+}
+
 FFCV_ErrorTemplates_ProjectRoot() {
+    ; Procura config.ini na raiz do projeto como marcador.
+    ; Sobe no máximo 4 níveis acima do script para encontrar a raiz.
     dir := A_ScriptDir
-    if RegExMatch(dir, "\\(test_macros|scripts|lib)$")
-        return RegExReplace(dir, "\\(test_macros|scripts|lib)$", "")
-    return dir
+    loop 4 {
+        if FileExist(dir "\config.ini")
+            return dir
+        parent := DirGetParent(dir)
+        if (parent = dir)
+            break ; reached filesystem root
+        dir := parent
+    }
+    ; Fallback: retorna o diretório pai mais provável (1 nível acima de globals/ ou lib/)
+    return DirGetParent(A_ScriptDir)
 }
 
 FFCV_ErrorReferencesPath() {
-    return FFCV_ErrorTemplates_ProjectRoot() "\lib\FFCV_ErrorReferences.json"
+    return FFCV_ErrorTemplates_ProjectRoot() "\lib\globals\mv\FFCV_ErrorReferences.json"
 }
 
 FFCV_OcrProbeScriptPath() {
     return FFCV_ErrorTemplates_ProjectRoot() "\tools\ocr-probe.ps1"
-}
-
-FFCV_ErrorTemplates() {
-    references := FFCV_LoadErrorReferences()
-    if !references["ok"]
-        return []
-
-    root := FFCV_ErrorTemplates_ProjectRoot()
-    templates := []
-    for _, ref in references["items"] {
-        sourceFile := ref.Get("sourceFile", "")
-        templates.Push(Map(
-            "tipo", ref.Get("tipo", ""),
-            "descricao", ref.Get("descricao", ""),
-            "img", sourceFile != "" ? root "\images\" sourceFile : "",
-            "sourceFile", sourceFile,
-            "text", ref.Get("text", "")
-        ))
-    }
-    return templates
 }
 
 FFCV_LoadErrorReferences() {
@@ -118,7 +114,7 @@ FFCV_LoadErrorReferences() {
     }
 }
 
-FFCV_ClassifyErrorModal(winTitle := "ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE", variation := 50) {
+FFCV_ClassifyErrorModal(winTitle := MV_CLASS_MODAL_FORMS, variation := 50) {
     global FFCV_OCR_LANGUAGE, FFCV_OCR_MATCH_THRESHOLD
     ; variation é mantido apenas por compatibilidade com chamadas antigas.
     _ := variation
@@ -162,22 +158,6 @@ FFCV_ClassifyErrorModal(winTitle := "ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE
         "ocrLineCount", popupOcr.Get("lineCount", 0),
         "ocrRegion", region
     )
-}
-
-FFCV_ErrorTemplateVisible(imagePath, winTitle := "ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE", variation := 100) {
-    ; Compatibilidade com testes antigos: não faz busca por imagem.
-    ; Classifica o modal por OCR e confere se a referência vencedora veio do mesmo arquivo.
-    _ := variation
-    if !FileExist(imagePath)
-        return false
-
-    SplitPath imagePath, &fileName
-    classified := FFCV_ClassifyErrorModal(winTitle)
-    if (classified.Get("tipo", "") = "erro_desconhecido")
-        return false
-
-    SplitPath classified.Get("img", ""), &classifiedFile
-    return classifiedFile != "" && StrLower(classifiedFile) = StrLower(fileName)
 }
 
 FFCV_UnknownOcrResult(reason, text := "", ocrPayload := "") {

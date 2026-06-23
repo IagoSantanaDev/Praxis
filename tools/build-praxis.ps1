@@ -52,15 +52,10 @@ $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $MainScript = Join-Path $ProjectRoot 'main.ahk'
 $InstallerScript = Join-Path $ProjectRoot 'installer\Praxis.iss'
 $ImagesDir = Join-Path $ProjectRoot 'images'
-$UiDir = Join-Path $ProjectRoot 'ui'
-$DocsDir = Join-Path $ProjectRoot 'docs'
+$UiDir = Join-Path $ProjectRoot 'lib\ui'
 $UiIndexPath = Join-Path $UiDir 'index.html'
-$OcrReferencesPath = Join-Path $ProjectRoot 'lib\FFCV_ErrorReferences.json'
+$OcrReferencesPath = Join-Path $ProjectRoot 'lib\globals\mv\FFCV_ErrorReferences.json'
 $OcrProbePath = Join-Path $ProjectRoot 'tools\ocr-probe.ps1'
-$EulaPath = Join-Path $DocsDir 'EULA.md'
-$NdaPath = Join-Path $DocsDir 'NDA.md'
-$PrivacyPath = Join-Path $DocsDir 'PRIVACY_LGPD.md'
-$ThirdPartyPath = Join-Path $DocsDir 'THIRD_PARTY_NOTICES.md'
 $InstallerAssetsDir = Join-Path $ProjectRoot 'installer\assets'
 $AppIconPath = Join-Path $InstallerAssetsDir 'icon.ico'
 $WizardBannerPath = Join-Path $InstallerAssetsDir 'wizard-large.bmp'
@@ -411,6 +406,90 @@ function New-HashManifest {
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $OutputPath -Encoding UTF8
 }
 
+function Restore-WebView2Loader {
+    param(
+        [string]$ProjectRoot,
+        [string]$Vendor64Path,
+        [string]$Vendor32Path
+    )
+
+    # Ja existe em vendor/64bit ou vendor/32bit?
+    if ((Test-Path -LiteralPath $Vendor64Path) -or (Test-Path -LiteralPath $Vendor32Path)) {
+        return
+    }
+
+    Write-Host "   [nuget] WebView2Loader.dll nao encontrado em vendor — restaurando Microsoft.Web.WebView2..." -ForegroundColor DarkGray
+
+    $pkgName = 'Microsoft.Web.WebView2'
+    $pkgVersion = '1.0.2535.41'
+    $tempDir = Join-Path ([IO.Path]::GetTempPath()) ('praxis-wv2-' + [Guid]::NewGuid().ToString('N'))
+    $nupkgPath = Join-Path $tempDir "$pkgName.$pkgVersion.nupkg"
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+
+    try {
+        $nupkgUrl = "https://api.nuget.org/v3-flatcontainer/$($pkgName.ToLowerInvariant())/$pkgVersion/$($pkgName.ToLowerInvariant()).$pkgVersion.nupkg"
+        Write-Host "   [nuget] Baixando $nupkgUrl" -ForegroundColor DarkGray
+
+        # Usa curl.exe diretamente (funciona no ambiente bash onde powershell-invoke-webrequest pode falhar)
+        $curlExe = Get-Command curl.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+        if ($curlExe) {
+            $null = & $curlExe -sL --max-time 30 -o $nupkgPath $nupkgUrl 2>&1
+            if ((Test-Path -LiteralPath $nupkgPath) -and ((Get-Item $nupkgPath).Length -lt 1024)) {
+                Remove-Item -LiteralPath $nupkgPath -Force -ErrorAction SilentlyContinue
+                Write-Warning "Download do NuGet package retornou arquivo muito pequeno — possivelmente bloqueado"
+                return
+            }
+        } else {
+            try {
+                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                Invoke-WebRequest -Uri $nupkgUrl -OutFile $nupkgPath -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
+            } catch {
+                Write-Warning "Falha ao baixar NuGet package: $_"
+                return
+            }
+        }
+
+        if (!(Test-Path -LiteralPath $nupkgPath)) {
+            Write-Warning "Download nao gerou arquivo"
+            return
+        }
+
+        # Extrair o .nupkg (ZIP com estrutura inside)
+        $extractDir = Join-Path $tempDir 'extracted'
+        try {
+            Expand-Archive -LiteralPath $nupkgPath -DestinationPath $extractDir -Force -ErrorAction Stop
+        } catch {
+            Write-Warning "Falha ao extrair NuGet package: $_"
+            return
+        }
+
+        # Localizar WebView2Loader.dll: preferir runtimes\win-x64\ sobre runtimes\win-x86\
+        $allDlls = @(Get-ChildItem -LiteralPath $extractDir -Filter 'WebView2Loader.dll' -Recurse -ErrorAction SilentlyContinue)
+        if ($allDlls.Count -eq 0) {
+            Write-Warning "WebView2Loader.dll nao encontrado no pacote extraido"
+            return
+        }
+
+        $chosen = $allDlls | Where-Object { $_.FullName -match '[\\/]runtimes[\\/]win-x64[\\/]' } | Select-Object -First 1
+        if (!$chosen) {
+            $chosen = $allDlls | Where-Object { $_.FullName -match '[\\/]runtimes[\\/]' } | Select-Object -First 1
+        }
+        if (!$chosen) {
+            $chosen = $allDlls[0]
+        }
+
+        $destDir = Split-Path -Parent $Vendor64Path
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        Copy-Item -LiteralPath $chosen.FullName -Destination $Vendor64Path -Force
+        Write-Host "   [nuget] WebView2Loader.dll restaurado em $Vendor64Path" -ForegroundColor DarkGray
+
+    } finally {
+        if (Test-Path -LiteralPath $tempDir) {
+            Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function New-AhkIntegrityManifest {
     param(
         [string]$RepositoryRoot,
@@ -418,41 +497,215 @@ function New-AhkIntegrityManifest {
         [string]$WebView2LoaderPath
     )
 
+    # Aceita caminho legado (lib\64bit\) ou novo (vendor\64bit\ ou vendor\32bit\)
     if (!(Test-Path -LiteralPath $WebView2LoaderPath)) {
-        throw "WebView2Loader.dll não encontrado para o manifesto de integridade: $WebView2LoaderPath"
+        # Fallback: procurar em vendor/64bit/ e vendor/32bit/
+        $found = $null
+        foreach ($subdir in @('lib\vendor\64bit', 'lib\vendor\32bit')) {
+            $candidate = Join-Path $RepositoryRoot "$subdir\WebView2Loader.dll"
+            if (Test-Path -LiteralPath $candidate) {
+                $found = $candidate
+                break
+            }
+        }
+        if (!$found) {
+            throw "WebView2Loader.dll não encontrado para o manifesto de integridade. Pesquisou: $WebView2LoaderPath e vendor/64bit/ e vendor/32bit/"
+        }
+        $WebView2LoaderPath = $found
     }
 
-    $relative = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $WebView2LoaderPath).Replace('\\', '/')
-    $hash = (Get-FileHash -LiteralPath $WebView2LoaderPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $allFiles = @()
 
+    # vendor/**/*.ahk e vendor/**/*.dll (recursivo) — inclui WebView2Loader.dll
+    $vendorBase = Join-Path $RepositoryRoot 'lib\vendor'
+    if (Test-Path -LiteralPath $vendorBase) {
+        foreach ($ext in @('*.ahk', '*.dll')) {
+            Get-ChildItem -LiteralPath $vendorBase -Filter $ext -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
+                $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+                $allFiles += [ordered]@{ relative = $rel; hash = $h }
+            }
+        }
+    }
+
+    # globals/mv/**/*.ahk (recursivo)
+    $mvBase = Join-Path $RepositoryRoot 'lib\globals\mv'
+    if (Test-Path -LiteralPath $mvBase) {
+        Get-ChildItem -LiteralPath $mvBase -Filter '*.ahk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
+            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $allFiles += [ordered]@{ relative = $rel; hash = $h }
+        }
+    }
+
+    # globals/shared/*.ahk
+    $sharedBase = Join-Path $RepositoryRoot 'lib\globals\shared'
+    if (Test-Path -LiteralPath $sharedBase) {
+        Get-ChildItem -LiteralPath $sharedBase -Filter '*.ahk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
+            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $allFiles += [ordered]@{ relative = $rel; hash = $h }
+        }
+    }
+
+    # modules/*/*.ahk (recursivo)
+    $modulesBase = Join-Path $RepositoryRoot 'lib\modules'
+    if (Test-Path -LiteralPath $modulesBase) {
+        Get-ChildItem -LiteralPath $modulesBase -Filter '*.ahk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
+            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $allFiles += [ordered]@{ relative = $rel; hash = $h }
+        }
+    }
+
+    # ui/index.html
+    $uiIndex = Join-Path $RepositoryRoot 'lib\ui\index.html'
+    if (Test-Path -LiteralPath $uiIndex) {
+        $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $uiIndex).Replace('\', '/')
+        $h = (Get-FileHash -LiteralPath $uiIndex -Algorithm SHA256).Hash.ToLowerInvariant()
+        $allFiles += [ordered]@{ relative = $rel; hash = $h }
+    }
+
+    # ui/*.ahk (recursivo) — UiBridge, UiLog. Adicionado em 2026-06-26
+    # para fechar gap onde adulteracao de UiBridge.ahk sequestraria OnJsMessage.
+    $uiBase = Join-Path $RepositoryRoot 'lib\ui'
+    if (Test-Path -LiteralPath $uiBase) {
+        Get-ChildItem -LiteralPath $uiBase -Filter '*.ahk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
+            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $allFiles += [ordered]@{ relative = $rel; hash = $h }
+        }
+    }
+
+    # cli-check.ahk (raiz) — smoke test invocado em runtime pelo EXE
+    # quando --integrity-check e passado. Adicionado em 2026-06-26.
+    $cliCheckSrc = Join-Path $RepositoryRoot 'cli-check.ahk'
+    if (Test-Path -LiteralPath $cliCheckSrc) {
+        $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $cliCheckSrc).Replace('\', '/')
+        $h = (Get-FileHash -LiteralPath $cliCheckSrc -Algorithm SHA256).Hash.ToLowerInvariant()
+        $allFiles += [ordered]@{ relative = $rel; hash = $h }
+    }
+
+    # main.ahk
+    $mainAhk = Join-Path $RepositoryRoot 'main.ahk'
+    if (Test-Path -LiteralPath $mainAhk) {
+        $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $mainAhk).Replace('\', '/')
+        $h = (Get-FileHash -LiteralPath $mainAhk -Algorithm SHA256).Hash.ToLowerInvariant()
+        $allFiles += [ordered]@{ relative = $rel; hash = $h }
+    }
+
+    # app/*.ahk
+    $appBase = Join-Path $RepositoryRoot 'lib\app'
+    if (Test-Path -LiteralPath $appBase) {
+        Get-ChildItem -LiteralPath $appBase -Filter '*.ahk' -File -ErrorAction SilentlyContinue | ForEach-Object {
+            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
+            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $allFiles += [ordered]@{ relative = $rel; hash = $h }
+        }
+    }
+
+    # config/*.ahk
+    $configBase = Join-Path $RepositoryRoot 'lib\config'
+    if (Test-Path -LiteralPath $configBase) {
+        Get-ChildItem -LiteralPath $configBase -Filter '*.ahk' -File -ErrorAction SilentlyContinue | ForEach-Object {
+            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
+            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $allFiles += [ordered]@{ relative = $rel; hash = $h }
+        }
+    }
+
+    # Emitir manifesto AHK: Map de path->SHA256 e variaveis indexadas FileSHA256_<index>
     $lines = @(
         '; Gerado automaticamente por tools/build-praxis.ps1.',
-        '; Não edite manualmente. Este arquivo é embutido no Praxis.exe pelo Ahk2Exe.',
-        'gIntegrityExpectedFiles := Map(',
-        "    `"$relative`", `"$hash`"",
-        ')'
+        '; Não edite manualmente. Este arquivo é embutido no Praxis.exe pelo Ahk2Exe.'
     )
+
+    for ($i = 0; $i -lt $allFiles.Count; $i++) {
+        $f = $allFiles[$i]
+        # Variavel indexada: global FileSHA256_0 := "<hash>"
+        $lines += "global FileSHA256_$i := `"$($f.hash)`""
+    }
+
+    $lines += ''
+    $lines += 'gIntegrityExpectedFiles := Map('
+
+    for ($i = 0; $i -lt $allFiles.Count; $i++) {
+        $f = $allFiles[$i]
+        $lines += "    `"$($f.relative)`", `"$($f.hash)`","
+    }
+
+    $lines += "    'fileCount', " + $allFiles.Count + ","
+    $lines += "    'manifestVersion', '1'"
+    $lines += ')'
 
     $outputDir = Split-Path -Parent $OutputPath
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
     Set-Content -LiteralPath $OutputPath -Value ($lines -join [Environment]::NewLine) -Encoding UTF8
 }
 
+Write-Step 'Restaurando WebView2Loader.dll se necessario'
+$Vendor64Dll = Join-Path $ProjectRoot 'lib\vendor\64bit\WebView2Loader.dll'
+$Vendor32Dll = Join-Path $ProjectRoot 'lib\vendor\32bit\WebView2Loader.dll'
+if (!(Test-Path -LiteralPath $Vendor64Dll) -and !(Test-Path -LiteralPath $Vendor32Dll)) {
+    Restore-WebView2Loader -ProjectRoot $ProjectRoot -Vendor64Path $Vendor64Dll -Vendor32Path $Vendor32Dll
+}
+
 Write-Step 'Validando arquivos do projeto'
 $VersionInfoVersion = Convert-ToWindowsVersionInfoVersion -SemanticVersion $Version
+
+Write-Step 'Validando chamadas top-level em lib/'
+$TopLevelCallsScript = Join-Path $PSScriptRoot 'find-top-level-calls.ps1'
+if (Test-Path -LiteralPath $TopLevelCallsScript) {
+    $PowerShellExe = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    if (-not $PowerShellExe) {
+        Write-Warning "powershell.exe nao encontrado no PATH; sanity check ignorado."
+    } else {
+        & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $TopLevelCallsScript -Root (Join-Path $ProjectRoot 'lib') -FailOnFindings
+        Assert-NativeCommandSucceeded 'Encontradas chamadas top-level bare em lib/; corrija antes de compilar.'
+    }
+} else {
+    Write-Warning "tools/find-top-level-calls.ps1 nao encontrado; sanity check ignorado."
+}
+
+Write-Step 'Validando atribuicoes implicitas a globais em lib/'
+$ImplicitLocalsScript = Join-Path $PSScriptRoot 'find-implicit-locals.ps1'
+if (Test-Path -LiteralPath $ImplicitLocalsScript) {
+    $PowerShellExe = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+    if (-not $PowerShellExe) {
+        Write-Warning "powershell.exe nao encontrado no PATH; sanity check ignorado."
+    } else {
+        & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $ImplicitLocalsScript -Root (Join-Path $ProjectRoot 'lib') -FailOnFindings
+        Assert-NativeCommandSucceeded 'Encontradas atribuicoes implicitas a globais em lib/; corrija antes de compilar.'
+    }
+} else {
+    Write-Warning "tools/find-implicit-locals.ps1 nao encontrado; sanity check ignorado."
+}
+
+# WebView2Loader.dll: aceita caminho padrao (vendor\64bit\) ou fallback (vendor\32bit\)
+$webview2Candidates = @(
+    $Vendor64Dll,
+    $Vendor32Dll
+)
+$ResolvedWebView2Dll = $null
+foreach ($candidate in $webview2Candidates) {
+    if (Test-Path -LiteralPath $candidate) {
+        $ResolvedWebView2Dll = $candidate
+        break
+    }
+}
+if (!$ResolvedWebView2Dll) {
+    throw "WebView2Loader.dll nao encontrado em nenhum dos caminhos pesquisados: $($webview2Candidates -join ', ')"
+}
+
 foreach ($required in @(
     $MainScript,
     $UiIndexPath,
     $OcrReferencesPath,
     $OcrProbePath,
-    (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll'),
+    $ResolvedWebView2Dll,
     (Join-Path $ProjectRoot 'LICENSE'),
     (Join-Path $ProjectRoot 'COPYRIGHT'),
     (Join-Path $ProjectRoot 'NOTICE.md'),
-    $EulaPath,
-    $NdaPath,
-    $PrivacyPath,
-    $ThirdPartyPath,
     $AppIconPath
 )) {
     if (!(Test-Path -LiteralPath $required)) { throw "Arquivo obrigatório não encontrado: $required" }
@@ -553,7 +806,7 @@ if (Test-Path -LiteralPath $GeneratedDir) {
 New-EmbeddedBase64Module -OutputPath $GeneratedUiPath -VariableName 'gEmbeddedIndexHtmlBase64' -Text (Get-Content -LiteralPath $UiIndexPath -Raw -Encoding UTF8)
 New-EmbeddedBase64Module -OutputPath $GeneratedOcrReferencesPath -VariableName 'gEmbeddedOcrReferencesBase64' -Text (Get-Content -LiteralPath $OcrReferencesPath -Raw -Encoding UTF8)
 New-EmbeddedBase64Module -OutputPath $GeneratedOcrProbePath -VariableName 'gEmbeddedOcrProbeBase64' -Text (Get-Content -LiteralPath $OcrProbePath -Raw -Encoding UTF8)
-New-AhkIntegrityManifest -RepositoryRoot $ProjectRoot -OutputPath $IntegrityManifestSourcePath -WebView2LoaderPath (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll')
+New-AhkIntegrityManifest -RepositoryRoot $ProjectRoot -OutputPath $IntegrityManifestSourcePath -WebView2LoaderPath $ResolvedWebView2Dll
 
 Write-Step 'Compilando AutoHotkey para EXE'
 
@@ -572,24 +825,31 @@ Wait-ForFile -Path $ExePath
 Invoke-SignFile -Path $ExePath
 
 Write-Step 'Copiando recursos distribuíveis sem código-fonte AHK'
-New-Item -ItemType Directory -Path (Join-Path $StageDir 'lib\64bit') -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll') -Destination (Join-Path $StageDir 'lib\64bit\WebView2Loader.dll')
+$stageVendorDir = Join-Path $StageDir ([System.IO.Path]::GetDirectoryName($ResolvedWebView2Dll).Replace($ProjectRoot, '').TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar))
+New-Item -ItemType Directory -Path $stageVendorDir -Force | Out-Null
+Copy-Item -LiteralPath $ResolvedWebView2Dll -Destination (Join-Path $stageVendorDir ([System.IO.Path]::GetFileName($ResolvedWebView2Dll)))
 foreach ($legalSource in @(
     (Join-Path $ProjectRoot 'LICENSE'),
     (Join-Path $ProjectRoot 'COPYRIGHT'),
-    (Join-Path $ProjectRoot 'NOTICE.md'),
-    $EulaPath,
-    $NdaPath,
-    $PrivacyPath,
-    $ThirdPartyPath
+    (Join-Path $ProjectRoot 'NOTICE.md')
 )) {
     if (Test-Path -LiteralPath $legalSource) {
         Copy-Item -LiteralPath $legalSource -Destination (Join-Path $StageDir (Split-Path $legalSource -Leaf))
     }
 }
 
+# cli-check.ahk e o smoke test invocado pelo EXE em runtime via
+# `RunWait(A_ScriptDir "\cli-check.ahk")` quando --integrity-check e
+# passado. Necessario no StageDir para que a verificacao funcione no
+# EXE distribuido (e nao apenas em dev mode). Allowlisted na deteccao
+# de leak abaixo (unico .ahk intencionalmente distribuido).
+$cliCheckSrc = Join-Path $ProjectRoot 'cli-check.ahk'
+if (Test-Path -LiteralPath $cliCheckSrc) {
+    Copy-Item -LiteralPath $cliCheckSrc -Destination (Join-Path $StageDir 'cli-check.ahk')
+}
+
 $leakedSources = Get-ChildItem -LiteralPath $StageDir -File -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.Extension -in @('.ahk', '.ps1', '.iss', '.html', '.json') }
+    Where-Object { $_.Extension -in @('.ahk', '.ps1', '.iss', '.html', '.json') -and $_.Name -ne 'cli-check.ahk' }
 if ($leakedSources) {
     $leakedList = ($leakedSources | ForEach-Object { $_.FullName }) -join [Environment]::NewLine
     throw "O staging contém arquivos de fonte/script que não devem ser distribuídos:$([Environment]::NewLine)$leakedList"
@@ -651,11 +911,7 @@ if (!$SkipInstaller) {
     foreach ($legalSource in @(
         (Join-Path $ProjectRoot 'LICENSE'),
         (Join-Path $ProjectRoot 'COPYRIGHT'),
-        (Join-Path $ProjectRoot 'NOTICE.md'),
-        $EulaPath,
-        $NdaPath,
-        $PrivacyPath,
-        $ThirdPartyPath
+        (Join-Path $ProjectRoot 'NOTICE.md')
     )) {
         if (Test-Path -LiteralPath $legalSource) {
             Copy-Item -LiteralPath $legalSource -Destination (Join-Path $DeliveryOutDir (Split-Path $legalSource -Leaf))

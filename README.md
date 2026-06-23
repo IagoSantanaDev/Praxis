@@ -22,7 +22,26 @@ Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão
 - Inno Setup 6 → necessário para gerar instalador
 - WebView2 Runtime → necessário para executar a interface WebView2
 
-Para detalhes de build, assinatura, artefatos e validação, consulte [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
+---
+
+## Build e Distribuição
+
+O build E2E é feito por `tools/build-praxis.ps1`. Os comandos mais comuns:
+
+| Comando | Saída |
+|---|---|
+| `tools\build-praxis.ps1 -Version X.Y.Z` | `dist\Praxis-X.Y.Z\stage\Praxis.exe` + instalador |
+| `tools\build-praxis.ps1 -Version X.Y.Z -SkipInstaller` | Apenas EXE + distribuição portátil |
+| `tools\build-praxis.ps1 -Version X.Y.Z -Release` | Build com assinatura, compressão e instalador |
+
+Saídas geradas:
+- `dist\Praxis-<ver>\stage\Praxis.exe` — EXE compilado (sem .ahk)
+- `dist\Praxis-<ver>\distribution\` — pasta portátil (sem instalador)
+- `dist\Praxis-<ver>\installer\Praxis-Setup-<ver>.exe` — instalador Inno Setup
+- `dist\Praxis-<ver>\delivery\` — pacote sanitizado final
+- `dist\Praxis-<ver>\Praxis-build-manifest.json` — SHA256 de cada artefato
+
+Validação de integridade em runtime: `AutoHotkey64.exe main.ahk --integrity-check` (exit 0 = OK).
 
 ---
 
@@ -30,24 +49,65 @@ Para detalhes de build, assinatura, artefatos e validação, consulte [`docs/DIS
 
 ```
 Praxis/
-├── main.ahk                   # Entry point: GUI e dispatcher
-├── config.ini                 # Configuração local
-├── lib/
-│   ├── WebView2.ahk           # Lib externa (thqby)
-│   ├── JSON.ahk               # Lib externa (thqby)
-│   ├── Promise.ahk            # Dependência da WebView2.ahk
-│   ├── ComVar.ahk             # Dependência da WebView2.ahk
-│   ├── 32bit/WebView2Loader.dll
-│   └── 64bit/WebView2Loader.dll
-├── scripts/
-│   ├── mv_session.ahk         # Sessão MV, detecção de módulos, polling
-│   ├── remessa_protocolo.ahk  # Script principal
-│   ├── protocolar.ahk        # Stub
-│   └── fechar_xml.ahk        # Stub
-├── ui/
-│   └── index.html             # Interface completa do app
-└── images/                    # Somente imagens realmente usadas pelos macros
+├── main.ahk                       # Entry point: shell mínimo com App_Run()
+├── cli-check.ahk                  # CLI para --integrity-check (sem GUI)
+├── config.ini                     # Configuração local (gerado pelo instalador)
+├── lib/                           # TODO o código de script (AHK v2)
+│   ├── app/                       # Estado e bootstrap da aplicação
+│   │   ├── App.ahk                # App_Run() e shell WebView2
+│   │   ├── AppState.ahk           # Estado global da aplicação
+│   │   ├── Dispatcher.ahk         # Bridge AHK ↔ JS (SendToUI)
+│   │   └── ScriptRegistry.ahk     # Registry dos 3 módulos de faturamento
+│   ├── config/                    # Configuração, segredos e caminhos
+│   │   ├── Secrets.ahk            # DPAPI: API key (cache Map())
+│   │   ├── Settings.ahk           # IniRead/IniWrite: config.ini (cache Map())
+│   │   └── Paths.ahk              # WorkDir, XML dir (cache Map())
+│   ├── ui/
+│   │   ├── index.html             # Interface WebView2 completa
+│   │   ├── UiBridge.ahk           # Ponte WebView2 → AHK (window.chrome.webview)
+│   │   └── UiLog.ahk              # Notify/Progress/Done para a UI
+│   ├── vendor/                    # Bibliotecas externas (distribuídas)
+│   │   ├── WebView2.ahk           # Wrapper WebView2 para AHK v2
+│   │   ├── ComVar.ahk             # Variante COM helper (deps WebView2)
+│   │   ├── JSON.ahk               # JSON parse/stringify
+│   │   ├── Promise.ahk            # Promise/await para AHK v2
+│   │   ├── 32bit/WebView2Loader.dll   # WebView2 loader (32-bit)
+│   │   └── 64bit/WebView2Loader.dll   # WebView2 loader (64-bit)
+│   ├── globals/                   # Módulos globais compartilhados
+│   │   ├── mv/                    # Automação MV2000i — screen/component/action
+│   │   │   ├── MVConstants.ahk        # Constantes de janelas, timeouts, paths MV
+│   │   │   ├── MVSession.ahk          # Login e contexto de sessão MV
+│   │   │   ├── MVWindows.ahk          # Helpers de janela MV
+│   │   │   ├── FFCV_ErrorTemplates.ahk # Cadastro de erros FFCV via OCR
+│   │   │   ├── FFCV_ErrorReferences.json # Referências SHA256 dos erros OCR
+│   │   │   ├── screens/              # Telas: Login, MovDoc, FFCV, XML, Popup
+│   │   │   ├── components/           # Componentes
+│   │   │   └── actions/              # Ações: OpenScreens, CloseScreen, etc.
+│   │   └── shared/                  # Utilitários compartilhados
+│   │       ├── DateUtils.ahk
+│   │       ├── StringUtils.ahk
+│   │       └── Validation.ahk
+│   └── modules/                  # Scripts por módulo de faturamento
+│       ├── remessa_protocolo/    # Download de protocolos MOV DOC → FFCV
+│       ├── protocolar/           # Protocolação de contas
+│       └── fechar_xml/           # Fechamento e geração TISS XML
+├── installer/                    # Inno Setup
+│   ├── Praxis.iss                # Script do instalador
+│   └── assets/                   # Ícone e banners do wizard
+├── tools/                        # Scripts de build
+│   ├── build-praxis.ps1          # Build E2E (EXE + instalador + delivery)
+│   ├── build-ocr-error-references.ps1 # Regenera FFCV_ErrorReferences.json
+│   ├── find-top-level-calls.ps1   # Sanity check anti double-execution (wired into build)
+│   └── ocr-probe.ps1             # Prova OCR contra MV (debug)
+└── README.md, LICENSE, COPYRIGHT, NOTICE.md   # Documentação e termos legais
 ```
+
+Arquivos gerados em build (NÃO versionados, em `.gitignore`):
+- `build/generated/Praxis_IntegrityManifest.ahk` — hash de todos os artefatos
+- `build/generated/Praxis_Ui.ahk` — `ui/index.html` em Base64 (embarcado no EXE)
+- `build/generated/Praxis_OcrReferences.ahk` — `FFCV_ErrorReferences.json` em Base64
+- `build/generated/Praxis_OcrProbe.ahk` — `ocr-probe.ps1` em Base64
+- `dist/Praxis-<ver>/` — pasta de release com EXE, instalador e delivery
 
 ---
 
@@ -76,16 +136,16 @@ Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
 
 ## Instalação (Desenvolvimento)
 
-1. Copiar pasta `Praxis/` para o computador
+1. Clonar ou copiar pasta `Praxis/` para o computador
 2. Criar `config.ini` com:
    ```ini
    [Paths]
    WorkDir=C:\Users\<usuario>\Documents\Praxis
    ```
 3. Criar pasta `%DOCUMENTS%\Praxis\XML\`
-4. Baixar libs AHK em `lib\`:
-   - `WebView2.ahk`, `JSON.ahk`, `Promise.ahk`, `ComVar.ahk`
-5. Duplo clique em `main.ahk`
+4. Duplo clique em `main.ahk`
+
+> **Nota:** As bibliotecas externas (p.ex. `lib/vendor/WebView2.ahk`) já estão incluídas no repositório — não é necessário baixá-las manualmente.
 
 ---
 
@@ -93,7 +153,7 @@ Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
 
 O pacote de produção é gerado pelo script de build e pelo instalador Inno Setup do projeto. Para testes controlados, o build também cria a pasta `dist\Praxis-<versão>\delivery\` com o instalador e os documentos legais, e a pasta `dist\Praxis-<versão>\distribution\` com a versão portátil para computadores que não aceitam instalador, sem expor `.ahk`, `.ps1`, `.html` ou `.json`.
 
-Para gerar e validar builds, consulte [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
+Para gerar e validar builds, consulte a seção [Build e Distribuição](#build-e-distribuição) acima.
 
 O instalador:
 - instala em `%LOCALAPPDATA%\Programs\Praxis\` sem exigir privilégios elevados por padrão;
@@ -133,6 +193,10 @@ O MV2000i roda sobre **Oracle Forms 6i (`ifrun60.EXE`)**.
 1. **Teclado** como caminho principal (SendText, Tab, Enter, F6/F7/F8/F10)
 2. **HWND por ClassNN + coordenada Client** como fallback
 3. **Clipboard** para leitura: double-click → `Ctrl+C`
+
+### D006 — Exceção lib/vendor/ no .gitignore
+
+A pasta `lib/vendor/` é **distribuída** no pacote de produção (contém `WebView2.ahk`, necessária em runtime). O `.gitignore` padrão ignora `vendor/` por convenção upstream; por isso, as negações explícitas `!lib/vendor/32bit/` e `!lib/vendor/64bit/` garantem que as DLLs WebView2Loader sejam rastreadas e incluídas no instalador, sem ser silenciadas por padrões genéricos upstream.
 
 ---
 

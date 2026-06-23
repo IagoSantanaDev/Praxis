@@ -1,0 +1,257 @@
+; Praxis — software proprietário
+; Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
+; Licença: proprietária. Consulte LICENSE, COPYRIGHT e NOTICE.md na raiz do repositório.
+; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
+
+#Requires AutoHotkey v2.0
+#Warn All, OutputDebug
+
+#Include ..\..\lib\vendor\WebView2.ahk
+
+; ─── State (AppState carregado antes deste include) ────────────
+global gRoot
+global gController := ""
+global gWebView    := ""
+global gMainGui    := ""
+global gWorkDir    := ""
+global gEmbeddedIndexHtmlBase64 := ""
+
+; gExitAfterStop e gExitDeadline sao declarados em AppState.ahk.
+#Include *i ..\..\build\generated\Praxis_Ui.ahk
+
+; ─── Timing constants ────────────────────────────────────────
+; Nomes explicitos para timeouts e intervalos criticos. Ajustar aqui
+; quando calibrar UX (ex.: tempo maximo que o usuario espera ao fechar).
+AWAIT_POLL_MS             := 100       ; intervalo de polling de AwaitPromise
+WEBVIEW2_ENV_TIMEOUT_MS   := 15000     ; timeout de WebView2.CreateEnvironment
+WEBVIEW2_CTRL_TIMEOUT_MS  := 15000     ; timeout de WebView2.CreateController
+RESIZE_DEBOUNCE_MS        := 50        ; debounce negativo de OnGuiResize
+CLOSE_HANDLER_TIMEOUT_MS  := 60000     ; deadline para handler terminar ao fechar
+POLL_EXIT_INTERVAL_MS     := 100       ; intervalo de PollExitAfterStop
+CLEANUP_DISPATCH_FLUSH_MS := 50        ; tempo para WebView2 despachar SendToUI final
+
+; ─── App Run ──────────────────────────────────────────────────
+AwaitPromise(promise, timeoutMs, timeoutMessage) {
+    if !IsObject(promise)
+        throw Error("AwaitPromise recebeu valor invalido.")
+
+    for prop in ["isFulfilled", "isRejected"] {
+        if !HasProp(promise, prop)
+            throw Error("Promise invalida. Propriedade ausente: " . prop)
+    }
+
+    if !HasMethod(promise, "await")
+        throw Error("Promise invalida. Metodo ausente: await")
+
+    startTick := A_TickCount
+
+    while !promise.isFulfilled && !promise.isRejected {
+        if (A_TickCount - startTick >= timeoutMs)
+            throw Error(timeoutMessage)
+
+        Sleep AWAIT_POLL_MS
+    }
+
+    return promise.await()
+}
+
+App_Run() {
+    global gMainGui, gController, gWebView, gWorkDir, gEmbeddedIndexHtmlBase64
+
+    if !IsSet(gRoot) || Trim(gRoot) = ""
+        throw Error("gRoot nao inicializado. Verifique main.ahk antes de App_Run().")
+
+    ; Le o WorkDir configurado pelo installer
+    gWorkDir := IniRead(A_ScriptDir "\config.ini", "Paths", "WorkDir",
+                        A_MyDocuments "\Praxis")
+
+    if !DirExist(gWorkDir)
+        DirCreate gWorkDir
+
+    webViewLoader := gRoot "\lib\vendor\" (A_PtrSize * 8) "bit\WebView2Loader.dll"
+    if !FileExist(webViewLoader)
+        throw Error("WebView2Loader.dll nao encontrado em: " . webViewLoader)
+
+    gMainGui := Gui("+Resize +MinSize640x460", "Praxis")
+    gMainGui.BackColor := "0xD4D0C8"
+    gMainGui.OnEvent("Close", OnAppClose)
+    gMainGui.OnEvent("Size",  OnGuiResize)
+    gMainGui.Show("w750 h540")
+
+    ; Criar ambiente WebView2 com timeout
+    try {
+        AwaitPromise(
+            WebView2.CreateEnvironmentAsync(),
+            WEBVIEW2_ENV_TIMEOUT_MS,
+            "Timeout ao criar ambiente WebView2."
+        )
+    } catch as err {
+        MsgBox(
+            "Microsoft Edge WebView2 Runtime nao encontrado ou nao inicializou."
+            . "`n`nO WebView2 Runtime e necessario para executar o Praxis."
+            . "`nBaixe em: https://developer.microsoft.com/microsoft-edge/webview2/"
+            . "`n`nErro: " . err.Message,
+            "Praxis — WebView2 Runtime",
+            "OK Iconx"
+        )
+        ExitApp 1
+    }
+
+    ; Criar controller com timeout
+    try {
+        gController := AwaitPromise(
+            WebView2.CreateControllerAsync(gMainGui.Hwnd, 0, "", "", webViewLoader),
+            WEBVIEW2_CTRL_TIMEOUT_MS,
+            "Timeout de 15s ao criar WebView2 Controller."
+        )
+    } catch as err {
+        MsgBox(
+            err.Message
+            . "`n`nReinicie o aplicativo. Se o problema persistir, "
+            . "verifique a instalacao do WebView2 Runtime.",
+            "Praxis — WebView2",
+            "OK Iconx"
+        )
+        ExitApp 1
+    }
+
+    if !(gController is WebView2.Controller)
+        throw Error("Falha ao criar WebView2 Controller.")
+
+    gWebView := gController.CoreWebView2
+
+    settings := gWebView.Settings
+    settings.AreDefaultContextMenusEnabled := false
+    settings.AreDevToolsEnabled            := false
+
+    gWebView.add_WebMessageReceived(OnJsMessage)
+
+    if A_IsCompiled {
+        if (Trim(gEmbeddedIndexHtmlBase64) = "")
+            throw Error("UI embutida nao encontrada no executavel.")
+        gWebView.NavigateToString(Base64DecodeUtf8(gEmbeddedIndexHtmlBase64))
+    } else {
+        uiPath := gRoot "\lib\ui\index.html"
+        if !FileExist(uiPath)
+            throw Error("UI de desenvolvimento nao encontrada em: " . uiPath)
+        gWebView.Navigate("file:///" . StrReplace(uiPath, "\", "/"))
+    }
+
+    SyncViewBounds()
+}
+
+OnGuiResize(thisGui, minMax, width, height) {
+    if (minMax = -1)
+        return
+    SetTimer SyncViewBounds, -RESIZE_DEBOUNCE_MS
+}
+
+; OnAppClose: chamada pelo OS (Alt+F4, botao X, WinClose).
+; Retornar true impede o fechamento padrao da janela.
+; Se o app esta ocioso, fecha direto. Se ha handler ativo, pede parada
+; e usa SetTimer para poll assincrono (nao trava a thread GUI).
+OnAppClose(thisGui) {
+    global gExitDeadline
+
+    if !IsAppRunning() {
+        CleanupApp()
+        ExitApp()
+    }
+
+    if !gExitAfterStop {
+        RequestAppClose()
+        gExitDeadline := A_TickCount + CLOSE_HANDLER_TIMEOUT_MS
+
+        if !IsStopRequested() {
+            RequestAppStop()
+            SendToUI(Map("type","status","message","Interrompendo antes de fechar...","running",true))
+        } else {
+            SendToUI(Map("type","status","message","Aguardando interrupcao concluir...","running",true))
+        }
+
+        SetTimer PollExitAfterStop, POLL_EXIT_INTERVAL_MS
+    }
+
+    return true
+}
+
+; FinishAppExitAfterStop: caminho comum de finalizacao do close-after-stop.
+; Chamado por PollExitAfterStop quando o handler termina ou estoura o timeout.
+; Reset explicito de gExitAfterStop e gExitDeadline torna idempotente em relacao
+; a CleanupApp() — se o caller decidir pular ExitApp, o estado fica limpo.
+FinishAppExitAfterStop(reason := "") {
+    global gExitAfterStop, gExitDeadline
+
+    SetTimer PollExitAfterStop, 0
+    gExitAfterStop := false
+    gExitDeadline  := 0
+
+    if (reason != "")
+        OutputDebug "[App] " . reason
+
+    ; Sleep da tempo ao WebView2 despachar a ultima SendToUI("running", false)
+    ; antes de gController.Close() invalidar o canal.
+    Sleep CLEANUP_DISPATCH_FLUSH_MS
+    CleanupApp()
+    ExitApp()
+}
+
+; PollExitAfterStop: timer chamado a cada POLL_EXIT_INTERVAL_MS ate o handler
+; terminar (ou ate CLOSE_HANDLER_TIMEOUT_MS). Quando termina, delega para
+; FinishAppExitAfterStop. Critical "On" serializa contra reentrancia do timer.
+PollExitAfterStop() {
+    Critical "On"
+    try {
+        if !IsAppRunning() {
+            FinishAppExitAfterStop()
+            return
+        }
+
+        if (A_TickCount > gExitDeadline)
+            FinishAppExitAfterStop("Timeout aguardando handler terminar antes de fechar.")
+    } finally {
+        Critical "Off"
+    }
+}
+
+CleanupApp() {
+    global gController, gWebView, gExitAfterStop, gExitDeadline
+
+    try {
+        if (gController is WebView2.Controller)
+            gController.Close()
+    } catch as e {
+        OutputDebug "[App] CleanupApp falhou: " . e.Message
+    } finally {
+        ClearAppStop()
+        gExitAfterStop := false
+        gExitDeadline  := 0
+        gWebView := ""
+        gController := ""
+    }
+}
+
+SyncViewBounds() {
+    global gController
+
+    if !(gController is WebView2.Controller)
+        return
+
+    gController.Fill()
+}
+
+Base64DecodeUtf8(base64Text) {
+    if (Trim(base64Text) = "")
+        return ""
+
+    flags := 1 ; CRYPT_STRING_BASE64
+    size := 0
+    if !DllCall("Crypt32\CryptStringToBinary", "Str", base64Text, "UInt", 0, "UInt", flags, "Ptr", 0, "UIntP", &size, "Ptr", 0, "Ptr", 0)
+        throw Error("Falha ao calcular tamanho do base64.")
+
+    buf := Buffer(size)
+    if !DllCall("Crypt32\CryptStringToBinary", "Str", base64Text, "UInt", 0, "UInt", flags, "Ptr", buf, "UIntP", &size, "Ptr", 0, "Ptr", 0)
+        throw Error("Falha ao decodificar base64.")
+
+    return StrGet(buf, size, "UTF-8")
+}
