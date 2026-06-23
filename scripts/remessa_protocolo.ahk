@@ -129,13 +129,12 @@ XML_BTN_SAIR_TELA     := ""        ; pendente
 
 ; ── Fragmentos/classificação de erros no popup de envio ───────
 ; Modais Oracle Forms não expõem a mensagem pelo Window Spy/WinGetText de forma confiável.
-; A classificação confiável deve vir de templates visuais; texto acessível é apenas fallback.
+; A classificação confiável vem do OCR local do Windows na área client do modal.
 ERR_JA_DIGITADA        := "já digitada"
 ERR_CONVENIO_DIFERENTE := "convênio diferente"
 ERR_CONTA_ABERTA       := "conta aberta"
 ERR_CONTA_JA_EM_REMESSA := "já em remessa"
 ERR_TIPO_DIFERENTE     := "tipo diferente"
-ERROR_TEMPLATES := FFCV_ErrorTemplates()
 
 ; ── Entrada por teclado/campo Oracle Forms ─────────────────────
 ; Padrão validado no macro 11: micro-settle suficiente para estabilidade sem sleeps longos.
@@ -703,7 +702,7 @@ InserirContasNaRemessa(protocolContas, tipoConta, erros) {
 
             outcome := EnviarConta(numConta)
             if (outcome["status"] = "modal") {
-                ; RP_WaitContaSubmitOutcome já classificou o modal. Não repetir ImageSearch aqui.
+                ; RP_WaitContaSubmitOutcome já classificou o modal. Não repetir classificação aqui.
                 erroConta := outcome["erro"]
 
                 ; Regra validada: conta já digitada é continuável; fecha só o modal Forms e segue no mesmo popup.

@@ -19,14 +19,12 @@ global gController := ""
 global gWebView    := ""
 global gMainGui    := ""
 global gRunning    := false
-global gUser       := ""
-global gPass       := ""
 global gWorkDir    := ""
-global gAccessAuthorized := false
-global gAccessValidateUrl := "https://praxis.squareweb.app/v1/access/validate"
 global gIntegrityExpectedFiles := Map()
 global gIntegritySilentMode := false
+global gEmbeddedIndexHtmlBase64 := ""
 #Include *i build\generated\Praxis_IntegrityManifest.ahk
+#Include *i build\generated\Praxis_Ui.ahk
 
 ; ─── Script registry ──────────────────────────────────────────
 global gScripts := [
@@ -95,7 +93,7 @@ if (A_Args.Length > 0 && A_Args[1] = "--integrity-check") {
 AppInit()
 
 AppInit() {
-    global gMainGui, gController, gWebView, gWorkDir
+    global gMainGui, gController, gWebView, gWorkDir, gEmbeddedIndexHtmlBase64
 
     AssertRuntimeIntegrity()
 
@@ -125,8 +123,16 @@ AppInit() {
 
     gWebView.add_WebMessageReceived(OnJsMessage)
 
-    uiPath := A_ScriptDir "\ui\index.html"
-    gWebView.Navigate("file:///" . StrReplace(uiPath, "\", "/"))
+    if A_IsCompiled {
+        if (Trim(gEmbeddedIndexHtmlBase64) = "")
+            throw Error("UI embutida não encontrada no executável.")
+        gWebView.NavigateToString(Base64DecodeUtf8(gEmbeddedIndexHtmlBase64))
+    } else {
+        uiPath := A_ScriptDir "\ui\index.html"
+        if !FileExist(uiPath)
+            throw Error("UI de desenvolvimento não encontrada em: " . uiPath)
+        gWebView.Navigate("file:///" . StrReplace(uiPath, "\", "/"))
+    }
 
     SyncViewBounds()
 }
@@ -213,6 +219,22 @@ JoinStrings(items, separator) {
     return output
 }
 
+Base64DecodeUtf8(base64Text) {
+    if (Trim(base64Text) = "")
+        return ""
+
+    flags := 1 ; CRYPT_STRING_BASE64
+    size := 0
+    if !DllCall("Crypt32\CryptStringToBinary", "Str", base64Text, "UInt", 0, "UInt", flags, "Ptr", 0, "UIntP", &size, "Ptr", 0, "Ptr", 0)
+        throw Error("Falha ao calcular tamanho do base64.")
+
+    buf := Buffer(size)
+    if !DllCall("Crypt32\CryptStringToBinary", "Str", base64Text, "UInt", 0, "UInt", flags, "Ptr", buf, "UIntP", &size, "Ptr", 0, "Ptr", 0)
+        throw Error("Falha ao decodificar base64.")
+
+    return StrGet(buf, size, "UTF-8")
+}
+
 OnGuiResize(thisGui, minMax, width, height) {
     if (minMax = -1)
         return
@@ -234,12 +256,10 @@ OnJsMessage(handler, args) {
     data := JSON.parse(raw)
 
     switch data["action"] {
-        case "ready":           CheckSavedAccessCode()
-        case "validate_access": HandleValidateAccess(data.Has("code") ? data["code"] : "")
-        case "save_creds":      HandleSaveCredentials(data["user"], data["pass"])
-        case "run_script":      RunScript(data["scriptId"], data["params"])
-        case "stop_script":     StopScript()
-        case "exit":            ExitApp()
+        case "ready":       InitializeApp()
+        case "run_script":  RunScript(data["scriptId"], data["params"])
+        case "stop_script": StopScript()
+        case "exit":        ExitApp()
     }
 }
 
@@ -248,243 +268,15 @@ SendToUI(data) {
     gWebView.PostWebMessageAsJson(JSON.stringify(data))
 }
 
-; ─── Access gate ──────────────────────────────────────────────
-CheckSavedAccessCode() {
-    global gAccessAuthorized
-
-    cfgPath := A_ScriptDir "\config.ini"
-    encCode := IniRead(cfgPath, "Access", "EncCode", "")
-    if (encCode = "") {
-        ShowAccessGate()
-        return
-    }
-
-    code := DecryptDPAPI(encCode)
-    if (code = "") {
-        ShowAccessGate("Não consegui ler o código salvo. Informe novamente.")
-        return
-    }
-
-    result := ValidateAccessCode(code)
-    if result["ok"] {
-        gAccessAuthorized := true
-        CheckSavedCredentials()
-        return
-    }
-
-    gAccessAuthorized := false
-    ShowAccessGate("Código de acesso salvo inválido ou expirado. Informe novamente.")
-}
-
-ShowAccessGate(message := "") {
-    global gAccessAuthorized
-    gAccessAuthorized := false
-    SendToUI(Map("type", "show_access", "message", message))
-}
-
-HandleValidateAccess(code) {
-    global gAccessAuthorized
-
-    code := Trim(code)
-    if (code = "") {
-        ShowAccessGate("Digite o código de acesso.")
-        return
-    }
-
-    result := ValidateAccessCode(code)
-    if result["ok"] {
-        SaveAccessCode(code)
-        gAccessAuthorized := true
-        CheckSavedCredentials()
-        return
-    }
-
-    gAccessAuthorized := false
-    ShowAccessGate(result["message"])
-}
-
-SaveAccessCode(code) {
-    cfgPath := A_ScriptDir "\config.ini"
-    IniWrite EncryptDPAPI(code), cfgPath, "Access", "EncCode"
-}
-
-ValidateAccessCode(code) {
-    global gAccessValidateUrl
-
-    try {
-        http := ComObject("WinHttp.WinHttpRequest.5.1")
-        http.SetTimeouts(5000, 5000, 10000, 10000)
-        http.Open("POST", gAccessValidateUrl, false)
-        http.SetRequestHeader("Content-Type", "application/json")
-        http.SetRequestHeader("Accept", "application/json")
-        http.Send(JSON.stringify(Map("code", code)))
-
-        status := http.Status
-        body := http.ResponseText
-        parsed := body != "" ? JSON.parse(body) : Map()
-
-        if (status >= 200 && status < 300 && parsed.Has("authorized") && parsed["authorized"] = true)
-            return Map("ok", true, "message", "Acesso autorizado.")
-
-        message := "Código de acesso inválido."
-        if (parsed.Has("error") && parsed["error"] is Map && parsed["error"].Has("message") && parsed["error"]["message"] != "")
-            message := parsed["error"]["message"]
-        return Map("ok", false, "message", message)
-    } catch as e {
-        return Map("ok", false, "message", "Não foi possível validar o acesso. Verifique a conexão e tente novamente.")
-    }
-}
-
-; ─── Auth ─────────────────────────────────────────────────────
-CheckSavedCredentials() {
-    cfgPath := A_ScriptDir "\config.ini"
-    user    := IniRead(cfgPath, "Auth", "User",    "")
-    encPass := IniRead(cfgPath, "Auth", "EncPass", "")
-
-    if (user = "" || encPass = "") {
-        SendToUI(Map("type","show_login","user",""))
-        return
-    }
-
-    global gUser, gPass
-    gUser := user
-    gPass := DecryptDPAPI(encPass)
-    if (gPass = "") {
-        SendToUI(Map("type","show_login","message","Não consegui ler a senha salva. Informe novamente."))
-        return
-    }
-    SendToUI(Map("type","login_ok","user",user,"scripts",gScripts))
-}
-
-HandleSaveCredentials(user, pass) {
-    global gAccessAuthorized
-    if !gAccessAuthorized {
-        ShowAccessGate("Valide o código de acesso antes de informar credenciais.")
-        return
-    }
-
-    SaveCredentials(user, pass)
-    global gUser, gPass
-    gUser := user
-    gPass := pass
-    SendToUI(Map("type","login_ok","user",user,"scripts",gScripts))
-}
-
-SaveCredentials(user, pass) {
-    cfgPath := A_ScriptDir "\config.ini"
-    IniWrite user,               cfgPath, "Auth", "User"
-    IniWrite EncryptDPAPI(pass), cfgPath, "Auth", "EncPass"
-}
-
-EncryptDPAPI(plainText) {
-    ; DPAPI de usuário atual + entropia de aplicação. Não grava segredo em arquivo temporário.
-    if (plainText = "")
-        return ""
-
-    dataBytes := StrPut(plainText, "UTF-16") * 2
-    data := Buffer(dataBytes, 0)
-    StrPut(plainText, data, "UTF-16")
-
-    entropy := DPAPIEntropyBuffer()
-    blobIn := DPAPIBlob(data.Ptr, data.Size)
-    blobEntropy := DPAPIBlob(entropy.Ptr, entropy.Size)
-    blobOut := DPAPIEmptyBlob()
-
-    if !DllCall("Crypt32\CryptProtectData", "Ptr", blobIn.Ptr, "Ptr", 0, "Ptr", blobEntropy.Ptr, "Ptr", 0, "Ptr", 0, "UInt", 0x1, "Ptr", blobOut.Ptr, "Int")
-        throw Error("Falha ao proteger segredo local com DPAPI.")
-
-    outPtr := NumGet(blobOut, DPAPIBlobPtrOffset(), "Ptr")
-    outLen := NumGet(blobOut, 0, "UInt")
-    try {
-        return Base64Encode(outPtr, outLen)
-    } finally {
-        DllCall("Kernel32\LocalFree", "Ptr", outPtr, "Ptr")
-    }
-}
-
-DecryptDPAPI(encrypted) {
-    ; Retorna vazio em falha para forçar nova digitação sem expor detalhe sensível.
-    if (encrypted = "")
-        return ""
-
-    try {
-        encryptedBytes := Base64Decode(encrypted)
-        entropy := DPAPIEntropyBuffer()
-        blobIn := DPAPIBlob(encryptedBytes.Ptr, encryptedBytes.Size)
-        blobEntropy := DPAPIBlob(entropy.Ptr, entropy.Size)
-        blobOut := DPAPIEmptyBlob()
-
-        if !DllCall("Crypt32\CryptUnprotectData", "Ptr", blobIn.Ptr, "Ptr", 0, "Ptr", blobEntropy.Ptr, "Ptr", 0, "Ptr", 0, "UInt", 0x1, "Ptr", blobOut.Ptr, "Int")
-            return ""
-
-        outPtr := NumGet(blobOut, DPAPIBlobPtrOffset(), "Ptr")
-        try {
-            return StrGet(outPtr, "UTF-16")
-        } finally {
-            DllCall("Kernel32\LocalFree", "Ptr", outPtr, "Ptr")
-        }
-    } catch as e {
-        return ""
-    }
-}
-
-DPAPIEntropyBuffer() {
-    entropyText := "Praxis|local-secret|dpapi-v2|IagoSantanaLima"
-    entropyBytes := StrPut(entropyText, "UTF-8")
-    entropy := Buffer(entropyBytes, 0)
-    StrPut(entropyText, entropy, "UTF-8")
-    return entropy
-}
-
-DPAPIBlob(dataPtr, dataLen) {
-    offset := DPAPIBlobPtrOffset()
-    blob := Buffer(offset + A_PtrSize, 0)
-    NumPut("UInt", dataLen, blob, 0)
-    NumPut("Ptr", dataPtr, blob, offset)
-    return blob
-}
-
-DPAPIEmptyBlob() {
-    offset := DPAPIBlobPtrOffset()
-    return Buffer(offset + A_PtrSize, 0)
-}
-
-DPAPIBlobPtrOffset() {
-    return A_PtrSize = 8 ? 8 : 4
-}
-
-Base64Encode(dataPtr, dataLen) {
-    flags := 0x40000001 ; CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF
-    chars := 0
-    if !DllCall("Crypt32\CryptBinaryToStringW", "Ptr", dataPtr, "UInt", dataLen, "UInt", flags, "Ptr", 0, "UInt*", &chars, "Int")
-        throw Error("Falha ao calcular Base64 DPAPI.")
-
-    out := Buffer(chars * 2, 0)
-    if !DllCall("Crypt32\CryptBinaryToStringW", "Ptr", dataPtr, "UInt", dataLen, "UInt", flags, "Ptr", out.Ptr, "UInt*", &chars, "Int")
-        throw Error("Falha ao gerar Base64 DPAPI.")
-
-    return StrGet(out.Ptr, "UTF-16")
-}
-
-Base64Decode(value) {
-    bytes := 0
-    if !DllCall("Crypt32\CryptStringToBinaryW", "Str", value, "UInt", 0, "UInt", 1, "Ptr", 0, "UInt*", &bytes, "Ptr", 0, "Ptr", 0, "Int")
-        throw Error("Valor DPAPI inválido.")
-
-    out := Buffer(bytes, 0)
-    if !DllCall("Crypt32\CryptStringToBinaryW", "Str", value, "UInt", 0, "UInt", 1, "Ptr", out.Ptr, "UInt*", &bytes, "Ptr", 0, "Ptr", 0, "Int")
-        throw Error("Falha ao decodificar valor DPAPI.")
-
-    return out
+; ─── App bootstrap ────────────────────────────────────────────
+InitializeApp() {
+    global gScripts
+    SendToUI(Map("type", "app_ready", "scripts", gScripts))
 }
 
 ; ─── Dispatcher ───────────────────────────────────────────────
 RunScript(scriptId, params) {
-    global gRunning, gAccessAuthorized
-    if !gAccessAuthorized {
-        ShowAccessGate("Valide o código de acesso antes de executar automações.")
-        return
-    }
+    global gRunning
     if gRunning {
         SendToUI(Map("type","error","message","Já existe um script em execução."))
         return

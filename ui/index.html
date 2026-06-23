@@ -33,63 +33,6 @@ body {
   overflow: hidden; user-select: none;
 }
 
-/* ══ LOGIN ════════════════════════════════════════════════════ */
-#login-overlay {
-  position: fixed; inset: 0;
-  background: linear-gradient(160deg,#B8D8E8 0%,#7ABCD4 40%,#4A90B8 100%);
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; z-index: 100; gap: 20px;
-}
-#login-overlay.hidden { display: none; }
-.auth-box.hidden { display: none; }
-
-.login-brand { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.login-brand-logo {
-  width: 52px; height: 52px; background: #fff; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: bold; font-size: 16px; color: var(--header);
-  box-shadow: 0 2px 8px rgba(0,0,0,.3);
-}
-.login-brand-name { font-size: 20px; font-weight: bold; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.4); }
-.login-brand-sub  { font-size: 11px; color: rgba(255,255,255,.8); }
-
-.auth-box { background: #F0EEE8; border: 2px outset #E8E6E0; width: 320px; box-shadow: 4px 4px 12px rgba(0,0,0,.35); }
-.login-box-title {
-  background: linear-gradient(90deg,var(--accent) 0%,#0077CC 100%);
-  color: #fff; padding: 6px 10px; font-size: 11px; font-weight: bold;
-}
-.login-box-body   { padding: 16px; }
-.login-box-head   { font-size: 13px; font-weight: bold; margin-bottom: 3px; }
-.login-box-sub    { font-size: 10px; color: var(--txt-muted); margin-bottom: 14px; }
-.login-field      { margin-bottom: 10px; }
-.login-label      { font-size: 10px; font-weight: bold; color: #333; display: block; margin-bottom: 3px; }
-.login-input {
-  width: 100%; height: 22px; padding: 2px 6px;
-  border: 1px solid #7F9DB9; font-family: var(--font); font-size: 11px;
-  background: var(--input-bg); outline: none; color: var(--txt);
-}
-.login-input:focus { border-color: var(--accent); background: #EEF5FF; }
-#login-error,
-#access-error {
-  font-size: 10px; color: #CC0000; background: #FFF0F0;
-  border: 1px solid #FFAAAA; padding: 4px 8px; margin-bottom: 10px; display: none;
-}
-#login-error.visible,
-#access-error.visible { display: block; }
-.login-btns {
-  display: flex; justify-content: flex-end; gap: 6px;
-  margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--win-bdr-mid);
-}
-.btn-mv {
-  padding: 3px 18px; font-family: var(--font); font-size: 11px;
-  background: var(--win-bg); border: 1px solid var(--win-bdr-mid);
-  border-right-color: var(--win-bdr-dk); border-bottom-color: var(--win-bdr-dk);
-  cursor: pointer; border-radius: 2px; color: var(--txt); min-width: 70px; text-align: center;
-}
-.btn-mv:hover  { background: #E0EDF8; border-color: var(--accent); }
-.btn-mv.primary { background: var(--accent); color: #fff; border-color: var(--accent-dk); font-weight: bold; }
-.btn-mv.primary:hover { background: var(--accent-dk); }
-
 /* ══ APP ══════════════════════════════════════════════════════ */
 #app { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 #app.hidden { display: none; }
@@ -228,58 +171,8 @@ body {
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-overlay">
-  <div class="login-brand">
-    <div class="login-brand-logo">MV</div>
-    <div class="login-brand-name">Praxis</div>
-    <div class="login-brand-sub">Automação Hospitalar</div>
-  </div>
-
-  <div id="access-box" class="auth-box">
-    <div class="login-box-title">🔐 Acesso Praxis</div>
-    <div class="login-box-body">
-      <div class="login-box-head">Valide o acesso</div>
-      <div class="login-box-sub">Informe o código autorizado para liberar o Praxis.</div>
-      <div id="access-error" role="alert"></div>
-      <div class="login-field">
-        <label class="login-label" for="inp-access-code">Código de acesso</label>
-        <input class="login-input" type="password" id="inp-access-code" autocomplete="off" spellcheck="false"
-               onkeydown="if(event.key==='Enter') doValidateAccess()">
-      </div>
-      <div class="login-btns">
-        <button class="btn-mv" onclick="ahk.send({action:'exit'})">Cancelar</button>
-        <button class="btn-mv primary" id="btn-access" onclick="doValidateAccess()">Validar</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="login-box" class="auth-box hidden">
-    <div class="login-box-title">🔒 Identificação</div>
-    <div class="login-box-body">
-      <div class="login-box-head">Identifique-se</div>
-      <div class="login-box-sub">Informe suas credenciais de acesso ao MV2000i.</div>
-      <div id="login-error" role="alert"></div>
-      <div class="login-field">
-        <label class="login-label" for="inp-user">Usuário</label>
-        <input class="login-input" type="text" id="inp-user" autocomplete="off" spellcheck="false"
-               onkeydown="if(event.key==='Enter') document.getElementById('inp-pass').focus()">
-      </div>
-      <div class="login-field">
-        <label class="login-label" for="inp-pass">Senha</label>
-        <input class="login-input" type="password" id="inp-pass"
-               onkeydown="if(event.key==='Enter') doSaveCreds()">
-      </div>
-      <div class="login-btns">
-        <button class="btn-mv" onclick="ahk.send({action:'exit'})">Cancelar</button>
-        <button class="btn-mv primary" onclick="doSaveCreds()">Confirmar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- APP -->
-<div id="app" class="hidden">
+<div id="app">
   <div id="hdr">
     <div class="hdr-logo">MV</div>
     <span class="hdr-title">Praxis</span>
@@ -340,17 +233,13 @@ const ahk = {
   send(data) {
     if (window.chrome?.webview) window.chrome.webview.postMessage(JSON.stringify(data));
     else {
-      const logData = data.action === 'validate_access' ? { ...data, code: '[redacted]' } : data;
-      console.log('[→ AHK]', logData);
+      console.log('[→ AHK]', data);
       devSim(data);
     }
   },
   receive(data) {
     switch (data.type) {
-      case 'show_access': showAccess(data.message || '');            break;
-      case 'show_login':  showLogin(data.message || '');             break;
-      case 'login_failed': showLogin(data.message || 'Login recusado pelo MV.'); break;
-      case 'login_ok':   onLoginOk(data);                      break;
+      case 'app_ready':  onAppReady(data);                     break;
       case 'status':     onStatus(data.message, data.running); break;
       case 'log':        appendLog(data.message, 'i');         break;
       case 'progress':   setProgress(data.value);              break;
@@ -369,85 +258,11 @@ if (window.chrome?.webview)
 
 document.addEventListener('DOMContentLoaded', () => ahk.send({ action: 'ready' }));
 
-// ─── Access gate ──────────────────────────────────────────────
-function showAccess(message = '') {
-  document.getElementById('login-overlay').classList.remove('hidden');
-  document.getElementById('access-box').classList.remove('hidden');
-  document.getElementById('login-box').classList.add('hidden');
-  document.getElementById('app').classList.add('hidden');
-  setAccessBusy(false);
-
-  const err = document.getElementById('access-error');
-  if (message) {
-    err.textContent = message;
-    err.classList.add('visible');
-  } else {
-    err.textContent = '';
-    err.classList.remove('visible');
-  }
-
-  document.getElementById('inp-access-code').value = '';
-  document.getElementById('inp-access-code').focus();
-}
-
-function doValidateAccess() {
-  const input = document.getElementById('inp-access-code');
-  const code = input.value.trim();
-  const err = document.getElementById('access-error');
-
-  if (!code) {
-    err.textContent = 'Digite o código de acesso.';
-    err.classList.add('visible');
-    input.focus();
-    return;
-  }
-
-  err.textContent = 'Validando acesso...';
-  err.classList.add('visible');
-  setAccessBusy(true);
-  ahk.send({ action: 'validate_access', code });
-}
-
-function setAccessBusy(isBusy) {
-  const button = document.getElementById('btn-access');
-  const input = document.getElementById('inp-access-code');
-  if (button) button.disabled = isBusy;
-  if (input) input.disabled = isBusy;
-}
-
-// ─── Login ────────────────────────────────────────────────────
-function showLogin(message = '') {
-  document.getElementById('login-overlay').classList.remove('hidden');
-  document.getElementById('access-box').classList.add('hidden');
-  document.getElementById('login-box').classList.remove('hidden');
-  document.getElementById('app').classList.add('hidden');
-  const err = document.getElementById('login-error');
-  if (message) {
-    err.textContent = message;
-    err.classList.add('visible');
-  } else {
-    err.textContent = '';
-    err.classList.remove('visible');
-  }
-  document.getElementById('inp-pass').value = '';
-  document.getElementById('inp-user').focus();
-}
-
-function doSaveCreds() {
-  const user = document.getElementById('inp-user').value.trim();
-  const pass = document.getElementById('inp-pass').value;
-  const err  = document.getElementById('login-error');
-  if (!user || !pass) { err.textContent = 'Preencha usuário e senha.'; err.classList.add('visible'); return; }
-  err.classList.remove('visible');
-  ahk.send({ action: 'save_creds', user, pass });
-}
-
-function onLoginOk(data) {
-  document.getElementById('login-overlay').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  document.getElementById('hdr-user').textContent = '👤 ' + data.user;
-  scripts = data.scripts;
+// ─── App bootstrap ────────────────────────────────────────────
+function onAppReady(data) {
+  scripts = data.scripts || [];
   renderSidebar();
+  document.getElementById('hdr-user').textContent = '';
   appendLog('Pronto. Selecione um módulo para iniciar.', 'k');
 }
 
@@ -605,45 +420,40 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
 // ─── Dev sim ──────────────────────────────────────────────────
 function devSim(data) {
-  if (data.action === 'ready')
-    setTimeout(() => ahk.receive({ type:'show_access' }), 200);
+  if (data.action !== 'ready') return;
 
-  if (data.action === 'validate_access')
-    setTimeout(() => ahk.receive({ type:'show_login' }), 300);
-
-  if (data.action === 'save_creds')
-    setTimeout(() => ahk.receive({
-      type: 'login_ok', user: data.user,
-      scripts: [
-        { id:'remessa_protocolo', nome:'Remessa por Protocolo', categoria:'Faturamento',
-          descricao:'Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV',
-          params:[
-            { id:'protocolos',     label:'Protocolos',           tipo:'text',  obrigatorio:true,  hint:'Ex: 12345, 67890' },
-            { id:'tipo_conta',     label:'Tipo de Conta',        tipo:'select',obrigatorio:true,
-              opcoes:['Internamento','Ambulatório','Emergência'] },
-            { id:'num_remessa',    label:'Remessa Existente',    tipo:'text',  obrigatorio:false, hint:'Deixe vazio para criar nova' },
-            { id:'data_entrega',   label:'Data de Entrega',      tipo:'date',  obrigatorio:false },
-            { id:'data_vencimento',label:'Data de Vencimento',   tipo:'date',  obrigatorio:false }
-          ]
-        },
-        { id:'protocolar', nome:'Protocolar', categoria:'Movimentação',
-          descricao:'Movimenta contas de remessas para outro setor',
-          params:[
-            { id:'remessas',    label:'Número das Remessas', tipo:'text', obrigatorio:true,  hint:'Ex: 511458, 514015' },
-            { id:'setor_atual', label:'Setor Atual',         tipo:'text', obrigatorio:true,  hint:'Ex: 34' },
-            { id:'setor_envio', label:'Setor de Envio',      tipo:'text', obrigatorio:true,  hint:'Ex: 365' }
-          ]
-        },
-        { id:'fechar_xml', nome:'Fechar e Gerar XML', categoria:'Faturamento',
-          descricao:'Fecha remessas e gera arquivo XML',
-          params:[
-            { id:'remessas',       label:'Número das Remessas', tipo:'text', obrigatorio:true, hint:'Ex: 511458, 514015' },
-            { id:'data_entrega',   label:'Data de Entrega',     tipo:'date', obrigatorio:true },
-            { id:'data_vencimento',label:'Data de Vencimento',  tipo:'date', obrigatorio:true }
-          ]
-        }
-      ]
-    }), 300);
+  setTimeout(() => ahk.receive({
+    type: 'app_ready',
+    scripts: [
+      { id:'remessa_protocolo', nome:'Remessa por Protocolo', categoria:'Faturamento',
+        descricao:'Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV',
+        params:[
+          { id:'protocolos',     label:'Protocolos',           tipo:'text',  obrigatorio:true,  hint:'Ex: 12345, 67890' },
+          { id:'tipo_conta',     label:'Tipo de Conta',        tipo:'select',obrigatorio:true,
+            opcoes:['Internamento','Ambulatório','Emergência'] },
+          { id:'num_remessa',    label:'Remessa Existente',    tipo:'text',  obrigatorio:false, hint:'Deixe vazio para criar nova' },
+          { id:'data_entrega',   label:'Data de Entrega',      tipo:'date',  obrigatorio:false },
+          { id:'data_vencimento',label:'Data de Vencimento',   tipo:'date',  obrigatorio:false }
+        ]
+      },
+      { id:'protocolar', nome:'Protocolar', categoria:'Movimentação',
+        descricao:'Movimenta contas de remessas para outro setor',
+        params:[
+          { id:'remessas',    label:'Número das Remessas', tipo:'text', obrigatorio:true,  hint:'Ex: 511458, 514015' },
+          { id:'setor_atual', label:'Setor Atual',         tipo:'text', obrigatorio:true,  hint:'Ex: 34' },
+          { id:'setor_envio', label:'Setor de Envio',      tipo:'text', obrigatorio:true,  hint:'Ex: 365' }
+        ]
+      },
+      { id:'fechar_xml', nome:'Fechar e Gerar XML', categoria:'Faturamento',
+        descricao:'Fecha remessas e gera arquivo XML',
+        params:[
+          { id:'remessas',       label:'Número das Remessas', tipo:'text', obrigatorio:true, hint:'Ex: 511458, 514015' },
+          { id:'data_entrega',   label:'Data de Entrega',     tipo:'date', obrigatorio:true },
+          { id:'data_vencimento',label:'Data de Vencimento',  tipo:'date', obrigatorio:true }
+        ]
+      }
+    ]
+  }), 200);
 }
 </script>
 </body>

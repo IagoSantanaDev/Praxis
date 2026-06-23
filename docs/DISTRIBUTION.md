@@ -28,7 +28,7 @@ Para build completo com instalador:
 - Ahk2Exe disponível;
 - Inno Setup 6 instalado;
 - assets do instalador presentes;
-- recursos de runtime presentes: UI HTML, imagens de erro e WebView2Loader 64-bit.
+- recursos de runtime presentes: UI HTML, JSON de referências OCR e script OCR para embutir no EXE; WebView2Loader 64-bit continua externo no staging.
 
 Para release assinado:
 
@@ -140,18 +140,36 @@ Para a versão `1.0.0`, o build completo gera:
 
 ```text
 dist\Praxis-1.0.0\stage\Praxis.exe
-dist\Praxis-1.0.0\stage\Praxis-build-manifest.json
+dist\Praxis-1.0.0\stage\lib\64bit\WebView2Loader.dll
 dist\Praxis-1.0.0\installer\Praxis-Setup-1.0.0.exe
+dist\Praxis-1.0.0\delivery\Praxis-Setup-1.0.0.exe
+dist\Praxis-1.0.0\distribution\Praxis.exe
+dist\Praxis-1.0.0\distribution\lib\64bit\WebView2Loader.dll
+dist\Praxis-1.0.0\distribution\LICENSE
+dist\Praxis-1.0.0\distribution\COPYRIGHT
+dist\Praxis-1.0.0\distribution\NOTICE.md
+dist\Praxis-1.0.0\distribution\EULA.md
+dist\Praxis-1.0.0\distribution\NDA.md
+dist\Praxis-1.0.0\distribution\PRIVACY_LGPD.md
+dist\Praxis-1.0.0\distribution\THIRD_PARTY_NOTICES.md
+dist\Praxis-1.0.0\delivery\LICENSE
+dist\Praxis-1.0.0\delivery\COPYRIGHT
+dist\Praxis-1.0.0\delivery\NOTICE.md
+dist\Praxis-1.0.0\delivery\EULA.md
+dist\Praxis-1.0.0\delivery\NDA.md
+dist\Praxis-1.0.0\delivery\PRIVACY_LGPD.md
+dist\Praxis-1.0.0\delivery\THIRD_PARTY_NOTICES.md
 dist\Praxis-1.0.0\Praxis-build-manifest.json
 dist\Praxis-1.0.0\Praxis-installer-manifest.json
 ```
 
-O staging inclui recursos necessários para runtime, como UI, imagens, WebView2Loader 64-bit e documentos de licença/aviso da raiz. O staging não deve conter `.ahk`, `.ps1` ou `.iss`.
+O staging agora é sanitizado para runtime: contém apenas o executável compilado, o loader WebView2 e os documentos legais que o instalador também instala. A pasta `distribution` é a entrega portátil para computadores que não aceitam instalador; ela não expõe `.ahk`, `.ps1`, `.html` ou `.json`.
 
-Para levar o pacote a outro PC, normalmente use apenas o instalador:
+Para levar o pacote a outro PC, use a pasta `distribution` ou apenas o instalador da pasta `delivery`:
 
 ```text
-Praxis-Setup-<versão>.exe
+dist\Praxis-<versão>\distribution\Praxis.exe
+dist\Praxis-<versão>\delivery\Praxis-Setup-<versão>.exe
 ```
 
 A pasta `stage` é útil para validação técnica, mas não é o pacote de entrega preferencial.
@@ -160,58 +178,72 @@ A pasta `stage` é útil para validação técnica, mas não é o pacote de entr
 
 Depois de gerar um build completo, valide pelo menos:
 
-1. o executável existe;
-2. o instalador existe;
-3. a UI foi copiada;
-4. as imagens esperadas foram copiadas;
-5. não há fonte AutoHotkey no staging;
-6. o modo de integridade retorna sucesso.
+1. o executável existe na pasta `stage`;
+2. o instalador existe na pasta `installer`;
+3. a pasta `delivery` existe para cenários com instalador;
+4. a pasta `distribution` existe para cenários sem instalador;
+5. o loader WebView2 foi copiado;
+6. não há fonte AutoHotkey, HTML, JSON ou scripts de build em `stage`, `delivery` ou `distribution`;
+7. o modo de integridade retorna sucesso.
 
 Exemplo:
 
 ```powershell
 $root = "dist\Praxis-9.9.18-test"
 $stage = Join-Path $root "stage"
+$delivery = Join-Path $root "delivery"
+$distribution = Join-Path $root "distribution"
 $exe = Join-Path $stage "Praxis.exe"
 $setup = Join-Path $root "installer\Praxis-Setup-9.9.18-test.exe"
+$loader = Join-Path $stage "lib\64bit\WebView2Loader.dll"
+$disallowed = @('.ahk', '.ps1', '.iss', '.html', '.json')
 
 $proc = Start-Process -FilePath $exe -ArgumentList "--integrity-check" -WorkingDirectory $stage -Wait -PassThru
-$sourceLeaks = @(Get-ChildItem -LiteralPath $stage -Recurse -File -Filter *.ahk -ErrorAction SilentlyContinue)
+$stageLeaks = @(Get-ChildItem -LiteralPath $stage -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $disallowed -contains $_.Extension })
+$deliveryLeaks = @(Get-ChildItem -LiteralPath $delivery -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $disallowed -contains $_.Extension })
+$distributionLeaks = @(Get-ChildItem -LiteralPath $distribution -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $disallowed -contains $_.Extension })
 
 [pscustomobject]@{
-  IntegrityExit   = $proc.ExitCode
-  SetupExists     = Test-Path -LiteralPath $setup
-  ExeExists       = Test-Path -LiteralPath $exe
-  UiExists        = Test-Path -LiteralPath (Join-Path $stage "ui\index.html")
-  ImageCount      = @(Get-ChildItem -LiteralPath (Join-Path $stage "images") -File -Filter *.png -ErrorAction SilentlyContinue).Count
-  SourceLeakCount = $sourceLeaks.Count
+  IntegrityExit      = $proc.ExitCode
+  SetupExists        = Test-Path -LiteralPath $setup
+  DeliveryExists     = Test-Path -LiteralPath $delivery
+  DistributionExists = Test-Path -LiteralPath $distribution
+  ExeExists          = Test-Path -LiteralPath $exe
+  LoaderExists       = Test-Path -LiteralPath $loader
+  StageLeakCount     = $stageLeaks.Count
+  DeliveryLeakCount  = $deliveryLeaks.Count
+  DistributionLeakCount = $distributionLeaks.Count
 }
 ```
 
 Resultado esperado:
 
 ```text
-IntegrityExit   : 0
-SetupExists     : True
-ExeExists       : True
-UiExists        : True
-ImageCount      : 5
-SourceLeakCount : 0
+IntegrityExit         : 0
+SetupExists           : True
+DeliveryExists        : True
+DistributionExists    : True
+ExeExists             : True
+LoaderExists          : True
+StageLeakCount        : 0
+DeliveryLeakCount     : 0
+DistributionLeakCount : 0
 ```
 
 Se `IntegrityExit` for diferente de `0`, o executável bloqueou porque algum recurso protegido está ausente ou alterado.
 
 ## Integridade de recursos em runtime
 
-O build gera um manifesto AutoHotkey embutido no executável. Esse manifesto contém hashes SHA-256 dos recursos externos protegidos.
+O build gera um manifesto AutoHotkey embutido no executável. Esse manifesto contém hashes SHA-256 apenas dos recursos externos que permanecem no staging sanitizado.
 
 Na inicialização, o Praxis valida:
 
-- UI HTML;
-- imagens usadas pelos templates de erro;
-- WebView2Loader 64-bit.
+- `lib\64bit\WebView2Loader.dll`;
+- a presença do binário compilado e dos artefatos embutidos no EXE.
 
-Se algum arquivo estiver ausente ou alterado, o aplicativo falha fechado antes de liberar a interface ou automações. O modo interno de teste é:
+A UI HTML, o JSON de referências OCR e o script OCR são embutidos no executável durante o build.
+
+Se algum arquivo externo estiver ausente ou alterado, o aplicativo falha fechado antes de liberar a interface ou automações. O modo interno de teste é:
 
 ```powershell
 .\Praxis.exe --integrity-check
@@ -241,11 +273,13 @@ Não distribua:
 - arquivos `.ahk` fonte;
 - scripts `.ps1` de build;
 - scripts `.iss` do instalador;
+- arquivos `.html` de interface;
+- arquivos `.json` de manifesto ou referência;
 - `.pfx`, senhas, chaves privadas ou tokens;
 - `config.ini` de desenvolvimento;
 - logs, dumps, XMLs reais ou evidências locais de teste.
 
-O script de build já bloqueia vazamento de `.ahk`, `.ps1` e `.iss` no staging. Ainda assim, valide antes de entregar.
+O script de build já bloqueia vazamento de `.ahk`, `.ps1`, `.iss`, `.html` e `.json` no staging. Ainda assim, valide antes de entregar.
 
 ## Checklist antes de entregar
 
@@ -253,8 +287,9 @@ Para build de teste:
 
 - [ ] comando de build concluiu sem erro;
 - [ ] instalador foi gerado;
+- [ ] pasta `delivery` foi gerada;
 - [ ] integridade retorna `0`;
-- [ ] staging não contém fonte AutoHotkey;
+- [ ] staging não contém fonte AutoHotkey, HTML ou JSON;
 - [ ] versão de teste está clara no nome do pacote;
 - [ ] limitações de assinatura foram comunicadas.
 
@@ -264,7 +299,7 @@ Para release:
 - [ ] certificado correto foi usado;
 - [ ] assinatura do EXE e do instalador foi validada;
 - [ ] working tree estava limpa ou `-AllowDirty` foi justificado;
-- [ ] manifestos foram preservados;
+- [ ] manifestos internos foram preservados fora da pasta `delivery`;
 - [ ] hash SHA-256 do instalador foi registrado;
 - [ ] pacote foi testado em máquina limpa ou VM compatível.
 

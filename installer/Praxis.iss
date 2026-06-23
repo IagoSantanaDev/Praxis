@@ -72,10 +72,7 @@ Name: "desktopicon"; Description: "Criar atalho na Área de Trabalho"; GroupDesc
 
 [Files]
 Source: "{#SourceDir}\Praxis.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\ui\*"; DestDir: "{app}\ui"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SourceDir}\images\*"; DestDir: "{app}\images"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourceDir}\lib\64bit\WebView2Loader.dll"; DestDir: "{app}\lib\64bit"; Flags: ignoreversion
-Source: "{#SourceDir}\Praxis-build-manifest.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 #ifexist SourceDir + "\COPYRIGHT"
 Source: "{#SourceDir}\COPYRIGHT"; DestDir: "{app}"; Flags: ignoreversion
@@ -94,9 +91,6 @@ Source: "{#SourceDir}\PRIVACY_LGPD.md"; DestDir: "{app}"; Flags: ignoreversion
 #endif
 #ifexist SourceDir + "\THIRD_PARTY_NOTICES.md"
 Source: "{#SourceDir}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
-#endif
-#ifexist SourceDir + "\README.md"
-Source: "{#SourceDir}\README.md"; DestDir: "{app}"; Flags: ignoreversion
 #endif
 
 [Dirs]

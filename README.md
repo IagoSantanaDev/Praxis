@@ -13,8 +13,7 @@ Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão
 | Shell da janela | AutoHotkey v2 (`Gui`) |
 | Interface UI | WebView2 (Chromium) + HTML/CSS/JS puro |
 | Comunicação JS↔AHK | `PostWebMessageAsJson` / `window.chrome.webview.postMessage` |
-| Automação do MV | AutoHotkey v2 — Send, ControlClick, ImageSearch + Clipboard |
-| Credenciais | Windows DPAPI nativo (`CryptProtectData` / `CryptUnprotectData`) |
+| Automação do MV | AutoHotkey v2 — Send, ControlClick, OCR local + Clipboard |
 | Configuração | `config.ini` (IniRead/IniWrite) |
 
 **Dependências para desenvolvimento:**
@@ -31,8 +30,8 @@ Para detalhes de build, assinatura, artefatos e validação, consulte [`docs/DIS
 
 ```
 Praxis/
-├── main.ahk                   # Entry point: GUI, login, dispatcher
-├── config.ini                 # Configuração e credenciais criptografadas
+├── main.ahk                   # Entry point: GUI e dispatcher
+├── config.ini                 # Configuração local
 ├── lib/
 │   ├── WebView2.ahk           # Lib externa (thqby)
 │   ├── JSON.ahk               # Lib externa (thqby)
@@ -41,12 +40,12 @@ Praxis/
 │   ├── 32bit/WebView2Loader.dll
 │   └── 64bit/WebView2Loader.dll
 ├── scripts/
-│   ├── mv_session.ahk         # Login MV, abertura de módulos, polling
+│   ├── mv_session.ahk         # Sessão MV, detecção de módulos, polling
 │   ├── remessa_protocolo.ahk  # Script principal
 │   ├── protocolar.ahk        # Stub
 │   └── fechar_xml.ahk        # Stub
 ├── ui/
-│   └── index.html             # Interface completa (login + app)
+│   └── index.html             # Interface completa do app
 └── images/                    # Somente imagens realmente usadas pelos macros
 ```
 
@@ -92,7 +91,7 @@ Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
 
 ## Instalação (Produção)
 
-O pacote de produção é gerado pelo script de build e pelo instalador Inno Setup do projeto.
+O pacote de produção é gerado pelo script de build e pelo instalador Inno Setup do projeto. Para testes controlados, o build também cria a pasta `dist\Praxis-<versão>\delivery\` com o instalador e os documentos legais, e a pasta `dist\Praxis-<versão>\distribution\` com a versão portátil para computadores que não aceitam instalador, sem expor `.ahk`, `.ps1`, `.html` ou `.json`.
 
 Para gerar e validar builds, consulte [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
 
@@ -109,7 +108,6 @@ O instalador:
 ## Interface
 
 - **Janela:** 750×540px (redimensionável, mínimo 640×460)
-- **Login:** estilo da tela de login do MV2000i
 - **App:** sidebar com módulos por categoria + formulário dinâmico + log + barra de progresso
 - **Comunicação:** bidirecional AHK↔JS via WebView2
 
@@ -124,7 +122,7 @@ O MV2000i roda sobre **Oracle Forms 6i (`ifrun60.EXE`)**.
 - `ControlClick` com **ClassNN**
 - `Send` (teclado: F7, F8, F10, Tab, Enter, setas)
 - `WinGetText` em popups modais
-- `ImageSearch` com `*TransFFFFFF *10` para menus
+- OCR local do Windows (`Windows.Media.Ocr`) na área client dos popups de erro
 
 ### Não confiável sozinho
 - `ControlSetText`/`ControlGetText` para campos de texto do Forms
@@ -147,7 +145,4 @@ MV_Poll(condFn, timeoutSecs)
 ; Leitura de campo via clipboard
 MV_ReadAt(winTitle, cx, cy)
 
-; Credenciais DPAPI
-EncryptDPAPI(plainText)  ; CryptProtectData do Windows
-DecryptDPAPI(encrypted)  ; CryptUnprotectData do Windows
 ```

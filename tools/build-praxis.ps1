@@ -52,6 +52,15 @@ $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $MainScript = Join-Path $ProjectRoot 'main.ahk'
 $InstallerScript = Join-Path $ProjectRoot 'installer\Praxis.iss'
 $ImagesDir = Join-Path $ProjectRoot 'images'
+$UiDir = Join-Path $ProjectRoot 'ui'
+$DocsDir = Join-Path $ProjectRoot 'docs'
+$UiIndexPath = Join-Path $UiDir 'index.html'
+$OcrReferencesPath = Join-Path $ProjectRoot 'lib\FFCV_ErrorReferences.json'
+$OcrProbePath = Join-Path $ProjectRoot 'tools\ocr-probe.ps1'
+$EulaPath = Join-Path $DocsDir 'EULA.md'
+$NdaPath = Join-Path $DocsDir 'NDA.md'
+$PrivacyPath = Join-Path $DocsDir 'PRIVACY_LGPD.md'
+$ThirdPartyPath = Join-Path $DocsDir 'THIRD_PARTY_NOTICES.md'
 $InstallerAssetsDir = Join-Path $ProjectRoot 'installer\assets'
 $AppIconPath = Join-Path $InstallerAssetsDir 'icon.ico'
 $WizardBannerPath = Join-Path $InstallerAssetsDir 'wizard-large.bmp'
@@ -60,8 +69,14 @@ $DistRoot = Join-Path $ProjectRoot 'dist'
 $ReleaseRoot = Join-Path $DistRoot "Praxis-$Version"
 $StageDir = Join-Path $ReleaseRoot 'stage'
 $InstallerOutDir = Join-Path $ReleaseRoot 'installer'
+$DeliveryOutDir = Join-Path $ReleaseRoot 'delivery'
+$DistributionOutDir = Join-Path $ReleaseRoot 'distribution'
 $ManifestPath = Join-Path $ReleaseRoot 'Praxis-build-manifest.json'
-$IntegrityManifestSourcePath = Join-Path $ProjectRoot 'build\generated\Praxis_IntegrityManifest.ahk'
+$GeneratedDir = Join-Path $ProjectRoot 'build\generated'
+$GeneratedUiPath = Join-Path $GeneratedDir 'Praxis_Ui.ahk'
+$GeneratedOcrReferencesPath = Join-Path $GeneratedDir 'Praxis_OcrReferences.ahk'
+$GeneratedOcrProbePath = Join-Path $GeneratedDir 'Praxis_OcrProbe.ahk'
+$IntegrityManifestSourcePath = Join-Path $GeneratedDir 'Praxis_IntegrityManifest.ahk'
 $ExePath = Join-Path $StageDir 'Praxis.exe'
 $VersionInfoVersion = $null
 $ResolvedSignToolPath = $null
@@ -76,6 +91,32 @@ $SourceDirty = $null
 function Write-Step {
     param([string]$Message)
     Write-Host "==> $Message" -ForegroundColor Cyan
+}
+
+function ConvertTo-Base64Utf8 {
+    param([string]$Text)
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+    return [Convert]::ToBase64String($bytes)
+}
+
+function New-EmbeddedBase64Module {
+    param(
+        [string]$OutputPath,
+        [string]$VariableName,
+        [string]$Text
+    )
+
+    $encoded = ConvertTo-Base64Utf8 -Text $Text
+    $lines = @(
+        '; Gerado automaticamente por tools/build-praxis.ps1.',
+        '; Não edite manualmente.',
+        "$VariableName := `"$encoded`""
+    )
+
+    $outputDir = Split-Path -Parent $OutputPath
+    New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+    Set-Content -LiteralPath $OutputPath -Value ($lines -join [Environment]::NewLine) -Encoding UTF8
 }
 
 function Resolve-FirstExistingPath {
@@ -363,7 +404,7 @@ function New-HashManifest {
         allowDirty = $Metadata.AllowDirty
         compress = $Metadata.Compress
         codeSigning = $Metadata.CodeSigning
-        protectionNotice = 'Build compilado e empacotado sem arquivos .ahk. Assinatura, compressão, DPAPI e manifesto elevam o custo de adulteração/inspeção casual, mas não são criptografia forte contra engenharia reversa profissional.'
+        protectionNotice = 'Build compilado e empacotado sem arquivos .ahk. Assinatura, compressão e manifesto elevam o custo de adulteração/inspeção casual, mas não são criptografia forte contra engenharia reversa profissional.'
         files = @($files)
     }
 
@@ -374,49 +415,23 @@ function New-AhkIntegrityManifest {
     param(
         [string]$RepositoryRoot,
         [string]$OutputPath,
-        [string]$UiDir,
-        [string]$ImagesDir,
         [string]$WebView2LoaderPath
     )
 
-    $protectedFiles = @()
-    if (Test-Path -LiteralPath $UiDir) {
-        $protectedFiles += Get-ChildItem -LiteralPath $UiDir -File -Recurse
-    }
-    if (Test-Path -LiteralPath $ImagesDir) {
-        $protectedFiles += Get-ChildItem -LiteralPath $ImagesDir -File -Recurse
-    }
-    if (Test-Path -LiteralPath $WebView2LoaderPath) {
-        $protectedFiles += Get-Item -LiteralPath $WebView2LoaderPath
+    if (!(Test-Path -LiteralPath $WebView2LoaderPath)) {
+        throw "WebView2Loader.dll não encontrado para o manifesto de integridade: $WebView2LoaderPath"
     }
 
-    $entries = $protectedFiles |
-        Sort-Object FullName |
-        ForEach-Object {
-            $relative = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
-            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            [ordered]@{
-                path = $relative
-                sha256 = $hash
-            }
-        }
-
-    if (!$entries -or $entries.Count -eq 0) {
-        throw 'Nenhum recurso externo foi encontrado para gerar o manifesto de integridade embutido.'
-    }
+    $relative = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $WebView2LoaderPath).Replace('\\', '/')
+    $hash = (Get-FileHash -LiteralPath $WebView2LoaderPath -Algorithm SHA256).Hash.ToLowerInvariant()
 
     $lines = @(
         '; Gerado automaticamente por tools/build-praxis.ps1.',
         '; Não edite manualmente. Este arquivo é embutido no Praxis.exe pelo Ahk2Exe.',
-        'gIntegrityExpectedFiles := Map('
+        'gIntegrityExpectedFiles := Map(',
+        "    `"$relative`", `"$hash`"",
+        ')'
     )
-
-    for ($i = 0; $i -lt $entries.Count; $i++) {
-        $entry = $entries[$i]
-        $suffix = if ($i -lt ($entries.Count - 1)) { ',' } else { '' }
-        $lines += "    `"$($entry.path)`", `"$($entry.sha256)`"$suffix"
-    }
-    $lines += ')'
 
     $outputDir = Split-Path -Parent $OutputPath
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
@@ -427,10 +442,17 @@ Write-Step 'Validando arquivos do projeto'
 $VersionInfoVersion = Convert-ToWindowsVersionInfoVersion -SemanticVersion $Version
 foreach ($required in @(
     $MainScript,
-    (Join-Path $ProjectRoot 'ui\index.html'),
-    $ImagesDir,
+    $UiIndexPath,
+    $OcrReferencesPath,
+    $OcrProbePath,
     (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll'),
     (Join-Path $ProjectRoot 'LICENSE'),
+    (Join-Path $ProjectRoot 'COPYRIGHT'),
+    (Join-Path $ProjectRoot 'NOTICE.md'),
+    $EulaPath,
+    $NdaPath,
+    $PrivacyPath,
+    $ThirdPartyPath,
     $AppIconPath
 )) {
     if (!(Test-Path -LiteralPath $required)) { throw "Arquivo obrigatório não encontrado: $required" }
@@ -524,9 +546,16 @@ if (Test-Path -LiteralPath $ReleaseRoot) {
 }
 New-Item -ItemType Directory -Path $StageDir, $InstallerOutDir | Out-Null
 
+Write-Step 'Gerando artefatos embutidos do EXE'
+if (Test-Path -LiteralPath $GeneratedDir) {
+    Remove-Item -LiteralPath $GeneratedDir -Recurse -Force
+}
+New-EmbeddedBase64Module -OutputPath $GeneratedUiPath -VariableName 'gEmbeddedIndexHtmlBase64' -Text (Get-Content -LiteralPath $UiIndexPath -Raw -Encoding UTF8)
+New-EmbeddedBase64Module -OutputPath $GeneratedOcrReferencesPath -VariableName 'gEmbeddedOcrReferencesBase64' -Text (Get-Content -LiteralPath $OcrReferencesPath -Raw -Encoding UTF8)
+New-EmbeddedBase64Module -OutputPath $GeneratedOcrProbePath -VariableName 'gEmbeddedOcrProbeBase64' -Text (Get-Content -LiteralPath $OcrProbePath -Raw -Encoding UTF8)
+New-AhkIntegrityManifest -RepositoryRoot $ProjectRoot -OutputPath $IntegrityManifestSourcePath -WebView2LoaderPath (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll')
+
 Write-Step 'Compilando AutoHotkey para EXE'
-Write-Step 'Gerando manifesto de integridade embutido no EXE'
-New-AhkIntegrityManifest -RepositoryRoot $ProjectRoot -OutputPath $IntegrityManifestSourcePath -UiDir (Join-Path $ProjectRoot 'ui') -ImagesDir $ImagesDir -WebView2LoaderPath (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll')
 
 $compileArgs = @('/in', $MainScript, '/out', $ExePath, '/base', $AutoHotkey64)
 if (Test-Path -LiteralPath $AppIconPath) {
@@ -543,19 +572,24 @@ Wait-ForFile -Path $ExePath
 Invoke-SignFile -Path $ExePath
 
 Write-Step 'Copiando recursos distribuíveis sem código-fonte AHK'
-Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ui') -Destination (Join-Path $StageDir 'ui') -Recurse
-Copy-Item -LiteralPath $ImagesDir -Destination (Join-Path $StageDir 'images') -Recurse
 New-Item -ItemType Directory -Path (Join-Path $StageDir 'lib\64bit') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'lib\64bit\WebView2Loader.dll') -Destination (Join-Path $StageDir 'lib\64bit\WebView2Loader.dll')
-foreach ($legalFile in @('LICENSE','COPYRIGHT','NOTICE.md','EULA.md','NDA.md','PRIVACY_LGPD.md','THIRD_PARTY_NOTICES.md','README.md')) {
-    $source = Join-Path $ProjectRoot $legalFile
-    if (Test-Path -LiteralPath $source) {
-        Copy-Item -LiteralPath $source -Destination (Join-Path $StageDir $legalFile)
+foreach ($legalSource in @(
+    (Join-Path $ProjectRoot 'LICENSE'),
+    (Join-Path $ProjectRoot 'COPYRIGHT'),
+    (Join-Path $ProjectRoot 'NOTICE.md'),
+    $EulaPath,
+    $NdaPath,
+    $PrivacyPath,
+    $ThirdPartyPath
+)) {
+    if (Test-Path -LiteralPath $legalSource) {
+        Copy-Item -LiteralPath $legalSource -Destination (Join-Path $StageDir (Split-Path $legalSource -Leaf))
     }
 }
 
 $leakedSources = Get-ChildItem -LiteralPath $StageDir -File -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.Extension -in @('.ahk', '.ps1', '.iss') }
+    Where-Object { $_.Extension -in @('.ahk', '.ps1', '.iss', '.html', '.json') }
 if ($leakedSources) {
     $leakedList = ($leakedSources | ForEach-Object { $_.FullName }) -join [Environment]::NewLine
     throw "O staging contém arquivos de fonte/script que não devem ser distribuídos:$([Environment]::NewLine)$leakedList"
@@ -581,8 +615,6 @@ New-HashManifest -RootPath $StageDir -OutputPath $ManifestPath -Metadata @{
     Compress = $EffectiveCompress
     CodeSigning = $codeSigningMetadata
 }
-Copy-Item -LiteralPath $ManifestPath -Destination (Join-Path $StageDir 'Praxis-build-manifest.json')
-
 if (!$SkipInstaller) {
     Write-Step 'Gerando instalador Inno Setup'
     & $InnoSetup "/DAppVersion=$Version" "/DAppVersionInfoVersion=$VersionInfoVersion" "/DSourceDir=$StageDir" "/DOutputDir=$InstallerOutDir" "/DAssetsDir=$InstallerAssetsDir" $InstallerScript
@@ -612,11 +644,39 @@ if (!$SkipInstaller) {
         stageManifest = (Get-PortableRelativePath -BasePath $ReleaseRoot -TargetPath $ManifestPath).Replace('\', '/')
     }
     $installerManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $ReleaseRoot 'Praxis-installer-manifest.json') -Encoding UTF8
+
+    Write-Step 'Montando pasta de distribuição sanitizada'
+    New-Item -ItemType Directory -Path $DeliveryOutDir -Force | Out-Null
+    Copy-Item -LiteralPath $setupPath -Destination (Join-Path $DeliveryOutDir (Split-Path $setupPath -Leaf))
+    foreach ($legalSource in @(
+        (Join-Path $ProjectRoot 'LICENSE'),
+        (Join-Path $ProjectRoot 'COPYRIGHT'),
+        (Join-Path $ProjectRoot 'NOTICE.md'),
+        $EulaPath,
+        $NdaPath,
+        $PrivacyPath,
+        $ThirdPartyPath
+    )) {
+        if (Test-Path -LiteralPath $legalSource) {
+            Copy-Item -LiteralPath $legalSource -Destination (Join-Path $DeliveryOutDir (Split-Path $legalSource -Leaf))
+        }
+    }
+}
+
+Write-Step 'Montando pasta de distribuição portátil'
+if (Test-Path -LiteralPath $DistributionOutDir) {
+    Remove-Item -LiteralPath $DistributionOutDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $DistributionOutDir -Force | Out-Null
+Get-ChildItem -LiteralPath $StageDir -Force | ForEach-Object {
+    Copy-Item -LiteralPath $_.FullName -Destination $DistributionOutDir -Recurse -Force
 }
 
 Write-Step 'Build concluído'
 Write-Host "Release: $ReleaseRoot" -ForegroundColor Green
 Write-Host "Executável: $ExePath" -ForegroundColor Green
+Write-Host "Distribuição portátil: $DistributionOutDir" -ForegroundColor Green
 if (!$SkipInstaller) {
     Write-Host "Instalador: $(Join-Path $InstallerOutDir "Praxis-Setup-$Version.exe")" -ForegroundColor Green
+    Write-Host "Distribuição sanitizada: $DeliveryOutDir" -ForegroundColor Green
 }

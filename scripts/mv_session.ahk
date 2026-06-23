@@ -20,8 +20,7 @@ MV_PROJECT_ROOT   := RegExReplace(A_ScriptDir, "\\scripts$", "")
 MV_SHORTCUT_DIR   := MV_PROJECT_ROOT "\atalhos"
 MV_MOVDOC_LNK     := MV_SHORTCUT_DIR "\MOVDOC.lnk"
 MV_FFCV_LNK       := MV_SHORTCUT_DIR "\FFCV.lnk"
-MV_WIN_LOGIN      := "Identificação ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
-MV_WIN_LOGIN_ERROR := "Mensagem do MV2000 ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+MV_WIN_IDENTIFICACAO := "Identificação ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
 
 ; Atenção: para detecção inicial, nunca exigir subtela exata.
 ; O usuário pode ter deixado MOV DOC/FFCV aberto em qualquer tela interna.
@@ -35,26 +34,14 @@ MV_WIN_FFCV_REMESSA := "MV2000i - Faturamento ahk_exe ifrun60.EXE"
 MV_WIN_FFCV         := MV_WIN_FFCV_ANY
 MV_WIN_MOVDOC       := MV_WIN_MOVDOC_ANY
 
-; ── Imagens de referência ─────────────────────────────────────
-MV_IMG_DIR := MV_PROJECT_ROOT "\images"
-
 ; ── Controles de popups conhecidos ────────────────────────────
 MV_MODAL_OK_CLASS := "Button1"
-
-; ── Login Identificação em coordenadas Client ──────────────────
-; Window Spy validado nas capturas Tela Login Usuario/Senha.
-; Não usar ClassNN para diferenciar campos: usuário e senha aparecem como Edit2.
-MV_LOGIN_USER_X := 170
-MV_LOGIN_USER_Y := 118
-MV_LOGIN_PASS_X := 307
-MV_LOGIN_PASS_Y := 119
 
 ; ── Polling / estabilidade ────────────────────────────────────
 MV_POLL_MS          := 100
 MV_TIMEOUT_LOAD     := 100
 MV_TIMEOUT_ACOE     := 100
 MV_DELAY_INPUT      := 100
-MV_LOGIN_STABLE_MS  := 600
 MV_MODULE_STABLE_MS := 600
 MV_TARGET_STABLE_MS := 600
 
@@ -67,11 +54,11 @@ MV_EnsureMovDoc() {
         MV_ActivateModule(MV_WIN_MOVDOC_ANY)
         if MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
             return true
-        ; fallback to login if activation/stability failed
+        ; se a janela de identificação aparecer, a automação não prossegue
     }
 
-    if WinExist(MV_WIN_LOGIN)
-        return MV_LoginOpenedModule(MV_WIN_MOVDOC_ANY, "MOV DOC")
+    if WinExist(MV_WIN_IDENTIFICACAO)
+        return MV_AbortAuthenticationRequired("MOV DOC")
 
     ; Não abrir novo MOV DOC via atalho. Se não estiver aberto, abortar.
     return false
@@ -82,11 +69,11 @@ MV_EnsureFFCV() {
         MV_ActivateModule(MV_WIN_FFCV_ANY)
         if MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
             return true
-        ; fallback to login if activation/stability failed
+        ; se a janela de identificação aparecer, a automação não prossegue
     }
 
-    if WinExist(MV_WIN_LOGIN)
-        return MV_LoginOpenedModule(MV_WIN_FFCV_ANY, "FFCV")
+    if WinExist(MV_WIN_IDENTIFICACAO)
+        return MV_AbortAuthenticationRequired("FFCV")
 
     ; Não abrir novo FFCV via atalho. Se não estiver aberto, abortar.
     return false
@@ -103,144 +90,20 @@ MV_AbrirFFCV() {
 }
 
 ; ════════════════════════════════════════════════════════════════
-;  LOGIN
+;  AUTENTICAÇÃO AUTOMÁTICA DESABILITADA
 ; ════════════════════════════════════════════════════════════════
 
-MV_LoginOpenedModule(moduleWin, moduleName) {
-    if !MV_Poll(() => WinExist(MV_WIN_LOGIN) || MV_ModuleReady(moduleWin), MV_TIMEOUT_LOAD)
-        return MV_RequestNewCredentials("Não consegui abrir a tela de login do " moduleName ".")
-
-    if WinExist(MV_WIN_LOGIN) {         
-        if !MV_DoLoginKeyboard(moduleWin, moduleName)
-            return false
-    }
-
-    if !MV_Poll(() => MV_ModuleReady(moduleWin), MV_TIMEOUT_LOAD)
-        return MV_RequestNewCredentials("Login enviado, mas o " moduleName " não ficou disponível.")
-
-    MV_ActivateModule(moduleWin)
-    if !MV_WaitWindowStable(moduleWin, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
-        return MV_RequestNewCredentials("Login enviado, mas o " moduleName " não estabilizou antes de continuar.")
-
-    return true
-}
-
-; Login principal: ativar a janela e clicar nos campos por coordenada Client validada.
-; Não depender de foco inicial nem de ClassNN: usuário e senha podem aparecer ambos como Edit2.
-MV_DoLoginKeyboard(moduleWin, moduleName) {
-    global gUser, gPass
-
-    if (Trim(gUser) = "" || gPass = "")
-        return MV_RequestNewCredentials("Credenciais não carregadas. Informe usuário e senha.")
-
-    if !MV_ActivateLoginWindow()
-        return false
-
-    if !MV_WaitWindowStable(MV_WIN_LOGIN, MV_LOGIN_STABLE_MS, MV_TIMEOUT_LOAD)
-        return false
-
-    if !MV_ClickLoginField(MV_LOGIN_USER_X, MV_LOGIN_USER_Y)
-        return false
-    MV_SendLoginText(gUser)
-
-    if !MV_ClickLoginField(MV_LOGIN_PASS_X, MV_LOGIN_PASS_Y)
-        return false
-    MV_SendLoginText(gPass)
-    Send "{Enter}"
-
-    deadline := A_TickCount + MV_TIMEOUT_LOAD * 1000
-    Loop {
-        if MV_LoginErrorVisible() {
-            MV_DismissActivePopup()
-            Sleep MV_DELAY_INPUT
-            MV_CloseModule(moduleWin)
-            return MV_RequestNewCredentials("O MV recusou o login. Informe novas credenciais.")
-        }
-
-        if MV_ModuleReady(moduleWin)
-            return true
-
-        if (A_TickCount > deadline)
-            return false
-
-        Sleep MV_POLL_MS
-    }
-}
-
-MV_LoginErrorVisible() {
-    return WinExist(MV_WIN_LOGIN_ERROR)
-}
-
-MV_ActivateLoginWindow() {
-    if !WinExist(MV_WIN_LOGIN)
-        return false
-
-    WinActivate MV_WIN_LOGIN
-    return MV_Poll(() => WinActive(MV_WIN_LOGIN), 5)
-}
-
-MV_ClickLoginField(clientX, clientY) {
-    if !MV_ActivateLoginWindow()
-        return false
-
-    CoordMode("Mouse", "Client")
-    MouseMove(clientX, clientY, 0)
-    Sleep 50
-    Click
-    Sleep 20
-
-    if !WinActive(MV_WIN_LOGIN) {
-        if !MV_ActivateLoginWindow()
-            return false
-        MouseMove(clientX, clientY, 0)
-        Sleep 50
-        Click
-        Sleep 20
-    }
-
-    return WinActive(MV_WIN_LOGIN)
-}
-
-MV_SendLoginText(value) {
-    SendText value
-    Sleep 20
-}
-
-MV_DismissActivePopup() {
-    try {
-        if WinExist(MV_WIN_LOGIN_ERROR) {
-            WinActivate MV_WIN_LOGIN_ERROR
-            Sleep MV_DELAY_INPUT
-            return MV_ClickFirstControl(MV_WIN_LOGIN_ERROR, MV_MODAL_OK_CLASS)
-        }
-    }
-    return false
-}
-
-MV_RequestNewCredentials(message) {
-    global gUser, gPass, gRunning
-    gUser := ""
-    gPass := ""
+MV_AbortAuthenticationRequired(moduleName) {
+    global gRunning
     gRunning := false
 
-    try SendToUI(Map("type", "login_failed", "message", message))
-    catch {
-        try SendToUI(Map("type", "show_login", "message", message))
-    }
+    message := "O Praxis não executa autenticação automática. Abra e autentique o " moduleName " manualmente no MV2000i antes de iniciar a automação."
+    try SendToUI(Map("type", "error", "message", message))
     return false
 }
 
-MV_CloseModule(moduleWin) {
-    try {
-        if WinExist(moduleWin) {
-            WinActivate moduleWin
-            WinClose moduleWin
-        }
-    }
-}
-
 ; ════════════════════════════════════════════════════════════════
-;  DETECÇÃO / IMAGEM / CONTROLES
+;  DETECÇÃO / CONTROLES
 ; ════════════════════════════════════════════════════════════════
 
 MV_ModuleReady(moduleWin) {
@@ -258,84 +121,6 @@ MV_WinReady(title) {
     if !WinExist(title)
         return false
     return WinGetMinMax(title) != -1
-}
-
-MV_ImageVisible(imagePath, variation := 10) {
-    if !FileExist(imagePath)
-        return false
-
-    CoordMode "Pixel", "Screen"
-    try return ImageSearch(&x, &y, 0, 0, A_ScreenWidth, A_ScreenHeight, "*" variation " " imagePath)
-    catch
-        return false
-}
-
-MV_ClickImage(imagePath, variation := 10, offsetX := 8, offsetY := 8, winTitle := "") {
-    if !FileExist(imagePath)
-        return false
-
-    CoordMode "Pixel", "Screen"
-    CoordMode "Mouse", "Screen"
-
-    x1 := 0, y1 := 0, x2 := A_ScreenWidth, y2 := A_ScreenHeight
-    if (winTitle != "" && WinExist(winTitle)) {
-        WinGetPos &wx, &wy, &ww, &wh, winTitle
-        x1 := wx, y1 := wy, x2 := wx + ww, y2 := wy + wh
-    }
-
-    try {
-        if ImageSearch(&x, &y, x1, y1, x2, y2, "*" variation " " imagePath) {
-            Click x + offsetX, y + offsetY
-            return true
-        }
-    }
-    return false
-}
-
-MV_ClickCachedImage(cacheKey, imagePath, winTitle, variation := 10, offsetX := 8, offsetY := 8) {
-    cfgPath := A_ScriptDir "\config.ini"
-
-    if (winTitle != "" && WinExist(winTitle)) {
-        WinGetPos &wx, &wy, &ww, &wh, winTitle
-        cachedX := IniRead(cfgPath, "ImageCache", cacheKey "_x", "")
-        cachedY := IniRead(cfgPath, "ImageCache", cacheKey "_y", "")
-
-        if (cachedX != "" && cachedY != "") {
-            CoordMode "Mouse", "Screen"
-            Click wx + (cachedX + 0), wy + (cachedY + 0)
-            return true
-        }
-    }
-
-    if !FileExist(imagePath)
-        return false
-
-    CoordMode "Pixel", "Screen"
-    CoordMode "Mouse", "Screen"
-
-    x1 := 0, y1 := 0, x2 := A_ScreenWidth, y2 := A_ScreenHeight
-    hasWindow := (winTitle != "" && WinExist(winTitle))
-    if hasWindow {
-        WinGetPos &wx, &wy, &ww, &wh, winTitle
-        x1 := wx, y1 := wy, x2 := wx + ww, y2 := wy + wh
-    }
-
-    try {
-        if ImageSearch(&x, &y, x1, y1, x2, y2, "*" variation " " imagePath) {
-            clickX := x + offsetX
-            clickY := y + offsetY
-            Click clickX, clickY
-
-            if hasWindow {
-                relX := clickX - wx
-                relY := clickY - wy
-                IniWrite relX, cfgPath, "ImageCache", cacheKey "_x"
-                IniWrite relY, cfgPath, "ImageCache", cacheKey "_y"
-            }
-            return true
-        }
-    }
-    return false
 }
 
 MV_DoubleClickControlAt(winTitle, classNN, clientX, clientY, tolerance := 14) {
