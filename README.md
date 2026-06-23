@@ -1,89 +1,148 @@
 # Praxis
 
-Aplicação desktop em AutoHotkey v2 para automações do fluxo Praxis, com interface HTML carregada via WebView2.
+Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão Hospitalar)**. Desenvolvido em AutoHotkey v2 com interface gráfica WebView2 (HTML/CSS/JS).
 
-## Visão geral
+> Hospital: São Rafael · Desenvolvedor: Iago Santana
 
-O projeto centraliza scripts operacionais em uma interface única. O arquivo `main.ahk` registra as automações disponíveis, abre a UI em `ui/index.html` e despacha as execuções para os scripts em `scripts/`.
+---
 
-Automações registradas atualmente:
+## Tecnologias
 
-- **Remessa por Protocolo**: baixa protocolos no MOV DOC e cria ou atualiza remessa no FFCV.
-- **Protocolar**: movimenta contas de remessas para outro setor.
-- **Fechar e Gerar XML**: fecha remessas e gera arquivo XML.
+| Componente | Tecnologia |
+|---|---|
+| Shell da janela | AutoHotkey v2 (`Gui`) |
+| Interface UI | WebView2 (Chromium) + HTML/CSS/JS puro |
+| Comunicação JS↔AHK | `PostWebMessageAsJson` / `window.chrome.webview.postMessage` |
+| Automação do MV | AutoHotkey v2 — Send, ControlClick, OCR local + Clipboard |
+| Configuração | `config.ini` (IniRead/IniWrite) |
 
-## Estrutura
+**Dependências para desenvolvimento:**
+- AutoHotkey v2 → [autohotkey.com](https://autohotkey.com)
+- Ahk2Exe → instalado junto ao AutoHotkey ou pelo instalador oficial
+- Inno Setup 6 → necessário para gerar instalador
+- WebView2 Runtime → necessário para executar a interface WebView2
 
-```text
-.
-├── main.ahk                 # Entrada da aplicação
-├── lib/                     # Bibliotecas AutoHotkey e WebView2Loader.dll
-├── scripts/                 # Automações executadas pela interface
-├── ui/                      # Interface HTML carregada no WebView2
-└── Imagens_Debug/           # Evidências locais de debug ignoradas pelo Git
+Para detalhes de build, assinatura, artefatos e validação, consulte [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
+
+---
+
+## Estrutura de Arquivos
+
+```
+Praxis/
+├── main.ahk                   # Entry point: GUI e dispatcher
+├── config.ini                 # Configuração local
+├── lib/
+│   ├── WebView2.ahk           # Lib externa (thqby)
+│   ├── JSON.ahk               # Lib externa (thqby)
+│   ├── Promise.ahk            # Dependência da WebView2.ahk
+│   ├── ComVar.ahk             # Dependência da WebView2.ahk
+│   ├── 32bit/WebView2Loader.dll
+│   └── 64bit/WebView2Loader.dll
+├── scripts/
+│   ├── mv_session.ahk         # Sessão MV, detecção de módulos, polling
+│   ├── remessa_protocolo.ahk  # Script principal
+│   ├── protocolar.ahk        # Stub
+│   └── fechar_xml.ahk        # Stub
+├── ui/
+│   └── index.html             # Interface completa do app
+└── images/                    # Somente imagens realmente usadas pelos macros
 ```
 
-## Requisitos
+---
 
-- Windows.
-- AutoHotkey v2.0 ou superior.
-- Microsoft Edge WebView2 Runtime.
-- `lib/64bit/WebView2Loader.dll` disponível no caminho esperado pelo `main.ahk`.
-- PowerShell disponível para criptografia/descriptografia local das credenciais via DPAPI.
+## Scripts Disponíveis
 
-## Como executar
+### 1. Remessa por Protocolo (principal)
+**Categoria:** Faturamento
 
-1. Instale o AutoHotkey v2.
-2. Garanta que o WebView2 Runtime esteja instalado.
-3. Execute o arquivo principal:
+Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
 
-```powershell
-AutoHotkey64.exe .\main.ahk
+| Parâmetro | Tipo | Obrigatório |
+|---|---|---|
+| Protocolos | text | Sim |
+| Tipo de Conta | select | Sim |
+| Remessa Existente | text | Não |
+| Data de Entrega | date | Não |
+| Data de Vencimento | date | Não |
+
+### 2. Protocolar
+**Categoria:** Movimentação · Stub — fluxo pendente de detalhamento
+
+### 3. Fechar e Gerar XML
+**Categoria:** Faturamento · Stub — fluxo pendente de detalhamento
+
+---
+
+## Instalação (Desenvolvimento)
+
+1. Copiar pasta `Praxis/` para o computador
+2. Criar `config.ini` com:
+   ```ini
+   [Paths]
+   WorkDir=C:\Users\<usuario>\Documents\Praxis
+   ```
+3. Criar pasta `%DOCUMENTS%\Praxis\XML\`
+4. Baixar libs AHK em `lib\`:
+   - `WebView2.ahk`, `JSON.ahk`, `Promise.ahk`, `ComVar.ahk`
+5. Duplo clique em `main.ahk`
+
+---
+
+## Instalação (Produção)
+
+O pacote de produção é gerado pelo script de build e pelo instalador Inno Setup do projeto. Para testes controlados, o build também cria a pasta `dist\Praxis-<versão>\delivery\` com o instalador e os documentos legais, e a pasta `dist\Praxis-<versão>\distribution\` com a versão portátil para computadores que não aceitam instalador, sem expor `.ahk`, `.ps1`, `.html` ou `.json`.
+
+Para gerar e validar builds, consulte [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
+
+O instalador:
+- instala em `%LOCALAPPDATA%\Programs\Praxis\` sem exigir privilégios elevados por padrão;
+- cria `%DOCUMENTS%\Praxis\` automaticamente;
+- grava `WorkDir` no `config.ini`;
+- cria atalhos no Menu Iniciar e, opcionalmente, na Área de Trabalho;
+- instala os recursos de runtime necessários do Praxis;
+- tenta instalar o Microsoft Edge WebView2 Runtime se ele não estiver presente.
+
+---
+
+## Interface
+
+- **Janela:** 750×540px (redimensionável, mínimo 640×460)
+- **App:** sidebar com módulos por categoria + formulário dinâmico + log + barra de progresso
+- **Comunicação:** bidirecional AHK↔JS via WebView2
+
+---
+
+## Notas Técnicas — Oracle Forms 6i
+
+O MV2000i roda sobre **Oracle Forms 6i (`ifrun60.EXE`)**.
+
+### Funciona bem
+- `WinExist`, `WinActivate`, `WinWaitActive`
+- `ControlClick` com **ClassNN**
+- `Send` (teclado: F7, F8, F10, Tab, Enter, setas)
+- `WinGetText` em popups modais
+- OCR local do Windows (`Windows.Media.Ocr`) na área client dos popups de erro
+
+### Não confiável sozinho
+- `ControlSetText`/`ControlGetText` para campos de texto do Forms
+- Window Spy para identificar campos por ClassNN único (muitos campos compartilham `Edit2`, etc.)
+- Coordenadas de tela (variam por monitor, resolução, escala)
+
+### Estratégia para campos de texto
+1. **Teclado** como caminho principal (SendText, Tab, Enter, F6/F7/F8/F10)
+2. **HWND por ClassNN + coordenada Client** como fallback
+3. **Clipboard** para leitura: double-click → `Ctrl+C`
+
+---
+
+## Padrões do Projeto
+
+```autohotkey
+; Polling (em vez de Sleep fixo)
+MV_Poll(condFn, timeoutSecs)
+
+; Leitura de campo via clipboard
+MV_ReadAt(winTitle, cx, cy)
+
 ```
-
-Também é possível abrir `main.ahk` diretamente se a associação de arquivos do AutoHotkey v2 estiver configurada no Windows.
-
-## Configuração local
-
-Na primeira execução, a aplicação pode criar `config.ini` ao lado do `main.ahk` para armazenar configurações locais, incluindo credenciais criptografadas com DPAPI do Windows.
-
-Esse arquivo é específico da máquina e está ignorado pelo Git.
-
-## Proteção, autoria e uso restrito
-
-O Praxis é um software proprietário de titularidade declarada de Iago Santana Lima, disponibilizado neste repositório com **todos os direitos reservados**.
-
-O acesso ao código-fonte, documentação, interface, scripts, imagens, versões antigas, builds ou materiais auxiliares não concede licença de uso, cópia, modificação, redistribuição, engenharia reversa, criação de obras derivadas ou exploração comercial.
-
-Qualquer uso autorizado deve ser formalizado por escrito, com definição de cliente, CNPJ, unidade, setor, máquina, usuário, ambiente, finalidade, prazo e versão autorizada.
-
-Para preservação de autoria e rastreabilidade, mantenha versionamento Git, histórico de alterações, datas de publicação, documentação técnica e evidências de criação atualizadas. Para proteção formal no Brasil, considere o registro de programa de computador junto ao INPI antes de distribuição externa ou uso comercial amplo.
-
-## Documentos legais, build e distribuição
-
-Consulte os documentos abaixo:
-
-- `DISTRIBUTION.md` — guia de registro INPI, revisão jurídica, distribuição segura, proteção técnica e geração de build/instalador;
-- `LICENSE` — licença proprietária de todos os direitos reservados;
-- `COPYRIGHT` — declaração de autoria e titularidade do repositório;
-- `NOTICE.md` — aviso de uso restrito e titularidade;
-- `EULA.md` — modelo de termo de licença de uso;
-- `NDA.md` — modelo de termo de confidencialidade;
-- `PRIVACY_LGPD.md` — política operacional de privacidade, segurança e LGPD;
-- `THIRD_PARTY_NOTICES.md` — avisos de componentes e bibliotecas de terceiros.
-
-## Componentes de terceiros
-
-O projeto pode utilizar AutoHotkey, Microsoft Edge WebView2, WebView2Loader.dll e bibliotecas AutoHotkey de terceiros. Esses componentes permanecem sujeitos às respectivas licenças e avisos de seus titulares originais.
-
-A licença proprietária do Praxis aplica-se ao código, documentação, interface, scripts, fluxos e materiais próprios do projeto, sem alterar direitos ou obrigações relativos a componentes externos.
-
-## Segurança e LGPD
-
-Por envolver automações em contexto hospitalar, não versionar nem compartilhar credenciais, dados pessoais, dados de pacientes, XMLs reais, logs sensíveis, prints de telas internas, arquivos de configuração, `.env`, `config.ini` ou evidências de debug contendo informações reais.
-
-Antes de usar dados, imagens ou logs em documentação, testes, prompts ou ferramentas de IA, remova informações sensíveis e confirme se há autorização adequada.
-
-## Licença
-
-Consulte `LICENSE`, `COPYRIGHT`, `NOTICE.md`, `EULA.md`, `NDA.md`, `PRIVACY_LGPD.md` e `THIRD_PARTY_NOTICES.md`.

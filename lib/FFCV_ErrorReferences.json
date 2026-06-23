@@ -1,0 +1,74 @@
+﻿{
+    "generatedAt":  "2026-06-07T19:31:31.0460257-03:00",
+    "generator":  "tools/build-ocr-error-references.ps1",
+    "sourceDir":  "images",
+    "languageRequested":  "pt-BR",
+    "referenceMode":  "canonical-pt-br",
+    "references":  [
+                       {
+                           "tipo":  "conta_ja_digitada",
+                           "descricao":  "Conta já digitada / redigite",
+                           "sourceFile":  "Erro_Conta_Ja_Digitada_Texto.png",
+                           "text":  "Atenção: Esta Conta já foi digitada, redigite !",
+                           "normalizedText":  "atencao esta conta ja foi digitada redigite",
+                           "ok":  true,
+                           "error":  "",
+                           "language":  "pt-BR",
+                           "fallbackUsed":  false,
+                           "lineCount":  1,
+                           "charCount":  47
+                       },
+                       {
+                           "tipo":  "conta_aberta",
+                           "descricao":  "Conta aberta",
+                           "sourceFile":  "Erro_Conta_Aberta_Texto.png",
+                           "text":  "Atenção: Existem ítens abertos na conta informada, abra a conta, feche e depois tente novamente",
+                           "normalizedText":  "atencao existem itens abertos na conta informada abra a conta feche e depois tente novamente",
+                           "ok":  true,
+                           "error":  "",
+                           "language":  "pt-BR",
+                           "fallbackUsed":  false,
+                           "lineCount":  2,
+                           "charCount":  95
+                       },
+                       {
+                           "tipo":  "conta_em_remessa",
+                           "descricao":  "Conta já em remessa",
+                           "sourceFile":  "Erro_Conta_Ja_Em_Remessa_Texto.png",
+                           "text":  "Atenção: Esta Conta não existe, não possui conta Fechada ou possui mais de um Atendimento. Utilize a Lista",
+                           "normalizedText":  "atencao esta conta nao existe nao possui conta fechada ou possui mais de um atendimento utilize a lista",
+                           "ok":  true,
+                           "error":  "",
+                           "language":  "pt-BR",
+                           "fallbackUsed":  false,
+                           "lineCount":  3,
+                           "charCount":  106
+                       },
+                       {
+                           "tipo":  "agrupamento_diferente",
+                           "descricao":  "Agrupamento de conta diferente",
+                           "sourceFile":  "Erro_Conta_De_Agrupamento_Diferente_Texto.png",
+                           "text":  "Atenção: Agrupamento da Conta diferente do Agrupamento da Remessa.Operação Não Realizada",
+                           "normalizedText":  "atencao agrupamento da conta diferente do agrupamento da remessa operacao nao realizada",
+                           "ok":  true,
+                           "error":  "",
+                           "language":  "pt-BR",
+                           "fallbackUsed":  false,
+                           "lineCount":  2,
+                           "charCount":  88
+                       },
+                       {
+                           "tipo":  "conta_tipo_diferente",
+                           "descricao":  "Conta de tipo diferente",
+                           "sourceFile":  "Erro_Conta_De_Tipo_Diferente_Texto.png",
+                           "text":  "Atenção: Esta Conta Não Existe para o Filtro Selecionado!",
+                           "normalizedText":  "atencao esta conta nao existe para o filtro selecionado",
+                           "ok":  true,
+                           "error":  "",
+                           "language":  "pt-BR",
+                           "fallbackUsed":  false,
+                           "lineCount":  1,
+                           "charCount":  57
+                       }
+                   ]
+}
