@@ -492,126 +492,22 @@ function Restore-WebView2Loader {
 
 function New-AhkIntegrityManifest {
     param(
-        [string]$RepositoryRoot,
         [string]$OutputPath,
-        [string]$WebView2LoaderPath
+        [object[]]$Files
     )
 
-    # Aceita caminho legado (lib\64bit\) ou novo (vendor\64bit\ ou vendor\32bit\)
-    if (!(Test-Path -LiteralPath $WebView2LoaderPath)) {
-        # Fallback: procurar em vendor/64bit/ e vendor/32bit/
-        $found = $null
-        foreach ($subdir in @('lib\vendor\64bit', 'lib\vendor\32bit')) {
-            $candidate = Join-Path $RepositoryRoot "$subdir\WebView2Loader.dll"
-            if (Test-Path -LiteralPath $candidate) {
-                $found = $candidate
-                break
-            }
-        }
-        if (!$found) {
-            throw "WebView2Loader.dll não encontrado para o manifesto de integridade. Pesquisou: $WebView2LoaderPath e vendor/64bit/ e vendor/32bit/"
-        }
-        $WebView2LoaderPath = $found
-    }
-
+    # $Files: hashtable com { relative; path } — relative é o caminho relativo
+    # ao A_ScriptDir do EXE distribuído (o stage/instalação). Entram apenas
+    # recursos externos que de fato são copiados para o pacote (WebView2Loader
+    # e documentos legais). Os fontes AHK/HTML/JSON são embutidos no EXE na
+    # compilação e não têm caminho em disco no pacote para validar.
     $allFiles = @()
-
-    # vendor/**/*.ahk e vendor/**/*.dll (recursivo) — inclui WebView2Loader.dll
-    $vendorBase = Join-Path $RepositoryRoot 'lib\vendor'
-    if (Test-Path -LiteralPath $vendorBase) {
-        foreach ($ext in @('*.ahk', '*.dll')) {
-            Get-ChildItem -LiteralPath $vendorBase -Filter $ext -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-                $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
-                $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-                $allFiles += [ordered]@{ relative = $rel; hash = $h }
-            }
+    foreach ($entry in $Files) {
+        if (!(Test-Path -LiteralPath $entry.path)) {
+            throw "Arquivo do manifesto de integridade não encontrado: $($entry.path)"
         }
-    }
-
-    # globals/mv/**/*.ahk (recursivo)
-    $mvBase = Join-Path $RepositoryRoot 'lib\globals\mv'
-    if (Test-Path -LiteralPath $mvBase) {
-        Get-ChildItem -LiteralPath $mvBase -Filter '*.ahk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
-            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            $allFiles += [ordered]@{ relative = $rel; hash = $h }
-        }
-    }
-
-    # globals/shared/*.ahk
-    $sharedBase = Join-Path $RepositoryRoot 'lib\globals\shared'
-    if (Test-Path -LiteralPath $sharedBase) {
-        Get-ChildItem -LiteralPath $sharedBase -Filter '*.ahk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
-            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            $allFiles += [ordered]@{ relative = $rel; hash = $h }
-        }
-    }
-
-    # modules/*/*.ahk (recursivo)
-    $modulesBase = Join-Path $RepositoryRoot 'lib\modules'
-    if (Test-Path -LiteralPath $modulesBase) {
-        Get-ChildItem -LiteralPath $modulesBase -Filter '*.ahk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
-            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            $allFiles += [ordered]@{ relative = $rel; hash = $h }
-        }
-    }
-
-    # ui/index.html
-    $uiIndex = Join-Path $RepositoryRoot 'lib\ui\index.html'
-    if (Test-Path -LiteralPath $uiIndex) {
-        $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $uiIndex).Replace('\', '/')
-        $h = (Get-FileHash -LiteralPath $uiIndex -Algorithm SHA256).Hash.ToLowerInvariant()
-        $allFiles += [ordered]@{ relative = $rel; hash = $h }
-    }
-
-    # ui/*.ahk (recursivo) — UiBridge, UiLog. Adicionado em 2026-06-26
-    # para fechar gap onde adulteracao de UiBridge.ahk sequestraria OnJsMessage.
-    $uiBase = Join-Path $RepositoryRoot 'lib\ui'
-    if (Test-Path -LiteralPath $uiBase) {
-        Get-ChildItem -LiteralPath $uiBase -Filter '*.ahk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
-            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            $allFiles += [ordered]@{ relative = $rel; hash = $h }
-        }
-    }
-
-    # cli-check.ahk (raiz) — smoke test invocado em runtime pelo EXE
-    # quando --integrity-check e passado. Adicionado em 2026-06-26.
-    $cliCheckSrc = Join-Path $RepositoryRoot 'cli-check.ahk'
-    if (Test-Path -LiteralPath $cliCheckSrc) {
-        $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $cliCheckSrc).Replace('\', '/')
-        $h = (Get-FileHash -LiteralPath $cliCheckSrc -Algorithm SHA256).Hash.ToLowerInvariant()
-        $allFiles += [ordered]@{ relative = $rel; hash = $h }
-    }
-
-    # main.ahk
-    $mainAhk = Join-Path $RepositoryRoot 'main.ahk'
-    if (Test-Path -LiteralPath $mainAhk) {
-        $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $mainAhk).Replace('\', '/')
-        $h = (Get-FileHash -LiteralPath $mainAhk -Algorithm SHA256).Hash.ToLowerInvariant()
-        $allFiles += [ordered]@{ relative = $rel; hash = $h }
-    }
-
-    # app/*.ahk
-    $appBase = Join-Path $RepositoryRoot 'lib\app'
-    if (Test-Path -LiteralPath $appBase) {
-        Get-ChildItem -LiteralPath $appBase -Filter '*.ahk' -File -ErrorAction SilentlyContinue | ForEach-Object {
-            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
-            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            $allFiles += [ordered]@{ relative = $rel; hash = $h }
-        }
-    }
-
-    # config/*.ahk
-    $configBase = Join-Path $RepositoryRoot 'lib\config'
-    if (Test-Path -LiteralPath $configBase) {
-        Get-ChildItem -LiteralPath $configBase -Filter '*.ahk' -File -ErrorAction SilentlyContinue | ForEach-Object {
-            $rel = (Get-PortableRelativePath -BasePath $RepositoryRoot -TargetPath $_.FullName).Replace('\', '/')
-            $h = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            $allFiles += [ordered]@{ relative = $rel; hash = $h }
-        }
+        $h = (Get-FileHash -LiteralPath $entry.path -Algorithm SHA256).Hash.ToLowerInvariant()
+        $allFiles += [ordered]@{ relative = $entry.relative; hash = $h }
     }
 
     # Emitir manifesto AHK: Map de path->SHA256 e variaveis indexadas FileSHA256_<index>
@@ -806,7 +702,21 @@ if (Test-Path -LiteralPath $GeneratedDir) {
 New-EmbeddedBase64Module -OutputPath $GeneratedUiPath -VariableName 'gEmbeddedIndexHtmlBase64' -Text (Get-Content -LiteralPath $UiIndexPath -Raw -Encoding UTF8)
 New-EmbeddedBase64Module -OutputPath $GeneratedOcrReferencesPath -VariableName 'gEmbeddedOcrReferencesBase64' -Text (Get-Content -LiteralPath $OcrReferencesPath -Raw -Encoding UTF8)
 New-EmbeddedBase64Module -OutputPath $GeneratedOcrProbePath -VariableName 'gEmbeddedOcrProbeBase64' -Text (Get-Content -LiteralPath $OcrProbePath -Raw -Encoding UTF8)
-New-AhkIntegrityManifest -RepositoryRoot $ProjectRoot -OutputPath $IntegrityManifestSourcePath -WebView2LoaderPath $ResolvedWebView2Dll
+# Manifesto de integridade: apenas recursos EXTERNOS copiados para o stage
+# (WebView2Loader + documentos legais presentes). A UI, imagens e dicionário
+# OCR são embutidos no EXE e não têm caminho em disco no pacote.
+$integrityFiles = @()
+$integrityFiles += [ordered]@{
+    relative = (Get-PortableRelativePath -BasePath $ProjectRoot -TargetPath $ResolvedWebView2Dll).Replace('\', '/')
+    path     = $ResolvedWebView2Dll
+}
+foreach ($legalDoc in @('LICENSE', 'COPYRIGHT', 'NOTICE.md')) {
+    $docPath = Join-Path $ProjectRoot $legalDoc
+    if (Test-Path -LiteralPath $docPath) {
+        $integrityFiles += [ordered]@{ relative = $legalDoc; path = $docPath }
+    }
+}
+New-AhkIntegrityManifest -OutputPath $IntegrityManifestSourcePath -Files $integrityFiles
 
 Write-Step 'Compilando AutoHotkey para EXE'
 
@@ -838,18 +748,13 @@ foreach ($legalSource in @(
     }
 }
 
-# cli-check.ahk e o smoke test invocado pelo EXE em runtime via
-# `RunWait(A_ScriptDir "\cli-check.ahk")` quando --integrity-check e
-# passado. Necessario no StageDir para que a verificacao funcione no
-# EXE distribuido (e nao apenas em dev mode). Allowlisted na deteccao
-# de leak abaixo (unico .ahk intencionalmente distribuido).
-$cliCheckSrc = Join-Path $ProjectRoot 'cli-check.ahk'
-if (Test-Path -LiteralPath $cliCheckSrc) {
-    Copy-Item -LiteralPath $cliCheckSrc -Destination (Join-Path $StageDir 'cli-check.ahk')
-}
+# cli-check.ahk deixou de ser distribuído (2026-09-08): o EXE compilado
+# executa IntegrityDoCheck() internamente com o manifesto embutido (ver
+# lib/app/IntegrityCheck.ahk e main.ahk). Isso remove a dependência de um
+# AutoHotkey instalado no PC de destino para rodar --integrity-check.
 
 $leakedSources = Get-ChildItem -LiteralPath $StageDir -File -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.Extension -in @('.ahk', '.ps1', '.iss', '.html', '.json') -and $_.Name -ne 'cli-check.ahk' }
+    Where-Object { $_.Extension -in @('.ahk', '.ps1', '.iss', '.html', '.json') }
 if ($leakedSources) {
     $leakedList = ($leakedSources | ForEach-Object { $_.FullName }) -join [Environment]::NewLine
     throw "O staging contém arquivos de fonte/script que não devem ser distribuídos:$([Environment]::NewLine)$leakedList"
@@ -928,10 +833,30 @@ Get-ChildItem -LiteralPath $StageDir -Force | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination $DistributionOutDir -Recurse -Force
 }
 
+Write-Step 'Gerando ZIP portátil do release'
+$PortableZipName = "Praxis-Portable-$Version.zip"
+$PortableZipPath = Join-Path $ReleaseRoot $PortableZipName
+if (Test-Path -LiteralPath $PortableZipPath) {
+    Remove-Item -LiteralPath $PortableZipPath -Force
+}
+# Copia para pasta com o nome do artefato para que o zip tenha raiz única
+# (Compress-Archive usa o nome do diretório de origem como pasta raiz).
+$PortableFolder = Join-Path $ReleaseRoot "Praxis-Portable-$Version"
+if (Test-Path -LiteralPath $PortableFolder) {
+    Remove-Item -LiteralPath $PortableFolder -Recurse -Force
+}
+Copy-Item -LiteralPath $DistributionOutDir -Destination $PortableFolder -Recurse -Force
+Compress-Archive -LiteralPath $PortableFolder -DestinationPath $PortableZipPath -CompressionLevel Optimal
+Remove-Item -LiteralPath $PortableFolder -Recurse -Force
+if (!(Test-Path -LiteralPath $PortableZipPath)) {
+    throw "Falha ao gerar ZIP portátil: $PortableZipPath"
+}
+
 Write-Step 'Build concluído'
 Write-Host "Release: $ReleaseRoot" -ForegroundColor Green
 Write-Host "Executável: $ExePath" -ForegroundColor Green
 Write-Host "Distribuição portátil: $DistributionOutDir" -ForegroundColor Green
+Write-Host "ZIP portátil: $PortableZipPath" -ForegroundColor Green
 if (!$SkipInstaller) {
     Write-Host "Instalador: $(Join-Path $InstallerOutDir "Praxis-Setup-$Version.exe")" -ForegroundColor Green
     Write-Host "Distribuição sanitizada: $DeliveryOutDir" -ForegroundColor Green

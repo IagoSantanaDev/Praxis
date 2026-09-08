@@ -37,11 +37,22 @@ O build E2E é feito por `tools/build-praxis.ps1`. Os comandos mais comuns:
 Saídas geradas:
 - `dist\Praxis-<ver>\stage\Praxis.exe` — EXE compilado (sem .ahk)
 - `dist\Praxis-<ver>\distribution\` — pasta portátil (sem instalador)
+- `dist\Praxis-<ver>\Praxis-Portable-<ver>.zip` — ZIP portátil pronto para uso
 - `dist\Praxis-<ver>\installer\Praxis-Setup-<ver>.exe` — instalador Inno Setup
 - `dist\Praxis-<ver>\delivery\` — pacote sanitizado final
 - `dist\Praxis-<ver>\Praxis-build-manifest.json` — SHA256 de cada artefato
 
-Validação de integridade em runtime: `AutoHotkey64.exe main.ahk --integrity-check` (exit 0 = OK).
+Validação de integridade em runtime: `Praxis.exe --integrity-check` (exit 0 = OK, 70 = recurso ausente/alterado).
+
+### Release automático (rolling)
+
+A cada push em `main`, o GitHub Actions (`.github/workflows/release.yml`) builda, zipla e publica/atualiza o **GitHub Release** com tag `continuous` (Latest), contendo `Praxis-Portable-<ver>.zip` + `SHA256SUMS.txt`.
+
+Publicação manual local (com `gh auth login`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
+```
 
 ---
 

@@ -144,9 +144,11 @@ dist\Praxis-1.0.0\stage\Praxis-build-manifest.json
 dist\Praxis-1.0.0\installer\Praxis-Setup-1.0.0.exe
 dist\Praxis-1.0.0\Praxis-build-manifest.json
 dist\Praxis-1.0.0\Praxis-installer-manifest.json
+dist\Praxis-1.0.0\distribution\                      — pasta portátil (sem instalador)
+dist\Praxis-1.0.0\Praxis-Portable-1.0.0.zip       — ZIP portátil pronto para uso
 ```
 
-O staging inclui recursos necessários para runtime, como UI, imagens, WebView2Loader 64-bit e documentos de licença/aviso da raiz. O staging não deve conter `.ahk`, `.ps1` ou `.iss`.
+O staging inclui recursos necessários para runtime (WebView2Loader 64-bit e documentos de licença/aviso da raiz). O staging não deve conter `.ahk`, `.ps1` ou `.iss` — nem o `cli-check.ahk`, que deixou de ser distribuído (o EXE faz o check internamente, ver seção de integridade).
 
 Para levar o pacote a outro PC, normalmente use apenas o instalador:
 
@@ -161,11 +163,11 @@ A pasta `stage` é útil para validação técnica, mas não é o pacote de entr
 Depois de gerar um build completo, valide pelo menos:
 
 1. o executável existe;
-2. o instalador existe;
-3. a UI foi copiada;
-4. as imagens esperadas foram copiadas;
+2. o instalador existe (quando gerado);
+3. o ZIP portátil existe e tem o conteúdo esperado;
+4. os hashes do manifesto conferem com os arquivos em disco;
 5. não há fonte AutoHotkey no staging;
-6. o modo de integridade retorna sucesso.
+6. o modo de integridade do EXE retorna `0`.
 
 Exemplo:
 
@@ -174,53 +176,50 @@ $root = "dist\Praxis-9.9.18-test"
 $stage = Join-Path $root "stage"
 $exe = Join-Path $stage "Praxis.exe"
 $setup = Join-Path $root "installer\Praxis-Setup-9.9.18-test.exe"
+$zip = Join-Path $root "Praxis-Portable-9.9.18-test.zip"
 
 $proc = Start-Process -FilePath $exe -ArgumentList "--integrity-check" -WorkingDirectory $stage -Wait -PassThru
-$sourceLeaks = @(Get-ChildItem -LiteralPath $stage -Recurse -File -Filter *.ahk -ErrorAction SilentlyContinue)
+$sourceLeaks = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Extension -in @('.ahk', '.ps1', '.iss') })
 
 [pscustomobject]@{
-  IntegrityExit   = $proc.ExitCode
-  SetupExists     = Test-Path -LiteralPath $setup
-  ExeExists       = Test-Path -LiteralPath $exe
-  UiExists        = Test-Path -LiteralPath (Join-Path $stage "ui\index.html")
-  ImageCount      = @(Get-ChildItem -LiteralPath (Join-Path $stage "images") -File -Filter *.png -ErrorAction SilentlyContinue).Count
-  SourceLeakCount = $sourceLeaks.Count
+  IntegrityExit        = $proc.ExitCode
+  SetupExists          = Test-Path -LiteralPath $setup
+  ExeExists            = Test-Path -LiteralPath $exe
+  ZipExists            = Test-Path -LiteralPath $zip
+  WebView2LoaderExists = Test-Path -LiteralPath (Join-Path $stage "lib\vendor\64bit\WebView2Loader.dll")
+  SourceLeakCount      = $sourceLeaks.Count
 }
 ```
 
 Resultado esperado:
 
 ```text
-IntegrityExit   : 0
-SetupExists     : True
-ExeExists       : True
-UiExists        : True
-ImageCount      : 5
-SourceLeakCount : 0
+IntegrityExit        : 0
+SetupExists          : True
+ExeExists            : True
+ZipExists            : True
+WebView2LoaderExists : True
+SourceLeakCount      : 0
 ```
 
 Se `IntegrityExit` for diferente de `0`, o executável bloqueou porque algum recurso protegido está ausente ou alterado.
 
 ## Integridade de recursos em runtime
 
-O build gera um manifesto AutoHotkey embutido no executável. Esse manifesto contém hashes SHA-256 dos recursos externos protegidos.
+O build gera um manifesto AutoHotkey embutido no executável. Esse manifesto contém hashes SHA-256 dos recursos externos do pacote: WebView2Loader 64-bit e os documentos legais distribuídos (LICENSE/COPYRIGHT/NOTICE.md). UI, imagens e dicionário OCR são embutidos no próprio EXE e não têm caminho em disco para validar.
 
-Na inicialização, o Praxis valida:
-
-- UI HTML;
-- imagens usadas pelos templates de erro;
-- WebView2Loader 64-bit.
-
-Se algum arquivo estiver ausente ou alterado, o aplicativo falha fechado antes de liberar a interface ou automações. O modo interno de teste é:
+O check é executado pelo próprio `Praxis.exe`, sem depender de AutoHotkey instalado no destino:
 
 ```powershell
-.\Praxis.exe --integrity-check
+\Praxis.exe --integrity-check
 ```
 
 Códigos relevantes:
 
 - `0`: integridade intacta;
 - `70`: recurso ausente ou alterado.
+
+O `cli-check.ahk` permanece na raiz do repositório apenas como helper de dev mode (`AutoHotkey64.exe cli-check.ahk --integrity-check`) e não é distribuído no pacote.
 
 ## Dependências no PC de destino
 
@@ -267,6 +266,24 @@ Para release:
 - [ ] manifestos foram preservados;
 - [ ] hash SHA-256 do instalador foi registrado;
 - [ ] pacote foi testado em máquina limpa ou VM compatível.
+
+## Release automático (GitHub Actions)
+
+A cada push na branch `main`, o workflow `.github/workflows/release.yml` roda em `windows-latest` e:
+
+1. baixa os zips oficiais do AutoHotkey v2 e do Ahk2Exe (sem instalar nada no runner);
+2. executa `tools/publish-release.ps1`, que roda `build-praxis.ps1 -SkipInstaller` e gera o ZIP portátil;
+3. publica/atualiza o **GitHub Release rolling** com tag `continuous` (marcado como Latest):
+   - `Praxis-Portable-<versão>.zip`;
+   - `SHA256SUMS.txt` (hash SHA-256 do ZIP).
+
+Publicação manual local (após `gh auth login`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
+```
+
+O release rolling não exige certificado de code signing nem Inno Setup. Para release assinado e com instalador, continue usando `build-praxis.ps1 -Release` na máquina de build local.
 
 ## Proteção jurídica e limites técnicos
 

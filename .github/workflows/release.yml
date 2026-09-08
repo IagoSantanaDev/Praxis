@@ -1,0 +1,65 @@
+# Release do Praxis a cada push em main
+#
+# Gera o build portátil (Praxis.exe sem fonte) + ZIP e publica/atualiza
+# um GitHub Release único com tag rolling "continuous" (Latest):
+#   - Praxis-Portable-<version>.zip  (pronto para uso)
+#   - SHA256SUMS.txt                 (hash do ZIP)
+#
+# Não precisa de instalador (Inno Setup) nem de certificado de code
+# signing: o modo -Release (assinado, endurecido) é feito manualmente
+# na máquina de build local com tools/build-praxis.ps1 -Release.
+#
+# Permissão contents: write é necessária para criar/atualizar o release.
+name: release-portable
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Baixar AutoHotkey v2 (zip oficial)
+        shell: powershell
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'ahk'
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          $zip = Join-Path $dir 'ahk-v2.zip'
+          curl.exe -sL -o $zip https://www.autohotkey.com/download/ahk-v2.zip
+          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+          $exe = Join-Path $dir 'AutoHotkey64.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "AutoHotkey64.exe não extraído: $exe" }
+          "AHK_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Baixar Ahk2Exe (release latest oficial)
+        shell: powershell
+        run: |
+          $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest' -Headers @{ 'User-Agent' = 'praxis-release-workflow' }
+          $asset = $rel.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1
+          if (-not $asset) { throw 'Nenhum asset .zip no release latest do Ahk2Exe.' }
+          $dir = Join-Path $env:RUNNER_TEMP 'ahk2exe'
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          $zip = Join-Path $dir 'Ahk2Exe.zip'
+          curl.exe -sL -o $zip $asset.browser_download_url
+          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+          $exe = Join-Path $dir 'Ahk2Exe.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "Ahk2Exe.exe não extraído: $exe" }
+          "AHK2EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build + publicar release rolling
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/publish-release.ps1 `
+            -AutoHotkeyBasePath "$env:AHK_EXE" `
+            -Ahk2ExePath "$env:AHK2EXE"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
