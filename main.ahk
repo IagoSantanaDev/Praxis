@@ -14,10 +14,13 @@ global gRoot := A_ScriptDir
 ; Supports: --integrity-check
 for arg in A_Args {
     if (arg = "--integrity-check" || arg = "--check") {
-        ; Delegate to cli-check.ahk to avoid pulling in App.ahk
-        ; (App.ahk calls App_Run() at parse-time which blocks on GUI)
-        cliResult := RunWait(A_ScriptDir "\cli-check.ahk", , "Min")
-        ExitApp cliResult
+        ; Check interno do EXE compilado: usa o manifesto embutido
+        ; (build/generated/Praxis_IntegrityManifest.ahk) e o A_ScriptDir
+        ; do executável. Não depende de AutoHotkey instalado no destino e
+        ; não distribui cli-check.ahk no stage.
+        ; Exit codes: 0 = OK; 70 = recurso ausente/alterado (docs/DISTRIBUTION.md).
+        IntegrityDoCheck()
+        ExitApp 0
     }
 }
 
@@ -30,6 +33,7 @@ for arg in A_Args {
 ; gStopRequested, gExitAfterStop, gExitDeadline).
 #Include lib\app\AppState.ahk
 #Include *i build\generated\Praxis_IntegrityManifest.ahk
+#Include lib\app\IntegrityCheck.ahk
 #Include lib\ui\UiBridge.ahk
 #Include lib\ui\UiLog.ahk
 ; Ordem importa: UiBridge (e seu include transitivo de Dispatcher) ANTES de App.

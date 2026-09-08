@@ -1,0 +1,4 @@
+# Scripts PowerShell: checkout com CRLF (Windows), blob normalizado para LF.
+# Encoding UTF-8 com BOM (definido nos arquivos) para o Windows PowerShell 5.1
+# ler os scripts como UTF-8 independente da codepage ANSI do sistema.
+*.ps1 text eol=crlf

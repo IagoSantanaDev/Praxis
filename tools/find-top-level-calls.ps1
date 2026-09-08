@@ -1,4 +1,4 @@
-# find-top-level-calls.ps1
+﻿# find-top-level-calls.ps1
 #
 # Detects top-level bare function calls in AHK v2 source files.
 # Catches the bug pattern where a file defines Foo() AND has a top-level Foo() call,
