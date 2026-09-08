@@ -28,13 +28,43 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Baixar AutoHotkey v2 (zip oficial)
+      - name: Baixar AutoHotkey v2 (zip oficial, com fallback)
         shell: powershell
         run: |
+          function Get-ZipFromSource {
+              param([string]$Url, [string]$Out, [string]$Label)
+              curl.exe -sSL --fail -o $Out $Url
+              if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Out)) {
+                  Write-Warning "$Label : download falhou (curl exit $LASTEXITCODE)"
+                  return $false
+              }
+              $size = (Get-Item -LiteralPath $Out).Length
+              $bytes = [System.IO.File]::ReadAllBytes($Out)
+              $isZip = ($bytes.Length -ge 4 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B -and $bytes[2] -eq 0x03 -and $bytes[3] -eq 0x04)
+              if ($size -lt 1MB -or -not $isZip) {
+                  Write-Warning "$Label : arquivo inválido (size=$size, magic=$($bytes[0..1] -join ','))"
+                  return $false
+              }
+              Write-Host "$Label : OK ($size bytes)"
+              return $true
+          }
+
           $dir = Join-Path $env:RUNNER_TEMP 'ahk'
           New-Item -ItemType Directory -Path $dir -Force | Out-Null
           $zip = Join-Path $dir 'ahk-v2.zip'
-          curl.exe -sL -o $zip https://www.autohotkey.com/download/ahk-v2.zip
+
+          # Fonte primária: release oficial do GitHub (mesmo host dos runners).
+          $ok = $false
+          try {
+              $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/AutoHotkey/AutoHotkey/releases/latest' -Headers @{ 'User-Agent' = 'praxis-release-workflow' }
+              $asset = $rel.assets | Where-Object { $_.name -like '*.zip' -and $_.name -notlike '*-bin*' } | Select-Object -First 1
+              if ($asset) { $ok = Get-ZipFromSource -Url $asset.browser_download_url -Out $zip -Label 'GitHub AutoHotkey.zip' }
+          } catch { Write-Warning "API GitHub indisponível: $_" }
+
+          # Fallback: site oficial do AutoHotkey.
+          if (-not $ok) { $ok = Get-ZipFromSource -Url 'https://www.autohotkey.com/download/ahk-v2.zip' -Out $zip -Label 'autohotkey.com ahk-v2.zip' }
+          if (-not $ok) { throw 'Não foi possível baixar um ZIP válido do AutoHotkey v2 de nenhuma fonte.' }
+
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
           $exe = Join-Path $dir 'AutoHotkey64.exe'
           if (-not (Test-Path -LiteralPath $exe)) { throw "AutoHotkey64.exe não extraído: $exe" }
@@ -43,13 +73,34 @@ jobs:
       - name: Baixar Ahk2Exe (release latest oficial)
         shell: powershell
         run: |
-          $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest' -Headers @{ 'User-Agent' = 'praxis-release-workflow' }
-          $asset = $rel.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1
-          if (-not $asset) { throw 'Nenhum asset .zip no release latest do Ahk2Exe.' }
+          function Get-ZipFromSource {
+              param([string]$Url, [string]$Out, [string]$Label)
+              curl.exe -sSL --fail -o $Out $Url
+              if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $Out)) {
+                  Write-Warning "$Label : download falhou (curl exit $LASTEXITCODE)"
+                  return $false
+              }
+              $size = (Get-Item -LiteralPath $Out).Length
+              $bytes = [System.IO.File]::ReadAllBytes($Out)
+              $isZip = ($bytes.Length -ge 4 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B -and $bytes[2] -eq 0x03 -and $bytes[3] -eq 0x04)
+              if ($size -lt 1KB -or -not $isZip) {
+                  Write-Warning "$Label : arquivo inválido (size=$size, magic=$($bytes[0..1] -join ','))"
+                  return $false
+              }
+              Write-Host "$Label : OK ($size bytes)"
+              return $true
+          }
+
           $dir = Join-Path $env:RUNNER_TEMP 'ahk2exe'
           New-Item -ItemType Directory -Path $dir -Force | Out-Null
           $zip = Join-Path $dir 'Ahk2Exe.zip'
-          curl.exe -sL -o $zip $asset.browser_download_url
+
+          $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest' -Headers @{ 'User-Agent' = 'praxis-release-workflow' }
+          $asset = $rel.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1
+          if (-not $asset) { throw 'Nenhum asset .zip no release latest do Ahk2Exe.' }
+          $ok = Get-ZipFromSource -Url $asset.browser_download_url -Out $zip -Label 'GitHub Ahk2Exe.zip'
+          if (-not $ok) { throw "Falha ao baixar Ahk2Exe de $($asset.browser_download_url)" }
+
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
           $exe = Join-Path $dir 'Ahk2Exe.exe'
           if (-not (Test-Path -LiteralPath $exe)) { throw "Ahk2Exe.exe não extraído: $exe" }
