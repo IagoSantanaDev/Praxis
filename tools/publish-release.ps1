@@ -61,18 +61,36 @@ function Get-GitHead {
     }
 }
 
-function Invoke-Publish {
+function Invoke-Gh {
     param([string[]]$Arguments)
 
-    if ($DryRun) {
-        Write-Host "   [dry-run] gh $($Arguments -join ' ')" -ForegroundColor DarkGray
-        return $false
+    # Windows PowerShell 5.1 converte stderr de exe nativo em NativeCommandError
+    # que, com $ErrorActionPreference='Stop', aborta o script até com 2>$null
+    # (ex.: `gh release view` com release inexistente imprime "release not found"
+    # no stderr e retorna exit 1). Isolamos a chamada com EAP=Continue e avaliamos
+    # o $LASTEXITCODE — padrão recomendado pela documentação oficial do GitHub.
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & gh @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousEap
     }
-    & gh @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "gh $($Arguments[0]) falhou com exit code $LASTEXITCODE"
+
+    return [pscustomobject]@{
+        ExitCode = [int]$exitCode
+        Output   = (@($output) -join [Environment]::NewLine).Trim()
     }
-    return $true
+}
+
+function Assert-GhSucceeded {
+    param([string[]]$Arguments)
+
+    $result = Invoke-Gh -Arguments $Arguments
+    if ($result.ExitCode -ne 0) {
+        throw "gh $($Arguments[0]) falhou com exit code $($result.ExitCode): $($result.Output)"
+    }
 }
 
 # 1. Versão
@@ -133,24 +151,34 @@ $releaseExists = $false
 if ($DryRun) {
     Write-Host "   [dry-run] gh release view $Tag --json tagName" -ForegroundColor DarkGray
 } else {
-    & gh release view $Tag --json tagName 2>$null | Out-Null
-    $releaseExists = $LASTEXITCODE -eq 0
+    $view = Invoke-Gh -Arguments @('release', 'view', $Tag, '--json', 'tagName')
+    $releaseExists = $view.ExitCode -eq 0
 }
 
 if (!$releaseExists) {
     Write-Step "Release '$Tag' não existe — criando"
-    Invoke-Publish @('release', 'create', $Tag, $ZipPath, $SumsPath, '--title', "Praxis $Version", '--notes-file', $NotesPath, '--latest') | Out-Null
+    if ($DryRun) {
+        Write-Host "   [dry-run] gh release create $Tag $ZipPath $SumsPath --title 'Praxis $Version' --notes-file $NotesPath --latest" -ForegroundColor DarkGray
+    } else {
+        Assert-GhSucceeded @('release', 'create', $Tag, $ZipPath, $SumsPath, '--title', "Praxis $Version", '--notes-file', $NotesPath, '--latest')
+    }
 } else {
     Write-Step "Release '$Tag' existe — atualizando assets e metadados"
-    Invoke-Publish @('release', 'upload', $Tag, $ZipPath, $SumsPath, '--clobber') | Out-Null
-    Invoke-Publish @('release', 'edit', $Tag, '--title', "Praxis $Version", '--notes-file', $NotesPath, '--latest') | Out-Null
+    if ($DryRun) {
+        Write-Host "   [dry-run] gh release upload $Tag $ZipPath $SumsPath --clobber" -ForegroundColor DarkGray
+        Write-Host "   [dry-run] gh release edit $Tag --title 'Praxis $Version' --notes-file $NotesPath --latest" -ForegroundColor DarkGray
+    } else {
+        Assert-GhSucceeded @('release', 'upload', $Tag, $ZipPath, $SumsPath, '--clobber')
+        Assert-GhSucceeded @('release', 'edit', $Tag, '--title', "Praxis $Version", '--notes-file', $NotesPath, '--latest')
+    }
 }
 
 $url = $null
 if ($DryRun) {
     Write-Host "   [dry-run] gh release view $Tag --json url -q '.url'" -ForegroundColor DarkGray
 } else {
-    $url = (& gh release view $Tag --json url -q '.url' 2>$null)
+    $view = Invoke-Gh -Arguments @('release', 'view', $Tag, '--json', 'url', '-q', '.url')
+    $url = $view.Output
 }
 Write-Step 'Publicação concluída'
 Write-Host "Release: $Tag  ($url)" -ForegroundColor Green
