@@ -5,21 +5,22 @@
 
 #Requires AutoHotkey v2.0
 #Warn All, OutputDebug
-#Include ..\..\..\lib\globals\mv\MVSession.ahk
-#Include ..\..\..\lib\globals\mv\ParseUtils.ahk
 
 ; ════════════════════════════════════════════════════════════════
-;  PROTOCOLAR PARSERS
-;  Lógica de parsing para o módulo Protocolar
+;  MV PARSE UTILS — helpers de parsing compartilhados
 ; ════════════════════════════════════════════════════════════════
+; Fonte única para parsing de listas CSV simples. Consolidado de
+; Protocolar_ParseRemessas (ProtocolarParsers.ahk) e ParseProtocolos
+; (RPParsers.ahk), que eram cópias idênticas (2026-09-09).
 
-; Protocolar_ParseRemessas delega para a canônica ParseListaCsv (globals/mv/ParseUtils.ahk).
-Protocolar_ParseRemessas(str) {
-    return ParseListaCsv(str)
-}
-
-Protocolar_Abort(msg) {
-    ; Delega para a canônica MV_Abort (MVSession.ahk) preservando o
-    ; comportamento original (status "Execução finalizada.").
-    return MV_Abort(msg, true)
+; Divide uma string separada por vírgula em lista limpa (Trim + descarta vazios).
+; Canônica da família de parsers de lista dos módulos MV.
+ParseListaCsv(str) {
+    result := []
+    for _, item in StrSplit(str, ",") {
+        item := Trim(item)
+        if (item != "")
+            result.Push(item)
+    }
+    return result
 }

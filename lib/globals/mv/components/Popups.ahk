@@ -13,21 +13,8 @@
 #Include ..\components\Controls.ahk
 #Include ..\MVConstants.ahk
 
-; ── Constantes de popups do MV (derivadas de RemessaProtocolo) ──
-; Sentinel do popup "Informacoes da Conta" embarcado na janela FFCV.
-POPUP_CONTA_SENTINEL_CLASS := "ui60Drawn W323"
-POPUP_CONTA_SENTINEL_X     := 432
-POPUP_CONTA_SENTINEL_Y     := 109
-POPUP_CAMPO_CONTA          := "Edit2"
-POPUP_CAMPO_CONTA_X        := 298
-POPUP_CAMPO_CONTA_Y        := 143
-POPUP_DROPDOWN_1           := "ComboBox2"
-POPUP_DROPDOWN_1_X         := 84
-POPUP_DROPDOWN_1_Y         := 143
-POPUP_DROPDOWN_2           := "ComboBox1"
-POPUP_DROPDOWN_2_X         := 190
-POPUP_DROPDOWN_2_Y         := 143
-POPUP_STABLE_MS            := 100
+; Constantes do popup "Informacoes da Conta" ficam em MVConstants.ahk
+; (MV_POPUP_*), junto de MV_TIPO_CONTA e dos timings MV_CONTA_*.
 
 ; ── Helpers de logging interno ────────────────────────────────
 ; Usa MV_Log de components/Controls.ahk (consolidado em 2026-06-26).
@@ -40,100 +27,44 @@ POPUP_STABLE_MS            := 100
 ; Usa sentinela ui60Drawn + busca do campo de conta por classe/posição.
 Popup_ContaVisible() {
     sentinel := Popup_FindControlByClassPrefixAtPoint(
-        MV_WIN_FFCV_ANY, "ui60Drawn",
-        POPUP_CONTA_SENTINEL_X, POPUP_CONTA_SENTINEL_Y, 35)
+        MV_WIN_FFCV_ANY, MV_POPUP_CONTA_SENTINEL_CLASS,
+        MV_POPUP_CONTA_SENTINEL_X, MV_POPUP_CONTA_SENTINEL_Y, 35)
     if !sentinel
         return false
 
     campoConta := MV_FindControlByClientPoint(
-        MV_WIN_FFCV_ANY, POPUP_CAMPO_CONTA,
-        POPUP_CAMPO_CONTA_X, POPUP_CAMPO_CONTA_Y, 35)
+        MV_WIN_FFCV_ANY, MV_POPUP_CAMPO_CONTA,
+        MV_POPUP_CAMPO_CONTA_X, MV_POPUP_CAMPO_CONTA_Y, 35)
     if !campoConta
         campoConta := Popup_FindControlByClassPrefixAtPoint(
             MV_WIN_FFCV_ANY, "Edit",
-            POPUP_CAMPO_CONTA_X, POPUP_CAMPO_CONTA_Y, 50)
+            MV_POPUP_CAMPO_CONTA_X, MV_POPUP_CAMPO_CONTA_Y, 50)
 
     if !campoConta
         campoConta := Popup_FindControlByClassPrefixAtPoint(
             MV_WIN_FFCV_ANY, "ComboBox",
-            POPUP_DROPDOWN_1_X, POPUP_DROPDOWN_1_Y, 40)
+            MV_POPUP_DROPDOWN_TIPO_X, MV_POPUP_DROPDOWN_TIPO_Y, 40)
 
     if !campoConta
         campoConta := Popup_FindControlByClassPrefixAtPoint(
             MV_WIN_FFCV_ANY, "ComboBox",
-            POPUP_DROPDOWN_2_X, POPUP_DROPDOWN_2_Y, 40)
+            MV_POPUP_DROPDOWN_SUB_TIPO_X, MV_POPUP_DROPDOWN_SUB_TIPO_Y, 40)
 
     MV_Log("Popup_ContaVisible", "campoConta=" campoConta, campoConta != 0)
     return campoConta != 0
 }
 
 ; Localiza o controle mais próximo do ponto informado, filtrando pelo prefixo ClassNN;
-; retorna o hwnd ou 0 se não encontrar.
+; retorna o hwnd ou 0. Delegated para a implementação canônica MV_FindControlAtPoint
+; (Controls.ahk) com classPrefix não-vazio.
 Popup_FindControlByClassPrefixAtPoint(winTitle, classPrefix, targetX, targetY, tolerance := 35) {
-    try hwnds := WinGetControlsHwnd(winTitle)
-    catch {
-        MV_Log("Popup_FindControlByClassPrefixAtPoint",
-            "WinGetControlsHwnd falhou winTitle=" winTitle, false)
-        return 0
-    }
-
-    bestHwnd := 0
-    bestDist := 999999
-
-    for hwnd in hwnds {
-        try ctrlClass := ControlGetClassNN(hwnd)
-        catch
-            continue
-
-        if (SubStr(ctrlClass, 1, StrLen(classPrefix)) != classPrefix)
-            continue
-
-        try ControlGetPos &cx, &cy, &cw, &ch, hwnd
-        catch
-            continue
-
-        if (targetX >= cx && targetX <= cx + cw && targetY >= cy && targetY <= cy + ch)
-            return hwnd
-
-        centerX := cx + (cw / 2)
-        centerY := cy + (ch / 2)
-        dist := Sqrt((targetX - centerX) ** 2 + (targetY - centerY) ** 2)
-        if (dist < bestDist) {
-            bestDist := dist
-            bestHwnd := hwnd
-        }
-    }
-
-    result := (bestHwnd && bestDist <= tolerance) ? bestHwnd : 0
-    MV_Log("Popup_FindControlByClassPrefixAtPoint",
-        "winTitle=" winTitle " classPrefix=" classPrefix " targetX=" targetX " targetY=" targetY " => hwnd=" result, result != 0)
-    return result
+    return MV_FindControlAtPoint(winTitle, classPrefix, targetX, targetY, tolerance, classPrefix)
 }
 
 ; Encontra o primeiro controle com a classe ClassNN exata na janela informada.
-; Retorna hwnd do controle ou 0 se não encontrado.
+; Retorna hwnd do controle ou 0. Delegated para MV_FirstControlByClass (Controls.ahk).
 Popup_FirstControlByClass(winTitle, classNN) {
-    try hwnds := WinGetControlsHwnd(winTitle)
-    catch {
-        MV_Log("Popup_FirstControlByClass",
-            "WinGetControlsHwnd falhou winTitle=" winTitle, false)
-        return 0
-    }
-
-    for hwnd in hwnds {
-        try ctrlClass := ControlGetClassNN(hwnd)
-        catch
-            continue
-        if (ctrlClass = classNN) {
-            MV_Log("Popup_FirstControlByClass",
-                "winTitle=" winTitle " classNN=" classNN " => hwnd=" hwnd, true)
-            return hwnd
-        }
-    }
-
-    MV_Log("Popup_FirstControlByClass",
-        "winTitle=" winTitle " classNN=" classNN " => NAO ENCONTRADO", false)
-    return 0
+    return MV_FirstControlByClass(winTitle, classNN)
 }
 
 ; Fecha o modal Forms ativo (ui60Modal_W32) clicando o botão OK.
@@ -171,7 +102,7 @@ Popup_DismissActiveModal() {
                 "Cliquei OK, mas o modal nao fechou em tempo.")
         }
 
-        Sleep POPUP_STABLE_MS
+        Sleep MV_CONTA_STABLE_MS
         MV_Log("Popup_DismissActiveModal", "modal fechado com sucesso", true)
         return Map("ok", true, "report",
             "OK do modal clicado e janela fechada/estabilizada.")

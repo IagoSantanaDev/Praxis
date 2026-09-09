@@ -35,8 +35,9 @@
 ; ── Janelas ───────────────────────────────────────────────────
 ; WIN_MOVDOC_BAIXA já existe em MVConstants.ahk como MV_WIN_MOVDOC_BAIXA.
 ; Usar MV_WIN_MOVDOC_BAIXA diretamente nos callers.
-; Manter ref local para uso interno e compatibilidade.
-WIN_MOVDOC_POPUP := "Forms ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
+; Título do popup MOV DOC derivado de MV_CLASS_MODAL_FORMS (Dialogs.ahk já define
+; DIALOG_MOVDOC_POPUP; manter alias local sem novo literal).
+WIN_MOVDOC_POPUP := DIALOG_MOVDOC_POPUP
 
 ; ── Regiões em coordenadas Client ──────────────────────────────
 ; Não usar EditN como contrato: Oracle Forms renumera conforme estado.
@@ -54,11 +55,10 @@ MOVDOC_CHECK_RECEBIDO_X     := 718
 MOVDOC_CHECK_RECEBIDO_Y     := 359
 
 ; ── Esperas e timings ──────────────────────────────────────────
-; Padrão validado no macro 11: micro-settle suficiente para
-; estabilidade sem sleeps longos em campos Oracle Forms.
-MOVDOC_FIELD_FOCUS_SETTLE_MS := 100
-MOVDOC_FIELD_CLEAR_SETTLE_MS := 100
-MOVDOC_KEY_SETTLE_MS         := 100
+; Timings canonicos em MVConstants (MV_FIELD_*); aliases compat.
+MOVDOC_FIELD_FOCUS_SETTLE_MS := MV_FIELD_FOCUS_SETTLE_MS
+MOVDOC_FIELD_CLEAR_SETTLE_MS := MV_FIELD_CLEAR_SETTLE_MS
+MOVDOC_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
 
 ; ════════════════════════════════════════════════════════════════
 ;  Funções públicas
@@ -79,11 +79,7 @@ MovDoc_AbrirTelaBaixa() {
 }
 
 MovDoc_SetProtocoloByClick(protocolo) {
-    if !WinExist(MV_WIN_MOVDOC_BAIXA)
-        return false
-
-    WinActivate MV_WIN_MOVDOC_BAIXA
-    if !MV_Poll(() => WinActive(MV_WIN_MOVDOC_BAIXA), 2)
+    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
         return false
 
     Click(MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, 1)
@@ -267,11 +263,7 @@ _ColetarVisiveis(protocolo, linhas, vistos) {
 }
 
 _FocusProtocolo() {
-    if !WinExist(MV_WIN_MOVDOC_BAIXA)
-        return false
-
-    WinActivate MV_WIN_MOVDOC_BAIXA
-    if !MV_Poll(() => WinActive(MV_WIN_MOVDOC_BAIXA), 2)
+    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
         return false
 
     Click(MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, 1)
@@ -279,11 +271,7 @@ _FocusProtocolo() {
 }
 
 _LerCampoGrid(x, y, campo := "", fastTimeoutMs := 150, fallbackTimeoutMs := 300) {
-    if !WinExist(MV_WIN_MOVDOC_BAIXA)
-        return ""
-
-    WinActivate MV_WIN_MOVDOC_BAIXA
-    if !MV_Poll(() => WinActive(MV_WIN_MOVDOC_BAIXA), 2)
+    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
         return ""
 
     Click(x + 15, y + 8, 1)
@@ -302,9 +290,5 @@ _LerCampoGrid(x, y, campo := "", fastTimeoutMs := 150, fallbackTimeoutMs := 300)
 }
 
 _CopySelecionado(timeoutMs := 500) {
-    A_Clipboard := ""
-    Send("^c")
-    if !ClipWait(timeoutMs / 1000)
-        return ""
-    return Trim(A_Clipboard)
+    return MV_CopyFocusedText(timeoutMs)
 }

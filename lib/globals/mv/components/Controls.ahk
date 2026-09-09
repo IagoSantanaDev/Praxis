@@ -31,20 +31,11 @@ MV_ClickControlAt(winTitle, classNN, clientX, clientY, tolerance := 14) {
 }
 
 MV_ClickFirstControl(winTitle, classNN) {
-    try hwnds := WinGetControlsHwnd(winTitle)
-    catch
+    hwnd := MV_FirstControlByClass(winTitle, classNN)
+    if !hwnd
         return false
-
-    for hwnd in hwnds {
-        try ctrlClass := ControlGetClassNN(hwnd)
-        catch
-            continue
-        if (ctrlClass = classNN) {
-            ControlClick hwnd,,,,, "NA"
-            return true
-        }
-    }
-    return false
+    ControlClick hwnd,,,,, "NA"
+    return true
 }
 
 MV_ControlCheckedAt(winTitle, classNN, clientX, clientY, tolerance := 14) {
@@ -177,4 +168,171 @@ MV_WaitWindowStable(winTitle, stableMs := 600, timeoutSecs := 20) {
 
         Sleep MV_POLL_MS
     }
+}
+
+; ════════════════════════════════════════════════════════════════
+;  HELPERS CANÔNICOS (consolidados 2026-09-09)
+;  Versões únicas de helpers que existiam duplicadas entre screens
+;  e test_macros. Fonte única — os callers devem chamar estas funções.
+; ════════════════════════════════════════════════════════════════
+
+; Extende a busca por ponto com prefixo de ClassNN.
+; Consolida Popup_FindControlByClassPrefixAtPoint (Popups.ahk) numa única
+; implementação. classPrefix="" (default) = busca por classe exata;
+; classPrefix="Edit"/"ComboBox"/"ui60Drawn" = prefixo.
+MV_FindControlAtPoint(winTitle, classNN, targetX, targetY, tolerance := 14, classPrefix := "") {
+    try hwnds := WinGetControlsHwnd(winTitle)
+    catch
+        return 0
+
+    bestHwnd := 0
+    bestDist := 999999
+
+    for hwnd in hwnds {
+        try ctrlClass := ControlGetClassNN(hwnd)
+        catch
+            continue
+
+        if (classPrefix != "") {
+            if (SubStr(ctrlClass, 1, StrLen(classPrefix)) != classPrefix)
+                continue
+        } else if (ctrlClass != classNN) {
+            continue
+        }
+
+        try ControlGetPos &cx, &cy, &cw, &ch, hwnd
+        catch
+            continue
+
+        if (targetX >= cx && targetX <= cx + cw && targetY >= cy && targetY <= cy + ch)
+            return hwnd
+
+        centerX := cx + (cw / 2)
+        centerY := cy + (ch / 2)
+        dist := Sqrt((targetX - centerX) ** 2 + (targetY - centerY) ** 2)
+        if (dist < bestDist) {
+            bestDist := dist
+            bestHwnd := hwnd
+        }
+    }
+
+    return (bestHwnd && bestDist <= tolerance) ? bestHwnd : 0
+}
+
+; MV_FindControlByClientPoint (classe exata) delega para MV_FindControlAtPoint.
+MV_FindControlByClientPoint(winTitle, classNN, targetX, targetY, tolerance := 14) {
+    return MV_FindControlAtPoint(winTitle, classNN, targetX, targetY, tolerance, "")
+}
+
+; Primeiro controle com a classe ClassNN exata na janela (hwnd ou 0).
+; Base única de MV_ClickFirstControl e Popup_FirstControlByClass.
+MV_FirstControlByClass(winTitle, classNN) {
+    try hwnds := WinGetControlsHwnd(winTitle)
+    catch
+        return 0
+
+    for hwnd in hwnds {
+        try ctrlClass := ControlGetClassNN(hwnd)
+        catch
+            continue
+        if (ctrlClass = classNN)
+            return hwnd
+    }
+    return 0
+}
+
+; Clique por ClassNN + client coords, com fallback para clique físico.
+; Canônica única de _ClickBySpec (FfcvScreen) e TissXml_ClickBySpec (TissXmlScreen).
+MV_ClickBySpec(winTitle, classNN, x, y) {
+    if (classNN = "" || classNN = "CLASSNN" || x = "" || y = "")
+        return false
+    if MV_ClickControlAt(winTitle, classNN, x, y, 20)
+        return true
+    if !WinExist(winTitle)
+        return false
+    try {
+        WinActivate winTitle
+        if !MV_Poll(() => WinActive(winTitle), 3)
+            return false
+        Click(x, y, 1)
+        return true
+    } catch {
+        return false
+    }
+}
+
+; Copia o texto focado com Ctrl+C e aguarda o clipboard (ClipWait).
+; Canônica única de _CopyFocusedNumericText (FfcvScreen) e _CopySelecionado (MovDocScreen).
+; Extração numérica opcional via parâmetro.
+MV_CopyFocusedText(timeoutMs := 600, extrairNumero := false) {
+    A_Clipboard := ""
+    Send "^c"
+    if !ClipWait(timeoutMs / 1000)
+        return ""
+
+    value := Trim(A_Clipboard)
+    if (extrairNumero && RegExMatch(value, "\d+", &m))
+        return m[0]
+    return value
+}
+
+; Aguarda o modal Forms ativo sumir (base de _WaitModalGone).
+MV_WaitModalGone(timeoutMs := 30000) {
+    return MV_Poll(() => Dialog_ActiveModalTitle() = "", timeoutMs / 1000)
+}
+
+; Aguarda uma janela específica sumir (base de _WaitWindowGone).
+MV_WaitWindowGone(winTitle, timeoutMs := 30000) {
+    return MV_Poll(() => !WinExist(winTitle), timeoutMs / 1000)
+}
+
+; Garante que a janela está ativa (base de _EnsureWindowActive).
+MV_EnsureWindowActive(winTitle, timeoutSecs := 3) {
+    if !WinExist(winTitle)
+        return false
+    WinActivate winTitle
+    return MV_Poll(() => WinActive(winTitle), timeoutSecs)
+}
+
+; Encontra um botão do modal por texto visível; retorna hwnd ou 0.
+; Base única de TissXml_ClickModalButtonByText e TissXml_ModalHasButton.
+MV_FindButtonByText(winTitle, buttonText) {
+    try hwnds := WinGetControlsHwnd(winTitle)
+    catch
+        return 0
+
+    for hwnd in hwnds {
+        try ctrlClass := ControlGetClassNN(hwnd)
+        catch
+            continue
+        if (ctrlClass != "Button" && !InStr(ctrlClass, "Button"))
+            continue
+        try btnText := ControlGetText(hwnd)
+        catch
+            continue
+        if (Trim(btnText) = buttonText)
+            return hwnd
+    }
+    return 0
+}
+
+; Preenche um campo por clique físico + teclado (clear opcional).
+; Canônica única de TissXml_SetTextByClickAt (clear=true) e
+; TissXml_SetTextByClickNoClear (clear=false) e FfcvContaPopup_LimparCampoEEnviar.
+MV_SetTextByClick(winTitle, x, y, value, clear := true) {
+    if !MV_EnsureWindowActive(winTitle)
+        return false
+
+    Click(x + 15, y + 8, 1)
+    Sleep MV_KEY_SETTLE_MS
+
+    if (clear) {
+        Send "{Home}"
+        Send "^+{End}"
+        Send "{Backspace}"
+        Sleep MV_KEY_SETTLE_MS
+    }
+
+    SendText value
+    return true
 }

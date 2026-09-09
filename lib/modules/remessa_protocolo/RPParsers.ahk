@@ -7,6 +7,7 @@
 #Warn All, OutputDebug
 #Include ..\..\..\lib\globals\mv\MVSession.ahk
 #Include ..\..\..\lib\globals\mv\FFCV_ErrorTemplates.ahk
+#Include ..\..\..\lib\globals\mv\ParseUtils.ahk
 
 ; ════════════════════════════════════════════════════════════════
 ;  REMESSA POR PROTOCOLO — parsers
@@ -19,14 +20,9 @@ RP_RecordTiming(timings, label, startedAt, extra := "") {
     return elapsedMs
 }
 
+; ParseProtocolos delega para a canônica ParseListaCsv (globals/mv/ParseUtils.ahk).
 ParseProtocolos(str) {
-    result := []
-    for _, p in StrSplit(str, ",") {
-        p := Trim(p)
-        if (p != "")
-            result.Push(p)
-    }
-    return result
+    return ParseListaCsv(str)
 }
 
 ContarContas(protocolContas) {

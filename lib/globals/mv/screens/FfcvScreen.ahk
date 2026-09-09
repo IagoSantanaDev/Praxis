@@ -64,7 +64,7 @@ FFCV_BTN_NOVA_REM      := ""         ; preferir F6; não mapear campo variável 
 FFCV_CAMPO_DATA_REM    := ""         ; EditN variável; manter teclado no fluxo atual
 FFCV_CAMPO_TIPO        := ""         ; EditN variável; manter teclado no fluxo atual
 FFCV_BTN_SALVAR_REM    := ""         ; preferir F10; não mapear campo variável sem nova validação
-FFCV_BTN_ADICIONAR     := "Button10" ; 1 - Inserir Conta
+FFCV_BTN_ADICIONAR     := MV_BTN_ADICIONAR_CONTA ; 1 - Inserir Conta
 FFCV_BTN_ABRIR_DATAS   := "Button6"  ; 5 - Entregar Rem.
 FFCV_BTN_IMPRIMIR      := "Button7"  ; Relatório/Imprimir atendimentos
 FFCV_BTN_IMPRIMIR_X    := 567
@@ -73,19 +73,11 @@ FFCV_BTN_IMPRIMIR_Y    := 458
 ; ── Controles popup de envio de contas ────────────────────────
 ; Validado por captura do usuário: "Informações da Conta" não abre WinTitle próprio;
 ; o sentinela é o painel desenhado ui60Drawn W323 dentro da janela principal FFCV.
-FFCV_POPUP_CONTA_SENTINEL_CLASS := "ui60Drawn W323"
-FFCV_POPUP_CONTA_SENTINEL_X     := 432
-FFCV_POPUP_CONTA_SENTINEL_Y     := 109
-POPUP_DROPDOWN_1   := "ComboBox2"
-POPUP_DROPDOWN_1_X := 84
-POPUP_DROPDOWN_1_Y := 143
-POPUP_DROPDOWN_2   := "ComboBox1"
-POPUP_DROPDOWN_2_X := 190
-POPUP_DROPDOWN_2_Y := 143
-POPUP_CAMPO_CONTA  := "Edit2"
-POPUP_CAMPO_CONTA_X := 298
-POPUP_CAMPO_CONTA_Y := 143
-POPUP_BTN_OK       := "Button1"  ; modal de aviso/erro usa o primeiro Button1
+; Constantes canônicas do popup ficam em MVConstants.ahk (MV_POPUP_*).
+; Mantidos apenas aliases de compatibilidade para callers existentes.
+FFCV_POPUP_CONTA_SENTINEL_CLASS := MV_POPUP_CONTA_SENTINEL_CLASS
+FFCV_POPUP_CONTA_SENTINEL_X     := MV_POPUP_CONTA_SENTINEL_X
+FFCV_POPUP_CONTA_SENTINEL_Y     := MV_POPUP_CONTA_SENTINEL_Y
 
 ; ── Controles tela de datas (Cadastro: Faturas e Remessas) ────
 ; Spy em Fluxos/Fluxo_FecharRemessa.
@@ -133,27 +125,25 @@ XML_BTN_SAIR_TELA     := ""        ; pendente
 ; ── Fragmentos/classificação de erros no popup de envio ───────
 ; Modais Oracle Forms não expõem a mensagem pelo Window Spy/WinGetText de forma confiável.
 ; A classificação confiável vem do OCR local do Windows na área client do modal.
-ERR_JA_DIGITADA        := "já digitada"
-ERR_CONVENIO_DIFERENTE := "convênio diferente"
-ERR_CONTA_ABERTA       := "conta aberta"
-ERR_CONTA_JA_EM_REMESSA := "já em remessa"
-ERR_TIPO_DIFERENTE     := "tipo diferente"
+; (Constantes ERR_* mortas removidas: taxonomia canônica vive em FFCV_ErrorReferences.json.)
 
 ; ── Esperas e timings ──────────────────────────────────────────
 ; Padrão validado no macro 11: micro-settle suficiente para
 ; estabilidade sem sleeps longos em campos Oracle Forms.
-FFCV_FIELD_FOCUS_SETTLE_MS := 100
-FFCV_FIELD_CLEAR_SETTLE_MS := 100
-FFCV_KEY_SETTLE_MS         := 100
+; Timings canonicos em MVConstants (MV_FIELD_*). Aliases de compat.
+FFCV_FIELD_FOCUS_SETTLE_MS := MV_FIELD_FOCUS_SETTLE_MS
+FFCV_FIELD_CLEAR_SETTLE_MS := MV_FIELD_CLEAR_SETTLE_MS
+FFCV_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
 
 ; ── Performance FFCV Inserir Conta ───────────────────────────
 ; Contrato do macro 11: manter popup aberto, reagir ao modal e liberar próxima conta por estado.
-FFCV_CONTA_FOCUS_SETTLE_MS      := 100
-FFCV_CONTA_CLEAR_SETTLE_MS      := 100
-FFCV_CONTA_READY_MIN_MS         := 180
-FFCV_CONTA_FIELD_EMPTY_MIN_MS   := 100
-FFCV_CONTA_STABLE_MS            := 100
-FFCV_CONTA_SUBMIT_TIMEOUT_MS    := 650
+; Timings canonicos em MVConstants (MV_CONTA_*). Aliases de compat.
+FFCV_CONTA_FOCUS_SETTLE_MS      := MV_CONTA_FOCUS_SETTLE_MS
+FFCV_CONTA_CLEAR_SETTLE_MS      := MV_CONTA_CLEAR_SETTLE_MS
+FFCV_CONTA_READY_MIN_MS         := MV_CONTA_READY_MIN_MS
+FFCV_CONTA_FIELD_EMPTY_MIN_MS   := MV_CONTA_FIELD_EMPTY_MIN_MS
+FFCV_CONTA_STABLE_MS            := MV_CONTA_STABLE_MS
+FFCV_CONTA_SUBMIT_TIMEOUT_MS    := MV_CONTA_SUBMIT_TIMEOUT_MS
 
 ; ── Esperas da fase de fechamento/XML ─────────────────────────
 ; Esta fase dispara processamentos pesados no Oracle Forms.
@@ -379,23 +369,10 @@ Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc) {
 /*
 _ClickBySpec(winTitle, classNN, x, y)
     Click by ClassNN + client coords; fallback direct Click.
+    Delega para a versão canônica MV_ClickBySpec (components/Controls.ahk).
 */
 _ClickBySpec(winTitle, classNN, x, y) {
-    if (classNN = "" || classNN = "CLASSNN" || x = "" || y = "")
-        return false
-    if MV_ClickControlAt(winTitle, classNN, x, y, 20)
-        return true
-    if !WinExist(winTitle)
-        return false
-    try {
-        WinActivate winTitle
-        if !MV_Poll(() => WinActive(winTitle), 3)
-            return false
-        Click(x, y, 1)
-        return true
-    } catch {
-        return false
-    }
+    return MV_ClickBySpec(winTitle, classNN, x, y)
 }
 
 /*
@@ -416,27 +393,11 @@ _WaitAnyModalOrDelay(timeoutSecs) {
 }
 
 _WaitModalGone(timeoutMs := 30000) {
-    startedAt := A_TickCount
-    Loop {
-        if (Dialog_ActiveModalTitle() = "")
-            return true
-        if (A_TickCount - startedAt >= timeoutMs)
-            return false
-        Sleep MV_POLL_MS
-    }
+    return MV_WaitModalGone(timeoutMs)
 }
 
 _WaitWindowGone(winTitle, timeoutMs := 30000) {
-    startedAt := A_TickCount
-    Loop {
-        if !WinExist(winTitle) {
-            Sleep 100
-            return true
-        }
-        if (A_TickCount - startedAt >= timeoutMs)
-            return false
-        Sleep MV_POLL_MS
-    }
+    return MV_WaitWindowGone(winTitle, timeoutMs)
 }
 
 
@@ -464,30 +425,14 @@ _CopyFocusedNumericText(timeoutMs)
     @return String numérica ou "" em timeout.
 */
 _CopyFocusedNumericText(timeoutMs := 600) {
-    A_Clipboard := ""
-    Send "^c"
-    if !ClipWait(timeoutMs / 1000)
-        return ""
-
-    value := Trim(A_Clipboard)
-    if RegExMatch(value, "\d+", &m)
-        return m[0]
-    return ""
+    return MV_CopyFocusedText(timeoutMs, true)
 }
 
 _EnsureWindowActive(winTitle, timeoutSecs := 3) {
-    if !WinExist(winTitle)
-        return false
-    WinActivate winTitle
-    return MV_Poll(() => WinActive(winTitle), timeoutSecs)
+    return MV_EnsureWindowActive(winTitle, timeoutSecs)
 }
 
 _TipoContaCodigo(tipoConta) {
-    if (tipoConta = "Internamento")
-        return "1"
-    if (tipoConta = "Emergência")
-        return "2"
-    if (tipoConta = "Ambulatório")
-        return "3"
-    return ""
+    ; Valor canônico em MVConstants.MV_TIPO_CONTA (Internamento->1, Emergência->2, Ambulatório->3).
+    return MV_TIPO_CONTA.Has(tipoConta) ? Str(MV_TIPO_CONTA[tipoConta]) : ""
 }

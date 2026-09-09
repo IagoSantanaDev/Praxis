@@ -34,31 +34,30 @@
 
 ; ── Controles popup "Informações da Conta" ──────────────────────
 ; Validados por captura do usuário (macro 11).
-; Sentinel: painel desenhado ui60Drawn W323 dentro da janela FFCV.
-; Campo da conta: Edit2 por classe + fallback por coordenadas.
-; Dropdowns: ComboBox2 (tipo 1° dropdown), ComboBox1 (tipo 2° dropdown).
-FFCVP_BTN_ADICIONAR     := "Button10"  ; 1 - Inserir Conta
+; Constantes canonicas em MVConstants.ahk (MV_POPUP_*); aliases aqui
+; preservam os callers sem duplicar valores.
+FFCVP_BTN_ADICIONAR     := MV_BTN_ADICIONAR_CONTA  ; 1 - Inserir Conta
 FFCVP_BTN_ADICIONAR_X   := 24
 FFCVP_BTN_ADICIONAR_Y   := 458
-FFCVP_CAMPO_CONTA       := "Edit2"
-FFCVP_CAMPO_CONTA_X     := 298
-FFCVP_CAMPO_CONTA_Y     := 143
-FFCVP_DROPDOWN_1        := "ComboBox2"
-FFCVP_DROPDOWN_1_X      := 84
-FFCVP_DROPDOWN_1_Y      := 143
-FFCVP_DROPDOWN_2        := "ComboBox1"
-FFCVP_DROPDOWN_2_X      := 190
-FFCVP_DROPDOWN_2_Y      := 143
-FFCVP_BTN_OK            := "Button1"   ; modal de aviso/erro
+FFCVP_CAMPO_CONTA       := MV_POPUP_CAMPO_CONTA
+FFCVP_CAMPO_CONTA_X     := MV_POPUP_CAMPO_CONTA_X
+FFCVP_CAMPO_CONTA_Y     := MV_POPUP_CAMPO_CONTA_Y
+FFCVP_DROPDOWN_1        := MV_POPUP_DROPDOWN_TIPO
+FFCVP_DROPDOWN_1_X      := MV_POPUP_DROPDOWN_TIPO_X
+FFCVP_DROPDOWN_1_Y      := MV_POPUP_DROPDOWN_TIPO_Y
+FFCVP_DROPDOWN_2        := MV_POPUP_DROPDOWN_SUB_TIPO
+FFCVP_DROPDOWN_2_X      := MV_POPUP_DROPDOWN_SUB_TIPO_X
+FFCVP_DROPDOWN_2_Y      := MV_POPUP_DROPDOWN_SUB_TIPO_Y
+FFCVP_BTN_OK            := MV_POPUP_BTN_OK   ; modal de aviso/erro
 
-; ── Esperas / timings (derivados de FfcvScreen.ahk / RP_*) ───
-FFCVP_FIELD_FOCUS_SETTLE_MS := 100
-FFCVP_FIELD_CLEAR_SETTLE_MS := 100
-FFCVP_KEY_SETTLE_MS         := 100
-FFCVP_CONTA_READY_MIN_MS    := 180
-FFCVP_CONTA_FIELD_EMPTY_MIN_MS := 100
-FFCVP_CONTA_STABLE_MS       := 100
-FFCVP_CONTA_SUBMIT_TIMEOUT_MS := 650
+; ── Esperas / timings (canonicos em MVConstants: MV_FIELD_*/MV_CONTA_*) ───
+FFCVP_FIELD_FOCUS_SETTLE_MS := MV_FIELD_FOCUS_SETTLE_MS
+FFCVP_FIELD_CLEAR_SETTLE_MS := MV_FIELD_CLEAR_SETTLE_MS
+FFCVP_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
+FFCVP_CONTA_READY_MIN_MS    := MV_CONTA_READY_MIN_MS
+FFCVP_CONTA_FIELD_EMPTY_MIN_MS := MV_CONTA_FIELD_EMPTY_MIN_MS
+FFCVP_CONTA_STABLE_MS       := MV_CONTA_STABLE_MS
+FFCVP_CONTA_SUBMIT_TIMEOUT_MS := MV_CONTA_SUBMIT_TIMEOUT_MS
 
 ; ── Helper de logging interno ─────────────────────────────────
 ; Usa MV_Log de components/Controls.ahk (consolidado em 2026-06-26).

@@ -221,8 +221,6 @@ InserirContasNaRemessa(protocolContas, tipoConta, erros) {
 ; ════════════════════════════════════════════════════════════════
 
 RP_Abort(msg) {
-    global gRunning
-    SendToUI(Map("type", "error", "message", msg))
-    gRunning := false
-    return false
+    ; Delega para a canônica MV_Abort (MVSession.ahk).
+    return MV_Abort(msg)
 }

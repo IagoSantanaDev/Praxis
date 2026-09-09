@@ -53,3 +53,21 @@ MV_ActivateModule(moduleWin) {
         MV_Poll(() => WinActive(moduleWin), 3)
     }
 }
+
+; ════════════════════════════════════════════════════════════════
+;  ERRO / ABORT
+; ════════════════════════════════════════════════════════════════
+
+; Aborta a execução de um módulo: envia erro à UI, encerra o estado de
+; running (gRunning) e retorna false. Canônica única de Protocolar_Abort
+; (ProtocolarParsers.ahk) e RP_Abort (RemessaProtocolo.ahk).
+; sendStatus=true emite também a mensagem de status "Execução finalizada."
+; (comportamento original do Protocolar).
+MV_Abort(msg, sendStatus := false) {
+    global gRunning
+    SendToUI(Map("type", "error", "message", msg))
+    if (sendStatus)
+        SendToUI(Map("type", "status", "message", "Execução finalizada.", "running", false))
+    gRunning := false
+    return false
+}

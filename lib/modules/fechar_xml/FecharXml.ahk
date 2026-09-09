@@ -23,10 +23,6 @@
 ; para evitar ciclo FecharXml ↔ FecharXmlRegistry.
 
 RunFecharXML(params) {
-    return FXML_Run(params)
-}
-
-FXML_Run(params) {
     global
     ; Placeholder — lógica de orquestração será implementada
     ;   1. Validar que TissXmlScreen gerou XML
