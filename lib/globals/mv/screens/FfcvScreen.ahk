@@ -165,12 +165,6 @@ FFCV_XML_QUERY_MIN_WAIT_MS       := 1200
 ;  Funções públicas — Manutenção de Remessa
 ; ════════════════════════════════════════════════════════════════
 
-/*
-Ffcv_AbrirManutencaoRemessa()
-    Abre a tela Manutenção de Remessa via atalho Alt+lm Enter.
-    Sempre abre uma nova instância; não reutiliza tela já aberta.
-    Retorna true se a janela ficou estável, false em timeout.
-*/
 Ffcv_AbrirManutencaoRemessa() {
     MV_ActivateModule(MV_WIN_FFCV_ANY)
     if !MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
@@ -185,11 +179,6 @@ Ffcv_AbrirManutencaoRemessa() {
     return MV_WaitWindowStable(MV_WIN_FFCV_REMESSA, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD)
 }
 
-/*
-Ffcv_CarregarConvenio(convenioNum)
-    Aciona F7, digita o número do convênio e confirma com F8.
-    Retorna true se a janela ficou estável após F8, false em falha.
-*/
 Ffcv_CarregarConvenio(convenioNum) {
     MV_ActivateModule(MV_WIN_FFCV_ANY)
     Send "{F7}"
@@ -200,11 +189,6 @@ Ffcv_CarregarConvenio(convenioNum) {
     return FFCV_WaitLoad()
 }
 
-/*
-Ffcv_SelecionarRemessaExistente(numRemessa)
-    Aciona F7, digita o número da remessa e confirma com F8.
-    Retorna true se a janela ficou estável, false em falha.
-*/
 Ffcv_SelecionarRemessaExistente(numRemessa) {
     Send "{F7}"
     Sleep FFCV_KEY_SETTLE_MS
@@ -214,12 +198,6 @@ Ffcv_SelecionarRemessaExistente(numRemessa) {
     return FFCV_WaitLoad()
 }
 
-/*
-Ffcv_CriarNovaRemessa(tipoConta)
-    Cria nova remessa: F6, data atual, Tab x3, código do tipo, F10.
-    @param tipoConta  "Internamento", "Emergência" ou "Ambulatório".
-    Retorna true se a janela ficou estável após F10, false em falha.
-*/
 Ffcv_CriarNovaRemessa(tipoConta) {
     Send "{F6}"
     Sleep FFCV_KEY_SETTLE_MS
@@ -235,24 +213,12 @@ Ffcv_CriarNovaRemessa(tipoConta) {
     return FFCV_WaitLoad()
 }
 
-/*
-Ffcv_PosicionarAreaRemessas()
-    Envia Tab x3 para posicionar o cursor na área de remessas.
-    Usado após carregar convênio antes de selecionar/criar remessa.
-    Retorna sempre true (operação de teclado).
-*/
 Ffcv_PosicionarAreaRemessas() {
     Send "{Tab 3}"
     Sleep FFCV_KEY_SETTLE_MS
     return true
 }
 
-/*
-Ffcv_ImprimirRelatorioAtendimentos()
-    Clica em Relatório/Imprimir atendimentos na tela FFCV ativa.
-    Confirma a janela de relatório com Enter.
-    Retorna true se a impressão foi acionada, false em falha.
-*/
 Ffcv_ImprimirRelatorioAtendimentos() {
     if !MV_EnsureFFCV() {
         Notify("FFCV não ficou ativa antes de imprimir relatório de atendimentos.")
@@ -277,12 +243,6 @@ Ffcv_ImprimirRelatorioAtendimentos() {
     return true
 }
 
-/*
-Ffcv_AbrirTelaTISS()
-    Abre a tela Monitoração de Faturamento - TISS via atalho Alt+lt Enter.
-    Sempre abre uma nova instância; não reutilizar TISS já aberta.
-    Retorna true se a janela existe, false em timeout.
-*/
 Ffcv_AbrirTelaTISS() {
     if !MV_EnsureFFCV()
         return false
@@ -298,13 +258,6 @@ Ffcv_AbrirTelaTISS() {
     return ok
 }
 
-/*
-Ffcv_SairTelaEntregaPendente()
-    Envia o atalho configurado em FFCV_ENTREGA_SAIR_ATALHO para sair
-    da tela "Cadastro: Faturas e Remessas" (Entrega de Remessas).
-    Retorna true se a tela fechou, false se o atalho não está mapeado
-    ou a tela não fechou.
-*/
 Ffcv_SairTelaEntregaPendente() {
     ; M1 (auditoria 2026-06-27): FFCV_ENTREGA_SAIR_ATALHO esta como placeholder "^q"
     ; desde M001. Se nao foi corrigido, falhar cedo com erro explicito em vez de
@@ -327,12 +280,6 @@ Ffcv_SairTelaEntregaPendente() {
     return MV_Poll(() => !WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
 }
 
-/*
-Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc)
-    Preenche data de entrega, copia número da remessa via Shift+Tab,
-    preenche data de vencimento na tela "Cadastro: Faturas e Remessas".
-    Retorna Map("ok", bool, "erro", string, "remessa", string).
-*/
 Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc) {
     if !_EnsureWindowActive(WIN_FFCV_DATAS)
         return Map("ok", false, "erro", "Tela de datas não ficou ativa para preencher entrega/vencimento.", "remessa", "")
@@ -362,11 +309,6 @@ Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc) {
     return Map("ok", true, "erro", "", "remessa", numRemessa)
 }
 
-/*
-Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc)
-    Orchestrates the full "Entregar Remessa" flow.
-    @return Map("ok", bool, "erro", string, "remessa", string)
-*/
 Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc) {
     if !_EnsureWindowActive(MV_WIN_FFCV_ANY)
         return Map("ok", false, "erro", "FFCV nao ficou ativa antes de abrir a tela de fechar remessa/datas.", "remessa", "")
@@ -469,18 +411,10 @@ _ClickNaoModal() {
     return false
 }
 
-/*
-_WaitAnyModalOrDelay(timeoutSecs)
-    Poll for any Oracle Forms modal window.
-*/
 _WaitAnyModalOrDelay(timeoutSecs) {
     return MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), timeoutSecs)
 }
 
-/*
-_WaitModalGone(timeoutMs)
-    Wait for no active modal.
-*/
 _WaitModalGone(timeoutMs := 30000) {
     startedAt := A_TickCount
     Loop {
@@ -492,10 +426,6 @@ _WaitModalGone(timeoutMs := 30000) {
     }
 }
 
-/*
-_WaitWindowGone(winTitle, timeoutMs)
-    Wait for a window to disappear.
-*/
 _WaitWindowGone(winTitle, timeoutMs := 30000) {
     startedAt := A_TickCount
     Loop {
@@ -509,10 +439,6 @@ _WaitWindowGone(winTitle, timeoutMs := 30000) {
     }
 }
 
-/*
-_WaitOracleSettled removido em 2026-06-26 — use MV_WaitOracleSettled de
-components/Controls.ahk (consolidado).
-*/
 
 ; ════════════════════════════════════════════════════════════════
 ;  Funções internas (privadas do módulo)
@@ -549,11 +475,6 @@ _CopyFocusedNumericText(timeoutMs := 600) {
     return ""
 }
 
-/*
-_EnsureWindowActive(winTitle, timeoutSecs := 3)
-    Ativa a janela e aguarda que fique ativa.
-    @return true se ativa em timeout, false caso contrário.
-*/
 _EnsureWindowActive(winTitle, timeoutSecs := 3) {
     if !WinExist(winTitle)
         return false
@@ -561,11 +482,6 @@ _EnsureWindowActive(winTitle, timeoutSecs := 3) {
     return MV_Poll(() => WinActive(winTitle), timeoutSecs)
 }
 
-/*
-_TipoContaCodigo(tipoConta)
-    Retorna o código Oracle Forms do tipo de conta.
-    @return String "1", "2" ou "" conforme tipoConta.
-*/
 _TipoContaCodigo(tipoConta) {
     if (tipoConta = "Internamento")
         return "1"

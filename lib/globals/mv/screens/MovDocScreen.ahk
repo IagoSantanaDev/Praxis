@@ -64,12 +64,6 @@ MOVDOC_KEY_SETTLE_MS         := 100
 ;  Funções públicas
 ; ════════════════════════════════════════════════════════════════
 
-/*
-MovDoc_AbrirTelaBaixa()
-    Abre a tela Baixa de Documentos via atalho Alt+mpb.
-    Sempre abre uma nova instância; não reutiliza Baixa já aberta.
-    Retorna true se a janela ficou estável, false em timeout.
-*/
 MovDoc_AbrirTelaBaixa() {
     MV_ActivateModule(MV_WIN_MOVDOC_ANY)
     if !MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
@@ -84,12 +78,6 @@ MovDoc_AbrirTelaBaixa() {
     return MV_WaitWindowStable(MV_WIN_MOVDOC_BAIXA, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD)
 }
 
-/*
-MovDoc_SetProtocoloByClick(protocolo)
-    Ativa a janela Baixa de Documentos, clica no campo Protocolo
-    (coordenadas client) e envia o texto do protocolo.
-    Retorna true se o clique e envio foram aceitos, false em falha.
-*/
 MovDoc_SetProtocoloByClick(protocolo) {
     if !WinExist(MV_WIN_MOVDOC_BAIXA)
         return false
@@ -105,14 +93,6 @@ MovDoc_SetProtocoloByClick(protocolo) {
     return true
 }
 
-/*
-MovDoc_LerGrid(protocolo, primeiraLinha?)
-    Percorre a grid do MOV DOC a partir da primeira linha já lida.
-    Coleta blocos de 4 linhas visíveis via Home/Shift+End/Ctrl+C.
-    Para quando detecta popup de fim de registro ou 2 blocos vazios.
-    Retorna array de Map("protocolo", "conta", "convenio").
-    @param primeiraLinha  Map com campos da primeira linha (opcional).
-*/
 MovDoc_LerGrid(protocolo, primeiraLinha?) {
     linhas := []
     vistos := Map()
@@ -150,12 +130,6 @@ MovDoc_LerGrid(protocolo, primeiraLinha?) {
     return linhas
 }
 
-/*
-MovDoc_FinalizarBaixa()
-    Marca o checkbox Recebido (clique simples ou duplo conforme estado),
-    envia F10 para salvar e F7 para preparar nova consulta.
-    Retorna true se todas as ações foram aceitas, false em falha.
-*/
 MovDoc_FinalizarBaixa() {
     checked := MV_ControlCheckedAt(
         MV_WIN_MOVDOC_BAIXA,
@@ -199,13 +173,6 @@ MovDoc_FinalizarBaixa() {
     return true
 }
 
-/*
-MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida)
-    Espera até que a primeira linha da grid contenha conta e convênio
-    válidos (diferentes do protocolo), indicando que F8 populou a grid.
-    Retorna true com primeiraLinhaValida preenchida ou false em timeout (12s).
-    @param primeiraLinhaValida  Output variable; recebe Map("protocolo","conta","convenio").
-*/
 MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida) {
     global
     startedAt := A_TickCount
@@ -228,14 +195,6 @@ MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida) {
     }
 }
 
-/*
-MovDoc_GridValueValid(valor, campo)
-    Validação semântica de valores lidos da grid.
-    Descarta vazio, não numérico, e regras de tamanho por campo.
-    @param valor  String lido via Ctrl+C.
-    @param campo  "conta" ou "convenio" para regra de tamanho.
-    @return true se válido, false caso contrário.
-*/
 MovDoc_GridValueValid(valor, campo := "") {
     valor := Trim(valor)
     if (valor = "")
@@ -253,12 +212,6 @@ MovDoc_GridValueValid(valor, campo := "") {
 ;  Funções internas (privadas do módulo)
 ; ════════════════════════════════════════════════════════════════
 
-/*
-_AvancarBloco()
-    Clica na última linha visível, envia Down N vezes (N = tamanho
-    do bloco), detecta popup de fim e clica na primeira linha.
-    Retorna Map("popup", true|false).
-*/
 _AvancarBloco() {
     ultimoY := MOVDOC_GRID_ROWS_Y[MOVDOC_GRID_ROWS_Y.Length]
     Click(MOVDOC_CONTA_X + 15, ultimoY + 8, 1)
@@ -285,13 +238,6 @@ _AvancarBloco() {
     return Map("popup", false)
 }
 
-/*
-_ColetarVisiveis(protocolo, linhas, vistos)
-    Lê conta e convênio das 4 coordenadas de linha visíveis.
-    Filtra por protocolo e deduplica via Map vistos.
-    Adiciona entradas em linhas e retorna contagem de adicionados.
-    @return Integer com número de linhas adicionadas.
-*/
 _ColetarVisiveis(protocolo, linhas, vistos) {
     added := 0
 
@@ -320,11 +266,6 @@ _ColetarVisiveis(protocolo, linhas, vistos) {
     return added
 }
 
-/*
-_FocusProtocolo()
-    Ativa a janela Baixa e clica no campo Protocolo para preparar F7.
-    Retorna true se o clique foi aceito, false em falha.
-*/
 _FocusProtocolo() {
     if !WinExist(MV_WIN_MOVDOC_BAIXA)
         return false
@@ -337,13 +278,6 @@ _FocusProtocolo() {
     return true
 }
 
-/*
-_LerCampoGrid(x, y, campo, fastTimeoutMs, fallbackTimeoutMs)
-    Clica na célula da grid, seleciona texto com Home/Shift+End,
-    copia via Ctrl+C e valida semanticamente.
-    Tenta duas vezes (fast + fallback) antes de retornar "".
-    @return String com valor do campo ou "" em falha.
-*/
 _LerCampoGrid(x, y, campo := "", fastTimeoutMs := 150, fallbackTimeoutMs := 300) {
     if !WinExist(MV_WIN_MOVDOC_BAIXA)
         return ""
@@ -367,11 +301,6 @@ _LerCampoGrid(x, y, campo := "", fastTimeoutMs := 150, fallbackTimeoutMs := 300)
     return ""
 }
 
-/*
-_CopySelecionado(timeoutMs)
-    Limpa clipboard, envia Ctrl+C, aguarda texto estar disponível.
-    @return String do clipboard ou "" em timeout.
-*/
 _CopySelecionado(timeoutMs := 500) {
     A_Clipboard := ""
     Send("^c")

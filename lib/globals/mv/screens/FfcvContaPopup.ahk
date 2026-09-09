@@ -67,14 +67,6 @@ FFCVP_CONTA_SUBMIT_TIMEOUT_MS := 650
 ;  API PÚBLICA
 ; ════════════════════════════════════════════════════════════════
 
-/*
-FfcvContaPopup_AbrirEConfigurar(tipoConta)
-    Abre o popup "Informações da Conta" via clique em Button10,
-    aguarda estabilidade, e configura os dropdowns conforme tipo de conta.
-    Mantém o popup aberto após configurar para receber contas em lote.
-    @param tipoConta  "Internamento", "Emergência" ou "Ambulatório".
-    @return true se abriu e configurou com sucesso, false em falha.
-*/
 FfcvContaPopup_AbrirEConfigurar(tipoConta) {
     ; Garantir que o FFCV está ativo antes de clicar.
     if !MV_EnsureFFCV() {
@@ -129,13 +121,6 @@ FfcvContaPopup_AbrirEConfigurar(tipoConta) {
     return true
 }
 
-/*
-FfcvContaPopup_ConfigurarDropdowns(tipoConta)
-    Executa a sequência de Tab/Down para posicionar nos campos corretos
-    do popup conforme o tipo de conta. Padrão validado no macro 11.
-    @param tipoConta  "Internamento", "Emergência" ou "Ambulatório".
-    @return true se configurado com sucesso, false caso contrário.
-*/
 FfcvContaPopup_ConfigurarDropdowns(tipoConta) {
     if !MV_EnsureFFCV()
         return false
@@ -169,14 +154,6 @@ FfcvContaPopup_ConfigurarDropdowns(tipoConta) {
     return true
 }
 
-/*
-FfcvContaPopup_EnviarConta(numConta)
-    Limpa o campo de conta, digita o número, e envia Enter.
-    Após Enter, aguarda resultado: modal de erro ou popup pronto para próxima conta.
-    @param numConta  Número da conta a inserir.
-    @return Map("status", "ready"|"modal"|"timeout"|"blocker", "erro", Map|string,
-                "texto", string, "report", string).
-*/
 FfcvContaPopup_EnviarConta(numConta) {
     result := FfcvContaPopup_LimparCampoEEnviar(numConta)
     if !result["ok"]
@@ -186,13 +163,6 @@ FfcvContaPopup_EnviarConta(numConta) {
     return outcome
 }
 
-/*
-FfcvContaPopup_LimparCampoEEnviar(numConta)
-    Clica no campo de conta por coordenadas, limpa, digita o número e Enter.
-    Wrapper para o fluxo de envio de uma conta no popup.
-    @param numConta  Número da conta.
-    @return Map("ok", bool, "erro", string, "report", string).
-*/
 FfcvContaPopup_LimparCampoEEnviar(numConta) {
     if !Popup_ContaVisible()
         return Map("ok", false, "erro", "Popup de conta nao esta visivel.", "report",
@@ -275,11 +245,6 @@ FfcvContaPopup_WaitSubmitOutcome(timeoutMs, submittedConta := "") {
     }
 }
 
-/*
-FfcvContaPopup_GetCampoContaText()
-    Lê o texto atual do campo de conta via busca por classe/posição.
-    @return String do campo ou "" se não encontrado.
-*/
 FfcvContaPopup_GetCampoContaText() {
     hwnd := Popup_FindControlByClassPrefixAtPoint(
         MV_WIN_FFCV_ANY, "Edit",
@@ -291,11 +256,6 @@ FfcvContaPopup_GetCampoContaText() {
         return ""
 }
 
-/*
-FfcvContaPopup_WaitReady(timeoutMs)
-    Aguarda o popup "Informações da Conta" ficar pronto após abrir.
-    Retorna Map("ok", bool, "erro", string, "elapsed", int).
-*/
 FfcvContaPopup_WaitReady(timeoutMs) {
     startedAt := A_TickCount
 
@@ -309,11 +269,6 @@ FfcvContaPopup_WaitReady(timeoutMs) {
     return Map("ok", true, "erro", "", "elapsed", A_TickCount - startedAt)
 }
 
-/*
-FfcvContaPopup_WaitStable(timeoutMs)
-    Aguarda estabilidade do popup após abertura e antes de configurar dropdowns.
-    Retorna Map("ok", bool, "erro", string).
-*/
 FfcvContaPopup_WaitStable(timeoutMs) {
     startedAt := A_TickCount
     deadline := startedAt + timeoutMs
@@ -336,13 +291,6 @@ FfcvContaPopup_WaitStable(timeoutMs) {
     }
 }
 
-/*
-FfcvContaPopup_Close(timeoutMs)
-    Fecha o popup "Informações da Conta" enviando Alt+2.
-    Aguarda o popup desaparecer dentro do timeout.
-    @param timeoutMs  Timeout em milissegundos (default 5000).
-    @return true se fechou, false caso contrário.
-*/
 FfcvContaPopup_Close(timeoutMs := 5000) {
     Send "{Alt down}2{Alt up}"
     Sleep FFCVP_KEY_SETTLE_MS

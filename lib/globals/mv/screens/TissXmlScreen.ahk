@@ -53,11 +53,6 @@ RP_XML_QUERY_MIN_WAIT_MS   := FFCV_XML_QUERY_MIN_WAIT_MS
 ;  HELPERS — click/teclado/modal (movidos de RemessaProtocolo.ahk)
 ; ════════════════════════════════════════════════════════════════
 
-/*
-TissXml_SetTextByClickAt(winTitle, x, y, value)
-    Clica em coordenadas de janela, limpa o campo com Home+Shift+End+Backspace
-    e digita o valor. Usado para o campo de caminho do arquivo XML.
-*/
 TissXml_SetTextByClickAt(winTitle, x, y, value) {
     if !_EnsureWindowActive(winTitle)
         return false
@@ -71,11 +66,6 @@ TissXml_SetTextByClickAt(winTitle, x, y, value) {
     return true
 }
 
-/*
-TissXml_SetTextByClickNoClear(winTitle, x, y, value)
-    Clica em coordenadas de janela e digita o valor sem limpar.
-    Usado para o campo de numero da remessa.
-*/
 TissXml_SetTextByClickNoClear(winTitle, x, y, value) {
     if !_EnsureWindowActive(winTitle)
         return false
@@ -114,12 +104,6 @@ TissXml_ClickBySpec(winTitle, classNN, x, y) {
     }
 }
 
-/*
-TissXml_WaitXmlQueryReady(timeoutMs)
-    Espera a consulta da remessa na tela XML/TISS estabilizar.
-    Estabilizacao = cursor normal + botao Faturamento clicavel apos espera minima.
-    @return Map("ok", bool, "elapsed", ms, "erro", string)
-*/
 TissXml_WaitXmlQueryReady(timeoutMs := 30000) {
     startedAt := A_TickCount
     stableSince := 0
@@ -148,11 +132,6 @@ TissXml_WaitXmlQueryReady(timeoutMs := 30000) {
     }
 }
 
-/*
-TissXml_WaitPathForm(timeoutSecs)
-    Espera o formulario de caminho do arquivo aparecer apos Faturamento.
-    @return Map("ok", bool, "erro", string)
-*/
 TissXml_WaitPathForm(timeoutSecs := 20) {
     startedAt := A_TickCount
     deadline := startedAt + timeoutSecs * 1000
@@ -216,12 +195,6 @@ TissXml_HandleSaveModals() {
     return false
 }
 
-/*
-TissXml_ClickModalButtonByText(winTitle, buttonText)
-    Localiza o primeiro botao com o texto informado em uma janela modal
-    e executa ControlClick nele.
-    @return true se encontrado e clicado; false caso contrario.
-*/
 TissXml_ClickModalButtonByText(winTitle, buttonText) {
     try hwnds := WinGetControlsHwnd(winTitle)
     catch
@@ -244,11 +217,6 @@ TissXml_ClickModalButtonByText(winTitle, buttonText) {
     return false
 }
 
-/*
-TissXml_ModalHasButton(winTitle, buttonText)
-    Verifica se uma janela modal contem um botao com o texto informado.
-    @return true se o botao existe; false caso contrario.
-*/
 TissXml_ModalHasButton(winTitle, buttonText) {
     try hwnds := WinGetControlsHwnd(winTitle)
     catch
@@ -269,10 +237,6 @@ TissXml_ModalHasButton(winTitle, buttonText) {
     return false
 }
 
-/*
-TissXml_WaitOracleSettled removido em 2026-06-26 — use MV_WaitOracleSettled de
-components/Controls.ahk (consolidado).
-*/
 
 ; ════════════════════════════════════════════════════════════════
 ;  Funcoes publicas — extraidas de RemessaProtocolo.ahk
