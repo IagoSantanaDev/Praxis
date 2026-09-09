@@ -19,7 +19,6 @@ MV_WIN_FFCV_ANY       := "Faturamento ahk_exe ifrun60.EXE"
 ; Títulos específicos só devem ser usados depois de navegar para a tela esperada.
 MV_WIN_MOVDOC_BAIXA   := "Protocolação de Baixa de Documentos ahk_exe ifrun60.EXE"
 MV_WIN_FFCV_REMESSA   := "MV2000i - Faturamento ahk_exe ifrun60.EXE"
-MV_WIN_IDENTIFICACAO  := "Identificação ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
 
 ; ── Controles de popups conhecidos ────────────────────────────
 MV_MODAL_OK_CLASS     := "Button1"

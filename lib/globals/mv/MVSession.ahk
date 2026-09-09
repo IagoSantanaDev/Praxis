@@ -30,13 +30,9 @@ MV_EnsureMovDoc() {
         MV_ActivateModule(MV_WIN_MOVDOC_ANY)
         if MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
             return true
-        ; se a janela de identificação aparecer, a automação não prossegue
     }
 
-    if WinExist(MV_WIN_IDENTIFICACAO)
-        return MV_AbortAuthenticationRequired("MOV DOC")
-
-    ; Não abrir novo MOV DOC via atalho. Se não estiver aberto, abortar.
+    ; Módulo não está aberto: a automação não cria janelas.
     return false
 }
 
@@ -45,26 +41,9 @@ MV_EnsureFFCV() {
         MV_ActivateModule(MV_WIN_FFCV_ANY)
         if MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
             return true
-        ; se a janela de identificação aparecer, a automação não prossegue
     }
 
-    if WinExist(MV_WIN_IDENTIFICACAO)
-        return MV_AbortAuthenticationRequired("FFCV")
-
-    ; Não abrir novo FFCV via atalho. Se não estiver aberto, abortar.
-    return false
-}
-
-; ════════════════════════════════════════════════════════════════
-;  AUTENTICAÇÃO AUTOMÁTICA DESABILITADA
-; ════════════════════════════════════════════════════════════════
-
-MV_AbortAuthenticationRequired(moduleName) {
-    global gRunning
-    gRunning := false
-
-    message := "O Praxis não executa autenticação automática. Abra e autentique o " moduleName " manualmente no MV2000i antes de iniciar a automação."
-    try SendToUI(Map("type", "error", "message", message))
+    ; Módulo não está aberto: a automação não cria janelas.
     return false
 }
 
