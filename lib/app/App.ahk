@@ -16,12 +16,9 @@ global gMainGui    := ""
 global gWorkDir    := ""
 global gEmbeddedIndexHtmlBase64 := ""
 
-; gExitAfterStop e gExitDeadline sao declarados em AppState.ahk.
 #Include *i ..\..\build\generated\Praxis_Ui.ahk
 
 ; ─── Timing constants ────────────────────────────────────────
-; Nomes explicitos para timeouts e intervalos criticos. Ajustar aqui
-; quando calibrar UX (ex.: tempo maximo que o usuario espera ao fechar).
 AWAIT_POLL_MS             := 100       ; intervalo de polling de AwaitPromise
 WEBVIEW2_ENV_TIMEOUT_MS   := 15000     ; timeout de WebView2.CreateEnvironment
 WEBVIEW2_CTRL_TIMEOUT_MS  := 15000     ; timeout de WebView2.CreateController
@@ -146,10 +143,9 @@ OnGuiResize(thisGui, minMax, width, height) {
     SetTimer SyncViewBounds, -RESIZE_DEBOUNCE_MS
 }
 
-; OnAppClose: chamada pelo OS (Alt+F4, botao X, WinClose).
-; Retornar true impede o fechamento padrao da janela.
-; Se o app esta ocioso, fecha direto. Se ha handler ativo, pede parada
-; e usa SetTimer para poll assincrono (nao trava a thread GUI).
+; `OnAppClose` intercepta o fechamento: fecha direto se o app estiver ocioso ou 
+; solicita a parada e monitora assincronamente com `SetTimer` se houver handler ativo.
+
 OnAppClose(thisGui) {
     global gExitDeadline
 
@@ -175,10 +171,8 @@ OnAppClose(thisGui) {
     return true
 }
 
-; FinishAppExitAfterStop: caminho comum de finalizacao do close-after-stop.
-; Chamado por PollExitAfterStop quando o handler termina ou estoura o timeout.
-; Reset explicito de gExitAfterStop e gExitDeadline torna idempotente em relacao
-; a CleanupApp() — se o caller decidir pular ExitApp, o estado fica limpo.
+; `FinishAppExitAfterStop` é o caminho comum de finalização do `close-after-stop`,
+; chamado por `PollExitAfterStop` quando o handler termina ou estoura o timeout.
 FinishAppExitAfterStop(reason := "") {
     global gExitAfterStop, gExitDeadline
 
@@ -196,9 +190,8 @@ FinishAppExitAfterStop(reason := "") {
     ExitApp()
 }
 
-; PollExitAfterStop: timer chamado a cada POLL_EXIT_INTERVAL_MS ate o handler
-; terminar (ou ate CLOSE_HANDLER_TIMEOUT_MS). Quando termina, delega para
-; FinishAppExitAfterStop. Critical "On" serializa contra reentrancia do timer.
+; PollExitAfterStop verifica periodicamente o fim do handler ou o timeout e 
+; chama FinishAppExitAfterStop; Critical "On" evita reentrância do timer.
 PollExitAfterStop() {
     Critical "On"
     try {

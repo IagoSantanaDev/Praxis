@@ -6,9 +6,8 @@
 ; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
 
 ; ─── Script registry ──────────────────────────────────────────
-; Centraliza o registro de scripts disponíveis na aplicação.
-; Cada módulo de script é responsável por declarar seus próprios
-; handlers via RPRegistry / ProtocolarRegistry.
+; Centraliza o registro dos scripts disponíveis; cada módulo declara seus
+; próprios handlers nos respectivos registries.
 
 #Include ..\..\lib\modules\remessa_protocolo\RPRegistry.ahk
 #Include ..\..\lib\modules\protocolar\ProtocolarRegistry.ahk

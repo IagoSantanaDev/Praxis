@@ -10,8 +10,6 @@
 ; ─── Project root (used by all #Include directives below) ────
 global gRoot := A_ScriptDir
 
-; ─── CLI argument dispatch ───────────────────────────────────
-; Supports: --integrity-check
 for arg in A_Args {
     if (arg = "--integrity-check" || arg = "--check") {
         ; Check interno do EXE compilado: usa o manifesto embutido
@@ -25,12 +23,8 @@ for arg in A_Args {
 }
 
 ; ─── Includes (ordem importa) ────────────────────────────────
-; AppState.ahk deve vir ANTES de Praxis_IntegrityManifest.ahk: o manifesto
-; reatribui gIntegrityExpectedFiles com os hashes reais, e so funciona se
-; AppState.ahk ja tiver declarado o Map como global (caso contrario cria
-; implicit-local). Documentado em lib/app/AppState.ahk:28-29.
-; App.ahk vem depois de AppState.ahk pelos mesmos motivos (gRunning,
-; gStopRequested, gExitAfterStop, gExitDeadline).
+; AppState.ahk deve vir antes do manifesto e do App.ahk, 
+; pois ambos dependem dos globais e variáveis declarados nele.
 #Include lib\app\AppState.ahk
 #Include *i build\generated\Praxis_IntegrityManifest.ahk
 #Include lib\app\IntegrityCheck.ahk

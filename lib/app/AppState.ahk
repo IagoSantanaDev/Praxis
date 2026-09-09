@@ -6,10 +6,8 @@
 ; Licença: proprietária. Consulte LICENSE, COPYRIGHT e NOTICE.md na raiz do repositório.
 ; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
 ; Proprietary and confidential. All rights reserved.
-;
-; Central state globals for the Praxis application.
-; This module is included early via #Include *i to ensure
-; state is available to all subsequent includes.
+
+; Centraliza os globais de estado do Praxis e é incluído no início para disponibilizá-los aos demais módulos.
 ; ============================================================
 
 ; ─── Application lifecycle ───────────────────────────────────
@@ -17,18 +15,14 @@ global gRunning := false
 global gStopRequested := false
 
 ; ─── Close coordination ─────────────────────────────────────────
-; gExitAfterStop e gExitDeadline sao compartilhados entre App.ahk (que arma
-; OnAppClose/PollExitAfterStop) e Dispatcher.ahk (que consulta IsAppClosing()
-; para rejeitar RunScript durante a janela de shutdown). Declarados aqui para
-; ficarem disponiveis em todos os entry points (main.ahk e cli-check.ahk).
+; gExitAfterStop e gExitDeadline são globais compartilhados entre App.ahk e Dispatcher.ahk,
+; permitindo controlar o shutdown e bloquear novas execuções durante o fechamento.
 global gExitAfterStop := false
 global gExitDeadline  := 0
 
 ; ─── Runtime integrity ───────────────────────────────────────
-; Loaded as #Include *i from build/generated/Praxis_IntegrityManifest.ahk
-; after these declarations so the Map is already initialized.
-; Auditoria 2026-06-27 (M5): gIntegritySilentMode removida (declarada mas
-; nunca referenciada — LogWrite de cli-check.ahk sempre executa independente).
+; O manifesto é incluído após as declarações, garantindo que o Map esteja inicializado.
+; gIntegritySilentMode foi removida por não ser utilizada.
 global gIntegrityExpectedFiles := Map()
 
 ; ─── Lifecycle helpers ─────────────────────────────────────────
@@ -42,9 +36,9 @@ SetAppRunning(state) {
     gRunning := !!state
 }
 
-; TryBeginAppRun: transicao atomica check-then-set de gRunning.
-; Usa Critical para serializar entre threads AHK no mesmo processo.
-; Retorna true se conseguiu iniciar; false se ja havia execucao ativa.
+; TryBeginAppRun controla atomicamente gRunning com Critical, 
+; impedindo execuções simultâneas e retornando true se iniciar ou
+; false se já estiver em execução..
 TryBeginAppRun() {
     Critical "On"
     try {

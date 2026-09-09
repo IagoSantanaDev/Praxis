@@ -7,18 +7,12 @@
 #Warn All, OutputDebug
 
 ; ─── Dependencies ─────────────────────────────────────────────
-; App.ahk e AppState.ahk ja sao incluidos por main.ahk antes deste arquivo.
 #Include ..\..\lib\modules\remessa_protocolo\RPRegistry.ahk
 #Include ..\..\lib\modules\protocolar\ProtocolarRegistry.ahk
 #Include ..\..\lib\modules\fechar_xml\FecharXml.ahk
 #Include ..\..\lib\vendor\JSON.ahk
 
 ; ─── Dispatcher: AHK → JS bridge ─────────────────────────────
-; Log estruturado: campo 'type' permite filtrar no praxis.log via "type:dispatcher"
-
-; Identificador de script: kebab/snake case, minusculas, digitos, underscore, slash.
-; Usado para validar script_id e nomes de arquivos. Centralizado aqui para que
-; regex mude em um lugar so caso os requisitos evoluam.
 IDENTIFIER_REGEX := "^[a-z0-9_/-]+$"
 
 GetLogPath() {
