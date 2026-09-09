@@ -55,6 +55,7 @@ Config_ReadSetting(section, key, defaultValue) {
 ; Retorna:
 ;   Nada. Lança Error se a escrita falhar.
 ; ============================================================
+
 Config_WriteSetting(section, key, value) {
     global gSettingsCache
     iniPath := A_ScriptDir "\config.ini"

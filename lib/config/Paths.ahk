@@ -8,24 +8,7 @@
 ; ============================================================
 
 ; ─── Canonical path resolver ──────────────────────────────────
-; Retorna paths canônicos da aplicação a partir de um nome simbólico.
-; Garante consistência de caminhos em toda a codebase.
-;
-; Parâmetros:
-;   name - Nome simbólico do path:
-;          "WorkDir"    -> diretório de trabalho configurado (padrão: A_MyDocuments\Praxis)
-;          "VendorDir" -> vendor/
-;          "ScriptsDir"-> scripts/
-;          "UiDir"     -> ui/
-;          "GlobalsDir"-> globals/
-;          "ModulesDir"-> modules/
-;          "ConfigDir" -> config/
-;          "LibDir"    -> lib/
-;          "BuildDir"  -> build/
-;
-; Retorna:
-;   String com o path absoluto. Lança Error se name for inválido.
-; ============================================================
+; Retorna caminhos absolutos e padronizados da aplicação a partir de nomes simbólicos, lançando erro para nomes inválidos.
 
 Config_GetPath(name) {
     static cache := Map()
@@ -78,7 +61,6 @@ Config_GetPath(name) {
     return path
 }
 
-; ─── Convenience aliases via globals ───────────────────────────
 ; Para retrocompatibilidade com código que usa gWorkDir diretamente.
 ; Inicializado sob demanda na primeira chamada.
 global gWorkDir := ""
