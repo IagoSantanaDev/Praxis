@@ -1,4 +1,4 @@
-<#
+﻿<#
 Praxis — software proprietário
 Copyright (c) 2026 Iago Santana Lima. Todos os direitos reservados.
 Licença: proprietária. Consulte LICENSE, COPYRIGHT e NOTICE.md na raiz do repositório.

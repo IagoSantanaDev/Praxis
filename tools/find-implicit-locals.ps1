@@ -1,4 +1,4 @@
-# find-implicit-locals.ps1
+﻿# find-implicit-locals.ps1
 #
 # Detects the AHK v2 "implicit local" bug pattern in lib/ source files.
 #

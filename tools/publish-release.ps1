@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Gera o build portátil do Praxis (EXE sem fonte), zipla e publica/atualiza um GitHub Release único (rolling).
 

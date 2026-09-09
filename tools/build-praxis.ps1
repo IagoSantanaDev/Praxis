@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Build de release do Praxis: compila AutoHotkey para EXE, prepara staging sem fonte e gera instalador.
 
