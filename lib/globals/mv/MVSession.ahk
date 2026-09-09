@@ -31,8 +31,6 @@ MV_EnsureMovDoc() {
         if MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
             return true
     }
-
-    ; Módulo não está aberto: a automação não cria janelas.
     return false
 }
 
@@ -42,8 +40,6 @@ MV_EnsureFFCV() {
         if MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
             return true
     }
-
-    ; Módulo não está aberto: a automação não cria janelas.
     return false
 }
 

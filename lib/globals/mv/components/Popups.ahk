@@ -67,9 +67,8 @@ Popup_ContaVisible() {
     return campoConta != 0
 }
 
-; Encontra o primeiro controle cujo ClassNN começa com o prefixo fornecido
-; na posição de client mais próxima ao ponto (targetX, targetY), dentro da tolerance.
-; Retorna hwnd do controle ou 0 se não encontrado.
+; Localiza o controle mais próximo do ponto informado, filtrando pelo prefixo ClassNN;
+; retorna o hwnd ou 0 se não encontrar.
 Popup_FindControlByClassPrefixAtPoint(winTitle, classPrefix, targetX, targetY, tolerance := 35) {
     try hwnds := WinGetControlsHwnd(winTitle)
     catch {

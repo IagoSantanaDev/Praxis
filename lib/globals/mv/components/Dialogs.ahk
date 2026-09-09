@@ -35,9 +35,8 @@ Dialog_ActiveModalTitle() {
     return result
 }
 
-; Classifica o erro do modal Forms ativo via OCR Windows.Media.Ocr.
-; Delega para FFCV_ClassifyErrorModal que usa referencias em FFCV_ErrorTemplates.
-; Retorna Map("tipo", string, "descricao", string, "fonte", string, "texto", string, "img", string).
+; Classifica erros do modal Oracle Forms via OCR, usando FFCV_ClassifyErrorModal, 
+; e retorna um Map com tipo, descrição, fonte, texto e imagem.
 Dialog_ClassifyErroContaModal(winTitle := "") {
     if (winTitle = "")
         winTitle := Dialog_ActiveModalTitle()

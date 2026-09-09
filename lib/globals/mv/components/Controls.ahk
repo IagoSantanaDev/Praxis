@@ -104,9 +104,8 @@ MV_Poll(condFn, timeoutSecs) {
     }
 }
 
-; Helper de logging interno usado por Dialogs/Popups/FfcvContaPopup.
-; Substitui as 3 helpers *_Log byte-identicas que existiam em cada arquivo.
-; Saida identica ao padrao anterior (funcName " => OK|FALHOU  " detail).
+; Centraliza o logging interno de Dialogs/Popups/FfcvContaPopup, 
+; substituindo três helpers duplicadas sem alterar o padrão de saída.
 MV_Log(funcName, detail, result) {
     try {
         if (result)
@@ -116,10 +115,7 @@ MV_Log(funcName, detail, result) {
     }
 }
 
-; Espera a janela Oracle Forms estabilizar: sem modal, sem cursor de espera,
-; contagem de controles inalterada por stableMs ms.
-; Substitui _WaitOracleSettled (FfcvScreen) e TissXml_WaitOracleSettled
-; (TissXmlScreen) que eram byte-identicos.
+; Aguarda o Oracle Forms estabilizar, substituindo duas funções duplicadas e idênticas por um helper único.
 MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
     startedAt := A_TickCount
     stableSince := 0
