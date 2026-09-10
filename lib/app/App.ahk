@@ -84,7 +84,9 @@ App_Run() {
         )
     } catch as err {
         MsgBox(
-            "Microsoft Edge WebView2 Runtime nao encontrado ou nao inicializou."
+            "Falha ao carregar o WebView2Loader.dll."
+            . "`n`nArquitetura do processo: " (A_PtrSize * 8) " bits."
+            . "`nLoader esperado: " . webViewLoader
             . "`n`nO WebView2 Runtime e necessario para executar o Praxis."
             . "`nBaixe em: https://developer.microsoft.com/microsoft-edge/webview2/"
             . "`n`nErro: " . err.Message,
