@@ -695,7 +695,13 @@ Write-Step 'Gerando artefatos embutidos do EXE'
 if (Test-Path -LiteralPath $GeneratedDir) {
     Remove-Item -LiteralPath $GeneratedDir -Recurse -Force
 }
-New-EmbeddedBase64Module -OutputPath $GeneratedUiPath -VariableName 'gEmbeddedIndexHtmlBase64' -Text (Get-Content -LiteralPath $UiIndexPath -Raw -Encoding UTF8)
+$uiText = Get-Content -LiteralPath $UiIndexPath -Raw -Encoding UTF8
+if (Test-Path -LiteralPath $AppIconPath) {
+    $iconBytes = [System.IO.File]::ReadAllBytes($AppIconPath)
+    $iconDataUri = 'data:image/x-icon;base64,' + [Convert]::ToBase64String($iconBytes)
+    $uiText = $uiText.Replace('../../installer/assets/icon.ico', $iconDataUri)
+}
+New-EmbeddedBase64Module -OutputPath $GeneratedUiPath -VariableName 'gEmbeddedIndexHtmlBase64' -Text $uiText
 New-EmbeddedBase64Module -OutputPath $GeneratedOcrReferencesPath -VariableName 'gEmbeddedOcrReferencesBase64' -Text (Get-Content -LiteralPath $OcrReferencesPath -Raw -Encoding UTF8)
 New-EmbeddedBase64Module -OutputPath $GeneratedOcrProbePath -VariableName 'gEmbeddedOcrProbeBase64' -Text (Get-Content -LiteralPath $OcrProbePath -Raw -Encoding UTF8)
 # Manifesto de integridade: apenas recursos EXTERNOS copiados para o stage

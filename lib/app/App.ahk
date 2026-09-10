@@ -64,6 +64,13 @@ App_Run() {
     if !FileExist(webViewLoader)
         throw Error("WebView2Loader.dll nao encontrado em: " . webViewLoader)
 
+    ; A janela usa o mesmo ícone 256px do instalador quando executada a partir do
+    ; código-fonte. No EXE compilado, o recurso /icon do Ahk2Exe já é a fonte
+    ; embutida e permanece como fallback.
+    appIconPath := gRoot "\installer\assets\icon.ico"
+    if FileExist(appIconPath)
+        TraySetIcon(appIconPath)
+
     gMainGui := Gui("-Resize -MaximizeBox", "Praxis")
     gMainGui.BackColor := "0xD4D0C8"
     gMainGui.OnEvent("Close", OnAppClose)

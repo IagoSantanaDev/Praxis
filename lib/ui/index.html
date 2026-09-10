@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Praxis</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="../../installer/assets/icon.ico">
 <style>
 :root {
   /* ─── Superfícies ─── */
@@ -96,10 +96,11 @@ button, input, select { font: inherit; color: inherit; }
   flex-shrink: 0; border-bottom: 1px solid var(--ink-line);
 }
 .hdr-mark {
-  width: 24px; height: 24px; border: 1.5px solid var(--accent);
-  border-radius: 3px; display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-num); font-weight: 600; font-size: var(--fs-2xs); color: var(--accent);
+  width: 32px; height: 32px; border: 2px solid var(--accent);
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0;
 }
+.hdr-mark img { width: 100%; height: 100%; object-fit: cover; }
 .hdr-id { display: flex; flex-direction: column; line-height: 1.2; }
 .hdr-title    { font-size: var(--fs-base); font-weight: 600; letter-spacing: .2px; }
 .hdr-subtitle { font-size: var(--fs-xs); color: var(--txt-invert-muted); }
@@ -262,7 +263,9 @@ button, input, select { font: inherit; color: inherit; }
 <!-- APP -->
 <div id="app">
   <div id="hdr">
-    <div class="hdr-mark">PX</div>
+    <div class="hdr-mark" role="img" aria-label="Ícone do Praxis">
+      <img src="../../installer/assets/icon.ico" alt="">
+    </div>
     <div class="hdr-id">
       <span class="hdr-title">Praxis</span>
       <span class="hdr-subtitle">Automação de faturamento hospitalar</span>
