@@ -122,10 +122,14 @@ RunRemessaProtocolo(params) {
     ; ── Fechamento ────────────────────────────────────────────
     if temDatas {
         stageStart := A_TickCount
-        Notify("Preenchendo datas...")
-        result := Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc)
+        Notify("Iniciando diretamente a ponte FecharEXMLOLD Parte 1 / Entrega de Remessas...")
+        if !Ffcv_PrepararEntregaPorProtocolo()
+            return RP_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
+        result := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true)
         if !result["ok"]
             return RP_Abort(result["erro"])
+        if !Ffcv_SairTelaEntregaPendente()
+            return RP_Abort("A tela Entrega de Remessas nao fechou apos o protocolo.")
         RP_RecordTiming(timings, "Fechar remessa + datas", stageStart, "remessa " result["remessa"])
         Progress(94)
         stageStart := A_TickCount

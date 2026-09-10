@@ -18,17 +18,93 @@
 #Include ..\..\..\lib\globals\mv\screens\FfcvScreen.ahk
 
 #Include FecharXmlParsers.ahk
-; FecharXmlRegistry.ahk já é carregado via ScriptRegistry.ahk →
-; FecharXmlRegistry.ahk → #Include FecharXml.ahk — não incluir novamente
-; para evitar ciclo FecharXml ↔ FecharXmlRegistry.
+; FecharXmlRegistry.ahk é apenas o shim de compatibilidade do módulo.
+; O Dispatcher carrega este arquivo diretamente; não incluir o registry
+; aqui para evitar ciclo FecharXml ↔ FecharXmlRegistry.
 
 RunFecharXML(params) {
-    global
-    ; Placeholder — lógica de orquestração será implementada
-    ;   1. Validar que TissXmlScreen gerou XML
-    ;   2. Confirmar envio na FfcvScreen
-    ;   3. Persistir estado em FecharXmlRegistry
-    ;   4. Retornar status consolidado
-    SendToUI(Map("type", "log", "message", "FecharXml: orchestrator placeholder chamado."))
-    return false
+    validation := FXML_ValidateParams(params)
+    if !validation["valid"] {
+        detail := ""
+        for _, errorText in validation["errors"]
+            detail .= (detail = "" ? "" : "; ") errorText
+        return MV_Abort("Parametros invalidos para fechar XML: " detail, true)
+    }
+
+    remessas := ParseListaCsv(params["remessas"])
+    dataEntrega := Trim(String(params["data_entrega"]))
+    dataVenc := Trim(String(params["data_vencimento"]))
+    fechar := FXML_OptionEnabled(params, "fechar", true)
+    gerarXml := FXML_OptionEnabled(params, "gerar_xml", true)
+    results := []
+
+    if !MV_EnsureFFCV()
+        return MV_Abort("FFCV nao ficou ativa para executar FecharEXML.", true)
+
+    ; Fluxo independente: FecharEXML.ahk. A impressao inicial e opcional
+    ; porque algumas telas do FFCV nao exibem Button9.
+    if (fechar && !FXML_ImprimirRelatorioInicial())
+        return MV_Abort("Nao foi possivel concluir a impressao inicial de atendimentos.", true)
+
+    if fechar {
+        for index, remessa in remessas {
+            ThrowIfAppStopped()
+            if !Ffcv_AbrirTelaEntregaRemessas()
+                return MV_Abort("Nao foi possivel abrir Entrega de Remessas para " remessa ".", true)
+
+            Notify("Fechando remessa " remessa " (" index "/" remessas.Length ")...")
+            entrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc)
+            if !entrega["ok"]
+                return MV_Abort(entrega["erro"], true)
+
+            results.Push(Map(
+                "success", true,
+                "remessaId", entrega["remessa"],
+                "xmlPath", ""
+            ))
+
+            if !Ffcv_SairTelaEntregaPendente()
+                return MV_Abort("A tela Entrega de Remessas nao fechou apos a remessa " remessa ".", true)
+        }
+    }
+
+    if gerarXml {
+        for _, remessa in remessas {
+            ThrowIfAppStopped()
+            Notify("Gerando XML da remessa " remessa "...")
+            xml := TissXml_Gerar(remessa)
+            if !xml["ok"]
+                return MV_Abort(xml["erro"], true)
+
+            results.Push(Map(
+                "success", true,
+                "xmlPath", xml["path"],
+                "remessaId", remessa
+            ))
+        }
+    }
+
+    summary := FXML_ParseFlowResult(results)
+    Done("FecharEXML concluído: " remessas.Length " remessa(s).")
+    return summary
+}
+
+FXML_ImprimirRelatorioInicial() {
+    button := MV_FirstControlByClass(MV_WIN_FFCV_ANY, "Button9")
+    if !button
+        return true
+
+    try ControlClick button,,,,, "NA"
+    catch
+        return false
+
+    if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
+        return false
+    reportButton := MV_FirstControlByClass(WIN_CAPA_REMESSA, "Button2")
+    if !reportButton
+        return false
+    try ControlClick reportButton,,,,, "NA"
+    catch
+        return false
+    return MV_WaitWindowGone(WIN_CAPA_REMESSA, MV_TIMEOUT_LOAD)
 }

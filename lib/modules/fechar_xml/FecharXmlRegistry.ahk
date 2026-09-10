@@ -12,7 +12,7 @@
 ;
 ; Padrão consistente com RPRegistry e ProtocolarRegistry: shim puro
 ; que inclui o módulo principal. FecharXml.ahk define RunFecharXML()
-; usado pelo Dispatcher.
+; usado pelo Dispatcher; o catálogo de scripts não inclui este registry.
 ;
 ; Consolidação 2026-09-09: FXML_Registry() removida (órfã — nunca
 ; chamada por ScriptRegistry/Dispatcher; o catálogo canônico de
