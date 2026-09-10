@@ -344,6 +344,16 @@ IsLeapYear(y) {
     return (Mod(y, 4) = 0 && Mod(y, 100) != 0) || Mod(y, 400) = 0
 }
 
+Dispatcher_FocusMacroWindow() {
+    for spec in ["ahk_exe ifrun60.EXE", "ahk_exe EXECUTASQL.exe"] {
+        if WinExist(spec) {
+            try WinActivate spec
+            return true
+        }
+    }
+    return false
+}
+
 StopScript() {
     wasRunning := IsAppRunning()
 
@@ -360,6 +370,7 @@ StopScript() {
     }
 
     RequestAppStop()
+    Dispatcher_FocusMacroWindow()
     DispatchLog("info", "route_stop", Map("was_running", true))
     SendToUI(Map("type","status","message","Interrompendo...","running",true))
 }

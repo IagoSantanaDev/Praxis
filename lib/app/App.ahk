@@ -64,7 +64,7 @@ App_Run() {
     if !FileExist(webViewLoader)
         throw Error("WebView2Loader.dll nao encontrado em: " . webViewLoader)
 
-    gMainGui := Gui("+Resize +MinSize640x460", "Praxis")
+    gMainGui := Gui("-Resize -MaximizeBox", "Praxis")
     gMainGui.BackColor := "0xD4D0C8"
     gMainGui.OnEvent("Close", OnAppClose)
     gMainGui.OnEvent("Size",  OnGuiResize)
