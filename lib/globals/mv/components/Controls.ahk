@@ -314,16 +314,31 @@ MV_SetTextByClick(winTitle, x, y, value, clear := true) {
     if !MV_EnsureWindowActive(winTitle)
         return false
 
+    before := MV_CaptureScreenState(winTitle)
     Click(x + 15, y + 8, 1)
-    Sleep MV_KEY_SETTLE_MS
+    if !MV_WaitScreenChanged(before, MV_KEY_SETTLE_MS * 10, winTitle)
+        return false
+    if !MV_WaitScreenStable(winTitle, MV_KEY_SETTLE_MS, MV_KEY_SETTLE_MS * 20)
+        return false
 
     if (clear) {
+        before := MV_CaptureScreenState(winTitle)
         Send "{Home}"
         Send "^+{End}"
         Send "{Backspace}"
-        Sleep MV_KEY_SETTLE_MS
+        if !MV_WaitScreenChanged(before, MV_KEY_SETTLE_MS * 10, winTitle)
+            return false
+        if !MV_WaitScreenStable(winTitle, MV_KEY_SETTLE_MS, MV_KEY_SETTLE_MS * 20)
+            return false
     }
 
+    before := MV_CaptureScreenState(winTitle)
     SendText value
-    return true
+    if !MV_WaitScreenChanged(before, MV_KEY_SETTLE_MS * 10, winTitle)
+        return false
+    if !MV_WaitScreenStable(winTitle, MV_KEY_SETTLE_MS, MV_KEY_SETTLE_MS * 20)
+        return false
+    try return Trim(ControlGetText(classNN, winTitle)) = Trim(String(value))
+    catch
+        return true
 }

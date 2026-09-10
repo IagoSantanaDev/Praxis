@@ -81,7 +81,6 @@ Popup_DismissActiveModal() {
 
     try {
         WinActivate popup
-        Sleep MV_DELAY_INPUT
 
         if !MV_Poll(() => Popup_FirstControlByClass(popup, MV_MODAL_OK_CLASS) != 0, 5) {
             MV_Log("Popup_DismissActiveModal",

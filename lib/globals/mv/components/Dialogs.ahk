@@ -68,7 +68,6 @@ Dialog_DismissMovDocPopup() {
         }
 
         WinActivate DIALOG_MOVDOC_POPUP
-        Sleep MV_DELAY_INPUT
 
         if !MV_Poll(() => Popup_FirstControlByClass(DIALOG_MOVDOC_POPUP, MV_MODAL_OK_CLASS) != 0, 5) {
             MV_Log("Dialog_DismissMovDocPopup", "OK botao nao ficou disponivel", false)

@@ -20,6 +20,7 @@ CoordMode("Mouse", "Client")
 ; ── Dependências ─────────────────────────────────────────────
 #Include %A_LineFile%\..\MVConstants.ahk
 #Include %A_LineFile%\..\components\Controls.ahk
+#Include %A_LineFile%\..\MVSync.ahk
 
 ; ════════════════════════════════════════════════════════════════
 ;  API PÚBLICA
