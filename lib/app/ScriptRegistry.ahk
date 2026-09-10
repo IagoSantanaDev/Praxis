@@ -90,7 +90,7 @@ ValidateScripts(scripts) {
         throw Error("gScripts deve ser Array.")
 
     ids := Map()
-    allowedTypes := Map("text", true, "select", true, "date", true)
+    allowedTypes := Map("text", true, "select", true, "date", true, "checkbox", true)
 
     for script in scripts {
         if !(script is Map)
@@ -164,6 +164,11 @@ ValidateScripts(scripts) {
             obrigatorio := param["obrigatorio"]
             if !(obrigatorio = true || obrigatorio = false)
                 throw Error("Campo obrigatorio deve ser booleano em script " . id . ": " . paramId)
+
+            if (tipo = "checkbox") {
+                if param.Has("padrao") && !(param["padrao"] = true || param["padrao"] = false)
+                    throw Error("Padrao checkbox deve ser booleano em script " . id . ": " . paramId)
+            }
 
             if (tipo = "date") {
                 if !param.Has("format")
