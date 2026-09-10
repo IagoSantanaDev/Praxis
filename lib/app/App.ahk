@@ -53,21 +53,17 @@ App_Run() {
     if !IsSet(gRoot) || Trim(gRoot) = ""
         throw Error("gRoot nao inicializado. Verifique main.ahk antes de App_Run().")
 
-    ; Le o WorkDir configurado pelo installer
-    gWorkDir := IniRead(A_ScriptDir "\config.ini", "Paths", "WorkDir",
-                        A_MyDocuments "\Praxis")
-
-    if !DirExist(gWorkDir)
-        DirCreate gWorkDir
+    ; Inicializa o diretório fixo de logs em Documentos\Praxis.
+    gWorkDir := Config_GetPath("WorkDir")
 
     webViewLoader := gRoot "\lib\vendor\" (A_PtrSize * 8) "bit\WebView2Loader.dll"
     if !FileExist(webViewLoader)
         throw Error("WebView2Loader.dll nao encontrado em: " . webViewLoader)
 
-    ; A janela usa o mesmo ícone 256px do instalador quando executada a partir do
-    ; código-fonte. No EXE compilado, o recurso /icon do Ahk2Exe já é a fonte
+    ; A janela usa o ícone compartilhado do pacote quando executada a partir do
+    ; código-fonte. No EXE compilado, o recurso /icon do Ahk2Exe é a fonte
     ; embutida e permanece como fallback.
-    appIconPath := gRoot "\installer\assets\icon.ico"
+    appIconPath := gRoot "\assets\icon.ico"
     if FileExist(appIconPath)
         TraySetIcon(appIconPath)
 
@@ -220,11 +216,48 @@ CleanupApp() {
     } catch as e {
         OutputDebug "[App] CleanupApp falhou: " . e.Message
     } finally {
+        TerminatePraxisAhkProcesses()
         ClearAppStop()
         gExitAfterStop := false
         gExitDeadline  := 0
         gWebView := ""
         gController := ""
+    }
+}
+
+; Encerra somente processos AutoHotkey que estejam executando um .ahk
+; localizado dentro da raiz desta instalação/desenvolvimento do Praxis.
+; O processo atual é excluído para que o chamador possa executar ExitApp
+; normalmente depois da limpeza.
+TerminatePraxisAhkProcesses() {
+    global gRoot
+
+    if !IsSet(gRoot) || Trim(gRoot) = ""
+        return
+
+    currentPid := DllCall("GetCurrentProcessId")
+    rootMarker := StrLower(StrReplace(RTrim(Trim(gRoot), "\/"), "/", "\")) . "\"
+
+    try {
+        wmi := ComObjGet("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
+        for process in wmi.ExecQuery("SELECT ProcessId, Name, CommandLine FROM Win32_Process") {
+            pid := Integer(process.ProcessId)
+            if (pid = currentPid)
+                continue
+
+            commandLine := StrLower(StrReplace(String(process.CommandLine), "/", "\"))
+            if !InStr(commandLine, rootMarker) || !InStr(commandLine, ".ahk")
+                continue
+
+            try {
+                process.Terminate()
+                OutputDebug "[App] Processo AHK do Praxis encerrado: PID " . pid
+            } catch as e {
+                OutputDebug "[App] Nao foi possivel encerrar PID " . pid . ": " . e.Message
+            }
+        }
+    } catch as e {
+        OutputDebug "[App] Falha ao enumerar processos AHK do Praxis: " . e.Message
     }
 }
 

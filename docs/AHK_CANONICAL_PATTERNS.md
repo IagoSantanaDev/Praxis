@@ -309,7 +309,7 @@ Esta seção complementa os contratos de interação com as famílias identifica
 
 - `lib/app/ScriptRegistry.ahk` é o **catálogo canônico**: `gScripts` registra os três scripts e `ValidateScripts` valida `Array`/`Map`, IDs, tipos (`text`, `select`, `date`), formatos e opções. Não duplicar o catálogo nos registries de módulo.
 - `RPRegistry.ahk`, `ProtocolarRegistry.ahk` e `FecharXmlRegistry.ahk` são shims de `#Include`, não registros paralelos. `FecharXmlRegistry.ahk` documenta que `FXML_Registry()` foi removida por ser órfã; não reintroduzi-la.
-- `lib/config/Settings.ahk` é a fonte única para `config.ini`, com cache `gSettingsCache`; não criar leituras diretas concorrentes sem justificativa de compatibilidade.
+- `lib/config/Paths.ahk` é a fonte única para os diretórios de Documentos, logs e XMLs; não criar resoluções diretas concorrentes sem justificativa de compatibilidade.
 - `lib/globals/mv/FFCV_ErrorTemplates.ahk` é o registro canônico de referências visuais/OCR. Artefatos gerados podem ser embutidos no build; `test_macros/13_ffcv_error_popup_detect.ahk` continua ferramenta de diagnóstico, não registry.
 
 Antes de remover símbolo, provar com `rg` todos os callers em `lib/`, `main.ahk`, `tools/` e `test_macros/`, incluindo includes e chamadas indiretas pelo `Dispatcher`. A ausência de chamada não autoriza remover shim que seja include do catálogo.

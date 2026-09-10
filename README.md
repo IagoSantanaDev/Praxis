@@ -14,12 +14,11 @@ Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão
 | Interface UI | WebView2 (Chromium) + HTML/CSS/JS puro |
 | Comunicação JS↔AHK | `PostWebMessageAsJson` / `window.chrome.webview.postMessage` |
 | Automação do MV | AutoHotkey v2 — Send, ControlClick, OCR local + Clipboard |
-| Configuração | `config.ini` (IniRead/IniWrite) |
+| Configuração | Caminhos fixos em `Documentos` |
 
 **Dependências para desenvolvimento:**
 - AutoHotkey v2 → [autohotkey.com](https://autohotkey.com)
-- Ahk2Exe → instalado junto ao AutoHotkey ou pelo instalador oficial
-- Inno Setup 6 → necessário para gerar instalador
+- Ahk2Exe → ferramenta de build disponível no ambiente de desenvolvimento
 - WebView2 Runtime → necessário para executar a interface WebView2
 
 ---
@@ -30,16 +29,13 @@ O build E2E é feito por `tools/build-praxis.ps1`. Os comandos mais comuns:
 
 | Comando | Saída |
 |---|---|
-| `tools\build-praxis.ps1 -Version X.Y.Z` | `dist\Praxis-X.Y.Z\stage\Praxis.exe` + instalador |
-| `tools\build-praxis.ps1 -Version X.Y.Z -SkipInstaller` | Apenas EXE + distribuição portátil |
-| `tools\build-praxis.ps1 -Version X.Y.Z -Release` | Build com assinatura, compressão e instalador |
+| `tools\build-praxis.ps1 -Version X.Y.Z` | EXE + distribuição portátil + ZIP |
+| `tools\build-praxis.ps1 -Version X.Y.Z -Release` | Build portátil com assinatura e compressão |
 
 Saídas geradas:
 - `dist\Praxis-<ver>\stage\Praxis.exe` — EXE compilado (sem .ahk)
-- `dist\Praxis-<ver>\distribution\` — pasta portátil (sem instalador)
+- `dist\Praxis-<ver>\distribution\` — pasta portátil
 - `dist\Praxis-<ver>\Praxis-Portable-<ver>.zip` — ZIP portátil pronto para uso
-- `dist\Praxis-<ver>\installer\Praxis-Setup-<ver>.exe` — instalador Inno Setup
-- `dist\Praxis-<ver>\delivery\` — pacote sanitizado final
 - `dist\Praxis-<ver>\Praxis-build-manifest.json` — SHA256 de cada artefato
 
 Validação de integridade em runtime: `Praxis.exe --integrity-check` (exit 0 = OK, 70 = recurso ausente/alterado).
@@ -62,7 +58,6 @@ powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
 Praxis/
 ├── main.ahk                       # Entry point: shell mínimo com App_Run()
 ├── cli-check.ahk                  # CLI para --integrity-check (sem GUI)
-├── config.ini                     # Configuração local (gerado pelo instalador)
 ├── lib/                           # TODO o código de script (AHK v2)
 │   ├── app/                       # Estado e bootstrap da aplicação
 │   │   ├── App.ahk                # App_Run() e shell WebView2
@@ -71,8 +66,7 @@ Praxis/
 │   │   └── ScriptRegistry.ahk     # Registry dos 3 módulos de faturamento
 │   ├── config/                    # Configuração, segredos e caminhos
 │   │   ├── Secrets.ahk            # DPAPI: API key (cache Map())
-│   │   ├── Settings.ahk           # IniRead/IniWrite: config.ini (cache Map())
-│   │   └── Paths.ahk              # WorkDir, XML dir (cache Map())
+│   │   └── Paths.ahk              # Documentos, logs e XMLs (cache Map())
 │   ├── ui/
 │   │   ├── index.html             # Interface WebView2 completa
 │   │   ├── UiBridge.ahk           # Ponte WebView2 → AHK (window.chrome.webview)
@@ -102,11 +96,10 @@ Praxis/
 │       ├── remessa_protocolo/    # Download de protocolos MOV DOC → FFCV
 │       ├── protocolar/           # Protocolação de contas
 │       └── fechar_xml/           # Fechamento e geração TISS XML
-├── installer/                    # Inno Setup
-│   ├── Praxis.iss                # Script do instalador
-│   └── assets/                   # Ícone e banners do wizard
+├── assets/                       # Recursos externos do aplicativo
+│   └── icon.ico                  # Ícone usado pelo EXE e pela UI
 ├── tools/                        # Scripts de build
-│   ├── build-praxis.ps1          # Build E2E (EXE + instalador + delivery)
+│   ├── build-praxis.ps1          # Build E2E da distribuição portátil
 │   ├── build-ocr-error-references.ps1 # Regenera FFCV_ErrorReferences.json
 │   ├── find-top-level-calls.ps1   # Sanity check anti double-execution (wired into build)
 │   └── ocr-probe.ps1             # Prova OCR contra MV (debug)
@@ -118,7 +111,7 @@ Arquivos gerados em build (NÃO versionados, em `.gitignore`):
 - `build/generated/Praxis_Ui.ahk` — `ui/index.html` em Base64 (embarcado no EXE)
 - `build/generated/Praxis_OcrReferences.ahk` — `FFCV_ErrorReferences.json` em Base64
 - `build/generated/Praxis_OcrProbe.ahk` — `ocr-probe.ps1` em Base64
-- `dist/Praxis-<ver>/` — pasta de release com EXE, instalador e delivery
+- `dist/Praxis-<ver>/` — pasta de release portátil
 
 ---
 
@@ -147,32 +140,20 @@ Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
 
 ## Instalação (Desenvolvimento)
 
-1. Clonar ou copiar pasta `Praxis/` para o computador
-2. Criar `config.ini` com:
-   ```ini
-   [Paths]
-   WorkDir=C:\Users\<usuario>\Documents\Praxis
-   ```
-3. Criar pasta `%DOCUMENTS%\Praxis\XML\`
-4. Duplo clique em `main.ahk`
+1. Clonar ou copiar a pasta `Praxis/` para qualquer diretório
+2. Duplo clique em `main.ahk` ou execute o EXE compilado
+3. Os logs serão gravados em `%USERPROFILE%\Documents\Praxis`
+4. Os XMLs serão gravados em `%USERPROFILE%\Documents\XML`
 
 > **Nota:** As bibliotecas externas (p.ex. `lib/vendor/WebView2.ahk`) já estão incluídas no repositório — não é necessário baixá-las manualmente.
 
 ---
 
-## Instalação (Produção)
+## Execução (Produção)
 
-O pacote de produção é gerado pelo script de build e pelo instalador Inno Setup do projeto. Para testes controlados, o build também cria a pasta `dist\Praxis-<versão>\delivery\` com o instalador e os documentos legais, e a pasta `dist\Praxis-<versão>\distribution\` com a versão portátil para computadores que não aceitam instalador, sem expor `.ahk`, `.ps1`, `.html` ou `.json`.
+O pacote de produção é portátil: extraia `Praxis-Portable-<versão>.zip` em qualquer diretório e execute `Praxis.exe`. O pacote não instala arquivos, não cria atalhos e não depende de Inno Setup.
 
-Para gerar e validar builds, consulte a seção [Build e Distribuição](#build-e-distribuição) acima.
-
-O instalador:
-- instala em `%LOCALAPPDATA%\Programs\Praxis\` sem exigir privilégios elevados por padrão;
-- cria `%DOCUMENTS%\Praxis\` automaticamente;
-- grava `WorkDir` no `config.ini`;
-- cria atalhos no Menu Iniciar e, opcionalmente, na Área de Trabalho;
-- instala os recursos de runtime necessários do Praxis;
-- tenta instalar o Microsoft Edge WebView2 Runtime se ele não estiver presente.
+Os logs ficam em `%USERPROFILE%\Documents\Praxis`. A planilha de envio fica em `%USERPROFILE%\Documents\Envio.CSV`. Os XMLs TISS são gravados em `%USERPROFILE%\Documents\XML`. O WebView2 Runtime continua sendo um pré-requisito do Windows para a interface.
 
 ---
 
@@ -207,7 +188,7 @@ O MV2000i roda sobre **Oracle Forms 6i (`ifrun60.EXE`)**.
 
 ### D006 — Exceção lib/vendor/ no .gitignore
 
-A pasta `lib/vendor/` é **distribuída** no pacote de produção (contém `WebView2.ahk`, necessária em runtime). O `.gitignore` padrão ignora `vendor/` por convenção upstream; por isso, as negações explícitas `!lib/vendor/32bit/` e `!lib/vendor/64bit/` garantem que as DLLs WebView2Loader sejam rastreadas e incluídas no instalador, sem ser silenciadas por padrões genéricos upstream.
+A pasta `lib/vendor/` é **distribuída** no pacote de produção (contém `WebView2.ahk`, necessária em runtime). O `.gitignore` padrão ignora `vendor/` por convenção upstream; por isso, as negações explícitas `!lib/vendor/32bit/` e `!lib/vendor/64bit/` garantem que as DLLs WebView2Loader sejam rastreadas e incluídas no pacote portátil, sem serem silenciadas por padrões genéricos upstream.
 
 ---
 

@@ -8,9 +8,8 @@
 #   - Praxis-Portable-<version>.zip  (pronto para uso)
 #   - SHA256SUMS.txt                 (hash do ZIP)
 #
-# Não precisa de instalador (Inno Setup) nem de certificado de code
-# signing: o modo -Release (assinado, endurecido) é feito manualmente
-# na máquina de build local com tools/build-praxis.ps1 -Release.
+# O workflow gera somente a distribuição portátil e o ZIP. O modo -Release
+# (assinado e endurecido) é feito manualmente na máquina de build local.
 #
 # Permissão contents: write é necessária para criar/atualizar releases.
 name: release-portable

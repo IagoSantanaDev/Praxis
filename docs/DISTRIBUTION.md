@@ -2,7 +2,7 @@
 
 > Runbook interno para gerar, validar e entregar builds do Praxis.
 
-Este documento é para quem mantém o Praxis e precisa produzir um pacote instalável ou um executável de teste. Ao final da leitura, a pessoa deve conseguir escolher o tipo de build correto, executar o comando, localizar os artefatos e validar o resultado antes de entregar.
+Este documento é para quem mantém o Praxis e precisa produzir um pacote portátil ou um executável de teste. Ao final da leitura, a pessoa deve conseguir executar o build, localizar os artefatos e validar o resultado antes de entregar.
 
 ## Visão geral
 
@@ -12,22 +12,19 @@ O build do Praxis transforma o projeto AutoHotkey em um pacote distribuível par
 - embute no executável um manifesto de integridade dos recursos externos;
 - copia para o staging apenas os recursos necessários em runtime;
 - bloqueia vazamento de arquivos fonte/script no pacote final;
-- gera manifestos SHA-256 do pacote e do instalador;
-- opcionalmente assina o executável e o instalador;
-- opcionalmente gera o instalador Inno Setup.
+- gera manifesto SHA-256 do pacote;
+- opcionalmente assina o executável.
 
 O build reduz exposição casual do código-fonte, mas não é DRM inviolável. AutoHotkey compilado, compressão, assinatura e hashes aumentam o custo de adulteração/inspeção casual; não impedem engenharia reversa profissional.
 
 ## Pré-requisitos da máquina de build
 
-Para build completo com instalador:
+Para build portátil:
 
 - Windows 64-bit;
 - PowerShell;
 - AutoHotkey v2 instalado;
 - Ahk2Exe disponível;
-- Inno Setup 6 instalado;
-- assets do instalador presentes;
 - recursos de runtime presentes: UI HTML, imagens de erro e WebView2Loader 64-bit.
 
 Para release assinado:
@@ -50,25 +47,13 @@ powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 `
 Características:
 
 - gera `Praxis.exe`;
-- gera instalador Inno Setup;
+- gera a pasta de distribuição e o ZIP portátil;
 - não exige assinatura digital;
 - não força compressão Ahk2Exe;
 - registra no manifesto se a árvore Git estava suja;
 - não deve ser tratado como release de produção.
 
 Se o build avisar que assinatura digital está desabilitada, isso é esperado em build de teste. Para release, use o modo `-Release`.
-
-### Build de teste sem instalador
-
-Use apenas quando quiser validar compilação e staging sem gerar instalador.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 `
-  -Version 9.9.18-test `
-  -SkipInstaller
-```
-
-Esse modo não serve para validar distribuição completa, porque não exercita o script Inno Setup nem o empacotamento final.
 
 ### Build com assinatura obrigatória
 
@@ -98,15 +83,10 @@ O modo `-Release` força:
 
 - assinatura digital obrigatória;
 - compressão Ahk2Exe;
-- geração de instalador;
 - working tree Git limpa;
 - metadados de release no manifesto.
 
-Bloqueios esperados:
-
-```text
-Release endurecido não permite -SkipInstaller. Gere e valide o instalador.
-```
+O build não gera instalador e não possui modo alternativo instalável.
 
 ```text
 Release endurecido bloqueado: working tree sujo. Commit/stash antes de gerar release ou use -AllowDirty para registrar exceção explícita.
@@ -136,35 +116,25 @@ Certificado autoassinado é útil para testes e ambiente interno controlado, mas
 
 ## Artefatos gerados
 
-Para a versão `1.0.0`, o build completo gera:
+Para a versão `1.0.0`, o build gera:
 
 ```text
 dist\Praxis-1.0.0\stage\Praxis.exe
-dist\Praxis-1.0.0\stage\Praxis-build-manifest.json
-dist\Praxis-1.0.0\installer\Praxis-Setup-1.0.0.exe
 dist\Praxis-1.0.0\Praxis-build-manifest.json
-dist\Praxis-1.0.0\Praxis-installer-manifest.json
-dist\Praxis-1.0.0\distribution\                      — pasta portátil (sem instalador)
+dist\Praxis-1.0.0\distribution\                      — pasta portátil
 dist\Praxis-1.0.0\Praxis-Portable-1.0.0.zip       — ZIP portátil pronto para uso
 ```
 
 O staging inclui recursos necessários para runtime (WebView2Loader 64-bit e documentos de licença/aviso da raiz). O staging não deve conter `.ahk`, `.ps1` ou `.iss` — nem o `cli-check.ahk`, que deixou de ser distribuído (o EXE faz o check internamente, ver seção de integridade).
 
-Para levar o pacote a outro PC, normalmente use apenas o instalador:
-
-```text
-Praxis-Setup-<versão>.exe
-```
-
-A pasta `stage` é útil para validação técnica, mas não é o pacote de entrega preferencial.
+Para levar o pacote a outro PC, extraia o ZIP portátil e execute `Praxis.exe`. A pasta `stage` é útil para validação técnica, mas o ZIP é o pacote de entrega preferencial.
 
 ## Validação pós-build
 
-Depois de gerar um build completo, valide pelo menos:
+Depois de gerar um build, valide pelo menos:
 
 1. o executável existe;
-2. o instalador existe (quando gerado);
-3. o ZIP portátil existe e tem o conteúdo esperado;
+2. o ZIP portátil existe e tem o conteúdo esperado;
 4. os hashes do manifesto conferem com os arquivos em disco;
 5. não há fonte AutoHotkey no staging;
 6. o modo de integridade do EXE retorna `0`.
@@ -175,7 +145,6 @@ Exemplo:
 $root = "dist\Praxis-9.9.18-test"
 $stage = Join-Path $root "stage"
 $exe = Join-Path $stage "Praxis.exe"
-$setup = Join-Path $root "installer\Praxis-Setup-9.9.18-test.exe"
 $zip = Join-Path $root "Praxis-Portable-9.9.18-test.zip"
 
 $proc = Start-Process -FilePath $exe -ArgumentList "--integrity-check" -WorkingDirectory $stage -Wait -PassThru
@@ -183,7 +152,6 @@ $sourceLeaks = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object
 
 [pscustomobject]@{
   IntegrityExit        = $proc.ExitCode
-  SetupExists          = Test-Path -LiteralPath $setup
   ExeExists            = Test-Path -LiteralPath $exe
   ZipExists            = Test-Path -LiteralPath $zip
   WebView2LoaderExists = Test-Path -LiteralPath (Join-Path $stage "lib\vendor\64bit\WebView2Loader.dll")
@@ -195,7 +163,6 @@ Resultado esperado:
 
 ```text
 IntegrityExit        : 0
-SetupExists          : True
 ExeExists            : True
 ZipExists            : True
 WebView2LoaderExists : True
@@ -223,11 +190,11 @@ O `cli-check.ahk` permanece na raiz do repositório apenas como helper de dev mo
 
 ## Dependências no PC de destino
 
-O instalador atual é voltado para Windows 64-bit.
+O aplicativo portátil é voltado para Windows 64-bit.
 
 O PC de destino não precisa ter AutoHotkey instalado. O runtime AutoHotkey vai dentro do `Praxis.exe` compilado.
 
-O PC de destino precisa ter Microsoft Edge WebView2 Runtime. Se o runtime não estiver presente, o instalador tenta baixar e executar o bootstrapper Evergreen da Microsoft durante a instalação.
+O PC de destino precisa ter Microsoft Edge WebView2 Runtime. O runtime deve ser disponibilizado previamente pela política de software do ambiente.
 
 O aplicativo também depende da validação de acesso em runtime pela API configurada no cliente. Se a rede do ambiente bloquear essa chamada, o build online atual não conseguirá validar novos acessos.
 
@@ -239,9 +206,8 @@ Não distribua:
 
 - arquivos `.ahk` fonte;
 - scripts `.ps1` de build;
-- scripts `.iss` do instalador;
 - `.pfx`, senhas, chaves privadas ou tokens;
-- `config.ini` de desenvolvimento;
+- arquivos de configuração com dados específicos de desenvolvimento;
 - logs, dumps, XMLs reais ou evidências locais de teste.
 
 O script de build já bloqueia vazamento de `.ahk`, `.ps1` e `.iss` no staging. Ainda assim, valide antes de entregar.
@@ -251,7 +217,7 @@ O script de build já bloqueia vazamento de `.ahk`, `.ps1` e `.iss` no staging. 
 Para build de teste:
 
 - [ ] comando de build concluiu sem erro;
-- [ ] instalador foi gerado;
+- [ ] ZIP portátil foi gerado;
 - [ ] integridade retorna `0`;
 - [ ] staging não contém fonte AutoHotkey;
 - [ ] versão de teste está clara no nome do pacote;
@@ -261,10 +227,10 @@ Para release:
 
 - [ ] `-Release` foi usado;
 - [ ] certificado correto foi usado;
-- [ ] assinatura do EXE e do instalador foi validada;
+- [ ] assinatura do EXE foi validada;
 - [ ] working tree estava limpa ou `-AllowDirty` foi justificado;
-- [ ] manifestos foram preservados;
-- [ ] hash SHA-256 do instalador foi registrado;
+- [ ] manifesto foi preservado;
+- [ ] hash SHA-256 do ZIP foi registrado;
 - [ ] pacote foi testado em máquina limpa ou VM compatível.
 
 ## Release automático (GitHub Actions)
@@ -272,7 +238,7 @@ Para release:
 A cada push na branch `main`, o workflow `.github/workflows/release.yml` roda em `windows-latest` e:
 
 1. baixa os zips oficiais do AutoHotkey v2 e do Ahk2Exe (sem instalar nada no runner);
-2. executa `tools/publish-release.ps1`, que roda `build-praxis.ps1 -SkipInstaller` e gera o ZIP portátil;
+2. executa `tools/publish-release.ps1`, que roda `build-praxis.ps1` e gera o ZIP portátil;
 3. publica/atualiza o **GitHub Release rolling** com tag `continuous` (marcado como Latest):
    - `Praxis-Portable-<versão>.zip`;
    - `SHA256SUMS.txt` (hash SHA-256 do ZIP).
@@ -283,7 +249,7 @@ Publicação manual local (após `gh auth login`):
 powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
 ```
 
-O release rolling não exige certificado de code signing nem Inno Setup. Para release assinado e com instalador, continue usando `build-praxis.ps1 -Release` na máquina de build local.
+O release rolling não exige certificado de code signing. Para release assinado, use `build-praxis.ps1 -Release` na máquina de build local.
 
 ## Proteção jurídica e limites técnicos
 

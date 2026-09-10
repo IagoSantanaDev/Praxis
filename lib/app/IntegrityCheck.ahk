@@ -13,7 +13,11 @@
 ;   #Include *i build\generated\Praxis_IntegrityManifest.ahk  (reatribui o Map com hashes reais)
 
 LogWrite(msg) {
-    logPath := A_ScriptDir "\praxis-integrity.log"
+    logDir := A_MyDocuments "\Praxis"
+    if !DirExist(logDir)
+        DirCreate logDir
+
+    logPath := logDir "\praxis-integrity.log"
     FileAppend msg "`n", logPath
 }
 

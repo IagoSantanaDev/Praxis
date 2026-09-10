@@ -95,4 +95,4 @@ Antes de qualquer distribuição comercial ou externa, confirme com revisão té
 - obrigações exatas da licença AutoHotkey/Ahk2Exe no modelo de executável gerado;
 - requisitos de distribuição do Microsoft Edge WebView2 Runtime/WebView2Loader;
 - se o pacote final inclui todos os notices e textos de licença exigidos;
-- se o instalador apresenta ou disponibiliza adequadamente os avisos de terceiros.
+- se o pacote portátil apresenta ou disponibiliza adequadamente os avisos de terceiros.

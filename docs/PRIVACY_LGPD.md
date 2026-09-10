@@ -25,7 +25,7 @@ O Praxis deve ser utilizado com observância aos seguintes princípios:
 É proibido commitar, publicar, compartilhar ou enviar para repositórios, chats, ferramentas de IA, serviços online ou ambientes não autorizados:
 
 - credenciais, senhas, tokens, chaves ou arquivos de configuração sensíveis;
-- `config.ini`, `.env`, logs e dumps;
+- logs e dumps;
 - prints de sistemas hospitalares com dados reais;
 - nomes de pacientes, CPF, cartão SUS, convênios, matrículas ou identificadores;
 - XMLs reais, guias, contas, protocolos ou relatórios contendo dados reais;

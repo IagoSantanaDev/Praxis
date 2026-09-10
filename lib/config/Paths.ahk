@@ -13,7 +13,7 @@
 Config_GetPath(name) {
     static cache := Map()
 
-    ; Cache para evitar múltiplas leituras de config.ini
+    ; Cache para evitar múltiplas resoluções de caminho.
     if cache.Has(name)
         return cache[name]
 
@@ -21,16 +21,18 @@ Config_GetPath(name) {
 
     switch name {
         case "WorkDir":
-            ; Lê do config.ini configurado pelo installer; fallback para padrão
-            path := IniRead(baseDir "\config.ini", "Paths", "WorkDir",
-                            A_MyDocuments "\Praxis")
-            ; Garante que o diretório existe
-            if !InStr(path, ".\") and !FileExist(path) {
-                try DirCreate(path)
-            }
+            ; Logs do aplicativo ficam separados dos XMLs gerados.
+            path := A_MyDocuments "\Praxis"
+            if !DirExist(path)
+                DirCreate(path)
 
         case "Documents":
             path := A_MyDocuments
+
+        case "XmlDir":
+            path := A_MyDocuments "\XML"
+            if !DirExist(path)
+                DirCreate(path)
 
         case "VendorDir":
             path := baseDir "\lib\vendor"

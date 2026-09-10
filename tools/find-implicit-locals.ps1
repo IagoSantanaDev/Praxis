@@ -5,8 +5,8 @@
 # In AutoHotkey v2, a function that assigns to a variable WITHOUT first
 # declaring `global X` silently creates an empty LOCAL — the global is
 # never touched. Reads of globals are fine; assignments are the bug.
-# Same bug class as the App.ahk (gExitAfterStop) and Settings.ahk
-# (gSettingsCache) fixes that motivated this tool.
+# Same bug class as the App.ahk (gExitAfterStop) fixes that motivated
+# this tool.
 #
 # What counts as an assignment:
 #   X := value

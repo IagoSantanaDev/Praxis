@@ -179,7 +179,7 @@ TissXml_Gerar(numRemessa)
     Gera o arquivo XML TISS para a remessa informada.
     Abre a tela XML/TISS, preenche o numero da remessa, aciona
     Faturamento, espera o formulario de caminho, salva o XML em
-    gWorkDir\XML\<numRemessa>.xml e volta para a tela principal.
+    Documentos\XML\<numRemessa>.xml e volta para a tela principal.
 
     Parametros:
         numRemessa (inteiro) — numero da remessa MovDoc.
@@ -195,8 +195,6 @@ TissXml_Gerar(numRemessa)
         por versoes com ClassNN validados.
 */
 TissXml_Gerar(numRemessa) {
-    global gWorkDir
-
     if !Ffcv_AbrirTelaTISS()
         return Map("ok", false, "erro", "Erro: tela XML/TISS nao abriu via Ffcv_AbrirTelaTISS.")
 
@@ -217,9 +215,7 @@ TissXml_Gerar(numRemessa) {
     if !faturamento["ok"]
         return Map("ok", false, "erro", "Formulario de caminho nao abriu apos Faturamento: " faturamento["erro"])
 
-    xmlDir := gWorkDir "\XML"
-    if !DirExist(xmlDir)
-        DirCreate xmlDir
+    xmlDir := Config_GetPath("XmlDir")
     xmlPath := xmlDir "\" numRemessa ".xml"
 
     if !TissXml_SetTextByClickAt(WIN_XML_PATH_FORM, XML_FORM_CAMPO_PATH_X, XML_FORM_CAMPO_PATH_Y, xmlPath)

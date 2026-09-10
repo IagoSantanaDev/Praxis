@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-Build de release do Praxis: compila AutoHotkey para EXE, prepara staging sem fonte e gera instalador.
+Build portátil do Praxis: compila AutoHotkey para EXE e gera ZIP pronto para uso.
 
 .DESCRIPTION
 Este script reduz a exposição do código-fonte ao distribuir somente o executável compilado,
@@ -8,15 +8,12 @@ recursos necessários, documentos legais e manifesto de hashes. Isso NÃO é cri
 nem impede engenharia reversa por atacante determinado; é uma camada técnica dentro de uma
 estratégia maior com registro, contrato, assinatura, hashes e controle de distribuição.
 
-Pré-requisitos para build completo:
+Pré-requisitos para build:
 - AutoHotkey v2 instalado.
-- Ahk2Exe instalado ou use -InstallAhk2Exe para acionar o instalador oficial do AutoHotkey.
-- Inno Setup 6 instalado para gerar o instalador, salvo se usar -SkipInstaller.
+- Ahk2Exe disponível no ambiente de build ou informado por parâmetro.
 
 Exemplos:
   powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -InstallAhk2Exe
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -SkipInstaller
   powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -RequireCodeSigning
   powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -Release
 #>
@@ -28,10 +25,6 @@ param(
 
     [string]$Ahk2ExePath,
     [string]$AutoHotkeyBasePath,
-    [string]$InnoSetupPath,
-
-    [switch]$InstallAhk2Exe,
-    [switch]$SkipInstaller,
     [switch]$Compress,
     [switch]$Release,
     [switch]$AllowDirty,
@@ -50,21 +43,16 @@ $ErrorActionPreference = 'Stop'
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $MainScript = Join-Path $ProjectRoot 'main.ahk'
-$InstallerScript = Join-Path $ProjectRoot 'installer\Praxis.iss'
 $ImagesDir = Join-Path $ProjectRoot 'images'
 $UiDir = Join-Path $ProjectRoot 'lib\ui'
 $UiIndexPath = Join-Path $UiDir 'index.html'
 $OcrReferencesPath = Join-Path $ProjectRoot 'lib\globals\mv\FFCV_ErrorReferences.json'
 $OcrProbePath = Join-Path $ProjectRoot 'tools\ocr-probe.ps1'
-$InstallerAssetsDir = Join-Path $ProjectRoot 'installer\assets'
-$AppIconPath = Join-Path $InstallerAssetsDir 'icon.ico'
-$WizardBannerPath = Join-Path $InstallerAssetsDir 'wizard-large.bmp'
-$WizardSmallPath = Join-Path $InstallerAssetsDir 'wizard-small.bmp'
+$AssetsDir = Join-Path $ProjectRoot 'assets'
+$AppIconPath = Join-Path $AssetsDir 'icon.ico'
 $DistRoot = Join-Path $ProjectRoot 'dist'
 $ReleaseRoot = Join-Path $DistRoot "Praxis-$Version"
 $StageDir = Join-Path $ReleaseRoot 'stage'
-$InstallerOutDir = Join-Path $ReleaseRoot 'installer'
-$DeliveryOutDir = Join-Path $ReleaseRoot 'delivery'
 $DistributionOutDir = Join-Path $ReleaseRoot 'distribution'
 $ManifestPath = Join-Path $ReleaseRoot 'Praxis-build-manifest.json'
 $GeneratedDir = Join-Path $ProjectRoot 'build\generated'
@@ -73,7 +61,6 @@ $GeneratedOcrReferencesPath = Join-Path $GeneratedDir 'Praxis_OcrReferences.ahk'
 $GeneratedOcrProbePath = Join-Path $GeneratedDir 'Praxis_OcrProbe.ahk'
 $IntegrityManifestSourcePath = Join-Path $GeneratedDir 'Praxis_IntegrityManifest.ahk'
 $ExePath = Join-Path $StageDir 'Praxis.exe'
-$VersionInfoVersion = $null
 $ResolvedSignToolPath = $null
 $NormalizedCertificateThumbprint = $null
 $CodeSigningEnabled = $false
@@ -163,20 +150,6 @@ function Find-Ahk2Exe {
     )
 }
 
-function Find-InnoSetupCompiler {
-    param([string]$ExplicitPath)
-
-    $pathFromCommand = Resolve-CommandPath 'ISCC.exe'
-    return Resolve-FirstExistingPath @(
-        $ExplicitPath,
-        "$env:ISCC",
-        $pathFromCommand,
-        "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
-        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
-    )
-}
-
 function Find-SignTool {
     param([string]$ExplicitPath)
 
@@ -255,25 +228,6 @@ function Assert-NativeCommandSucceeded {
 
     $exitCode = Get-NativeExitCode
     if ($exitCode -ne 0) { throw "$FailureMessage Exit code: $exitCode" }
-}
-
-function Convert-ToWindowsVersionInfoVersion {
-    param([string]$SemanticVersion)
-
-    if ([string]::IsNullOrWhiteSpace($SemanticVersion)) {
-        return '1.0.0.0'
-    }
-
-    $coreVersion = ($SemanticVersion -split '[-+]')[0]
-    $parts = @($coreVersion -split '\.')
-    while ($parts.Count -lt 4) { $parts += '0' }
-    if ($parts.Count -gt 4) { $parts = $parts[0..3] }
-
-    $normalizedParts = foreach ($part in $parts) {
-        if ($part -notmatch '^\d+$') { '0' } else { [int]$part }
-    }
-
-    return ($normalizedParts -join '.')
 }
 
 function Get-GitBuildState {
@@ -548,8 +502,6 @@ if (!(Test-Path -LiteralPath $Vendor64Dll) -or !(Test-Path -LiteralPath $Vendor3
 }
 
 Write-Step 'Validando arquivos do projeto'
-$VersionInfoVersion = Convert-ToWindowsVersionInfoVersion -SemanticVersion $Version
-
 Write-Step 'Validando chamadas top-level em lib/'
 $TopLevelCallsScript = Join-Path $PSScriptRoot 'find-top-level-calls.ps1'
 if (Test-Path -LiteralPath $TopLevelCallsScript) {
@@ -603,19 +555,10 @@ foreach ($required in @(
     if (!(Test-Path -LiteralPath $required)) { throw "Arquivo obrigatório não encontrado: $required" }
 }
 
-if (!$SkipInstaller) {
-    foreach ($installerAsset in @($AppIconPath, $WizardBannerPath, $WizardSmallPath)) {
-        if (!(Test-Path -LiteralPath $installerAsset)) { throw "Asset visual obrigatório do instalador não encontrado: $installerAsset" }
-    }
-}
-
 if ($ReleaseMode) {
-    if ($SkipInstaller) {
-        throw 'Release endurecido não permite -SkipInstaller. Gere e valide o instalador.'
-    }
     $EffectiveCompress = $true
     $EffectiveRequireCodeSigning = $true
-    Write-Step 'Modo release endurecido habilitado: assinatura, compressão, instalador e Git limpo obrigatórios'
+    Write-Step 'Modo release endurecido habilitado: assinatura, compressão e Git limpo obrigatórios'
 }
 
 $gitState = Get-GitBuildState -RepositoryRoot $ProjectRoot
@@ -638,31 +581,8 @@ if (!$AutoHotkey64) {
 }
 
 $Ahk2Exe = Find-Ahk2Exe -ExplicitPath $Ahk2ExePath
-if (!$Ahk2Exe -and $InstallAhk2Exe) {
-    $Ahk2ExeInstaller = Join-Path (Split-Path (Split-Path $AutoHotkey64 -Parent) -Parent) 'UX\install-ahk2exe.ahk'
-    if (!(Test-Path -LiteralPath $Ahk2ExeInstaller)) {
-        throw "Instalador oficial do Ahk2Exe não encontrado: $Ahk2ExeInstaller"
-    }
-
-    Write-Step 'Instalando Ahk2Exe pelo instalador oficial do AutoHotkey'
-    & $AutoHotkey64 $Ahk2ExeInstaller /Y
-    Assert-NativeCommandSucceeded 'Falha ao instalar Ahk2Exe.'
-    $Ahk2Exe = Find-Ahk2Exe -ExplicitPath $Ahk2ExePath
-}
-
 if (!$Ahk2Exe) {
-    throw 'Ahk2Exe.exe não encontrado. Execute novamente com -InstallAhk2Exe ou informe -Ahk2ExePath.'
-}
-
-$InnoSetup = $null
-if (!$SkipInstaller) {
-    $InnoSetup = Find-InnoSetupCompiler -ExplicitPath $InnoSetupPath
-    if (!$InnoSetup) {
-        throw 'ISCC.exe não encontrado. Instale Inno Setup 6, informe -InnoSetupPath ou use -SkipInstaller.'
-    }
-    if (!(Test-Path -LiteralPath $InstallerScript)) {
-        throw "Script do instalador não encontrado: $InstallerScript"
-    }
+    throw 'Ahk2Exe.exe não encontrado. Instale a ferramenta de build separadamente ou informe -Ahk2ExePath.'
 }
 
 $NormalizedCertificateThumbprint = Normalize-CertificateThumbprint -Thumbprint $CertificateThumbprint
@@ -689,7 +609,7 @@ Write-Step 'Limpando saída anterior'
 if (Test-Path -LiteralPath $ReleaseRoot) {
     Remove-Item -LiteralPath $ReleaseRoot -Recurse -Force
 }
-New-Item -ItemType Directory -Path $StageDir, $InstallerOutDir | Out-Null
+New-Item -ItemType Directory -Path $StageDir | Out-Null
 
 Write-Step 'Gerando artefatos embutidos do EXE'
 if (Test-Path -LiteralPath $GeneratedDir) {
@@ -699,7 +619,7 @@ $uiText = Get-Content -LiteralPath $UiIndexPath -Raw -Encoding UTF8
 if (Test-Path -LiteralPath $AppIconPath) {
     $iconBytes = [System.IO.File]::ReadAllBytes($AppIconPath)
     $iconDataUri = 'data:image/x-icon;base64,' + [Convert]::ToBase64String($iconBytes)
-    $uiText = $uiText.Replace('../../installer/assets/icon.ico', $iconDataUri)
+    $uiText = $uiText.Replace('../../assets/icon.ico', $iconDataUri)
 }
 New-EmbeddedBase64Module -OutputPath $GeneratedUiPath -VariableName 'gEmbeddedIndexHtmlBase64' -Text $uiText
 New-EmbeddedBase64Module -OutputPath $GeneratedOcrReferencesPath -VariableName 'gEmbeddedOcrReferencesBase64' -Text (Get-Content -LiteralPath $OcrReferencesPath -Raw -Encoding UTF8)
@@ -787,50 +707,6 @@ New-HashManifest -RootPath $StageDir -OutputPath $ManifestPath -Metadata @{
     Compress = $EffectiveCompress
     CodeSigning = $codeSigningMetadata
 }
-if (!$SkipInstaller) {
-    Write-Step 'Gerando instalador Inno Setup'
-    & $InnoSetup "/DAppVersion=$Version" "/DAppVersionInfoVersion=$VersionInfoVersion" "/DSourceDir=$StageDir" "/DOutputDir=$InstallerOutDir" "/DAssetsDir=$InstallerAssetsDir" $InstallerScript
-    Assert-NativeCommandSucceeded 'Falha ao gerar instalador Inno Setup.'
-
-    $setupPath = Join-Path $InstallerOutDir "Praxis-Setup-$Version.exe"
-    Wait-ForFile -Path $setupPath
-    Invoke-SignFile -Path $setupPath
-
-    Write-Step 'Atualizando manifesto com hash do instalador'
-    $installerHash = Get-FileHash -LiteralPath $setupPath -Algorithm SHA256
-    $installerManifest = [ordered]@{
-        product = 'Praxis'
-        version = $Version
-        builtAtUtc = (Get-Date).ToUniversalTime().ToString('o')
-        codeSigning = $codeSigningMetadata
-        sourceCommit = $SourceCommit
-        sourceDirty = $SourceDirty
-        releaseMode = $ReleaseMode
-        allowDirty = [bool]$AllowDirty
-        compress = $EffectiveCompress
-        installer = [ordered]@{
-            path = (Get-PortableRelativePath -BasePath $ReleaseRoot -TargetPath $setupPath).Replace('\', '/')
-            sha256 = $installerHash.Hash.ToLowerInvariant()
-            bytes = (Get-Item -LiteralPath $setupPath).Length
-        }
-        stageManifest = (Get-PortableRelativePath -BasePath $ReleaseRoot -TargetPath $ManifestPath).Replace('\', '/')
-    }
-    $installerManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $ReleaseRoot 'Praxis-installer-manifest.json') -Encoding UTF8
-
-    Write-Step 'Montando pasta de distribuição sanitizada'
-    New-Item -ItemType Directory -Path $DeliveryOutDir -Force | Out-Null
-    Copy-Item -LiteralPath $setupPath -Destination (Join-Path $DeliveryOutDir (Split-Path $setupPath -Leaf))
-    foreach ($legalSource in @(
-        (Join-Path $ProjectRoot 'LICENSE'),
-        (Join-Path $ProjectRoot 'COPYRIGHT'),
-        (Join-Path $ProjectRoot 'NOTICE.md')
-    )) {
-        if (Test-Path -LiteralPath $legalSource) {
-            Copy-Item -LiteralPath $legalSource -Destination (Join-Path $DeliveryOutDir (Split-Path $legalSource -Leaf))
-        }
-    }
-}
-
 Write-Step 'Montando pasta de distribuição portátil'
 if (Test-Path -LiteralPath $DistributionOutDir) {
     Remove-Item -LiteralPath $DistributionOutDir -Recurse -Force
@@ -864,7 +740,3 @@ Write-Host "Release: $ReleaseRoot" -ForegroundColor Green
 Write-Host "Executável: $ExePath" -ForegroundColor Green
 Write-Host "Distribuição portátil: $DistributionOutDir" -ForegroundColor Green
 Write-Host "ZIP portátil: $PortableZipPath" -ForegroundColor Green
-if (!$SkipInstaller) {
-    Write-Host "Instalador: $(Join-Path $InstallerOutDir "Praxis-Setup-$Version.exe")" -ForegroundColor Green
-    Write-Host "Distribuição sanitizada: $DeliveryOutDir" -ForegroundColor Green
-}

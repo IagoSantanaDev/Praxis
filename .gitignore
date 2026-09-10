@@ -83,7 +83,6 @@ praxis-integrity-manual.log
 .env
 .env.*
 !.env.example
-config.ini
 *.local.ini
 secrets.json
 secrets.ini

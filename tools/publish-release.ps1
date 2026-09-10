@@ -4,7 +4,7 @@ Gera o build portátil do Praxis (EXE sem fonte), zipla e publica/atualiza um Gi
 
 .DESCRIPTION
 Fluxo:
-  1. Deriva a versão (default: 1.0.0-<sha curto do HEAD>) e roda tools/build-praxis.ps1 -SkipInstaller
+  1. Deriva a versão (default: 1.0.0-<sha curto do HEAD>) e roda tools/build-praxis.ps1
      (que gera dist\Praxis-<ver>\distribution\ e o ZIP portátil).
   2. Gera SHA256SUMS.txt com o hash do ZIP.
   3. Publica (ou atualiza, com --clobber) um GitHub Release da branch informada.
@@ -115,7 +115,7 @@ $SumsPath = Join-Path $ReleaseRoot 'SHA256SUMS.txt'
 # 2. Build
 if (!$SkipBuild) {
     Write-Step "Build portátil (versão $Version)"
-    $buildArgs = @('-Version', $Version, '-SkipInstaller')
+    $buildArgs = @('-Version', $Version)
     if (![string]::IsNullOrWhiteSpace($AutoHotkeyBasePath)) { $buildArgs += @('-AutoHotkeyBasePath', $AutoHotkeyBasePath) }
     if (![string]::IsNullOrWhiteSpace($Ahk2ExePath)) { $buildArgs += @('-Ahk2ExePath', $Ahk2ExePath) }
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $BuildScript @buildArgs

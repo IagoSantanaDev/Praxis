@@ -30,26 +30,10 @@ FFCV_OCR_LANGUAGE := "pt-BR"
 FFCV_OCR_SCALE := 2
 FFCV_OCR_MATCH_THRESHOLD := 0.35
 
-DirGetParent(dir) {
-    local parentDir
-    SplitPath dir, , &parentDir
-    return parentDir
-}
-
 FFCV_ErrorTemplates_ProjectRoot() {
-    ; Procura config.ini na raiz do projeto como marcador.
-    ; Sobe no máximo 4 níveis acima do script para encontrar a raiz.
-    dir := A_ScriptDir
-    loop 4 {
-        if FileExist(dir "\config.ini")
-            return dir
-        parent := DirGetParent(dir)
-        if (parent = dir)
-            break ; reached filesystem root
-        dir := parent
-    }
-    ; Fallback: retorna o diretório pai mais provável (1 nível acima de globals/ ou lib/)
-    return DirGetParent(A_ScriptDir)
+    ; A_ScriptDir já é a raiz do script principal, tanto em modo de
+    ; desenvolvimento quanto no EXE compilado.
+    return A_ScriptDir
 }
 
 FFCV_ErrorReferencesPath() {
