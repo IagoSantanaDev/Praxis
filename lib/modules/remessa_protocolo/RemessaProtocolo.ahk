@@ -170,11 +170,13 @@ ErrosMensagem(erros, timings) {
 
 
 ProcessarProtocolo(protocolo) {
-    WinActivate MV_WIN_MOVDOC_BAIXA
+    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA)
+        return Map("ok", false, "erro", "MOV DOC Baixa nao ficou ativa.")
     if !MovDoc_SetProtocoloByClick(protocolo)
         return Map("ok", false, "erro", "Nao consegui focar/preencher o campo Protocolo.")
-    Sleep MV_DELAY_INPUT
-    Send "{F8}"
+    if !MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F8", MV_TIMEOUT_LOAD * 1000,
+        , "consulta do protocolo " protocolo)
+        return Map("ok", false, "F8 nao produziu transicao observavel para o protocolo " protocolo ".")
     if !MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida)
         return Map("ok", false, "erro", "Grid nao ficou legivel apos F8 para o protocolo " protocolo ".")
     linhas := MovDoc_LerGrid(protocolo, primeiraLinhaValida)

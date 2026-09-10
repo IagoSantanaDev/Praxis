@@ -73,9 +73,14 @@ FfcvContaPopup_AbrirEConfigurar(tipoConta) {
         return false
     }
 
-    ; Clicar em "1 - Inserir Conta".
+    ; Clicar em "1 - Inserir Conta" e exigir evidência de transição.
+    before := MV_CaptureScreenState(MV_WIN_FFCV_ANY)
     if !MV_ClickControlAt(MV_WIN_FFCV_ANY, FFCVP_BTN_ADICIONAR, FFCVP_BTN_ADICIONAR_X, FFCVP_BTN_ADICIONAR_Y) {
         MV_Log("FfcvContaPopup_AbrirEConfigurar", "nao consegui clicar em Inserir Conta", false)
+        return false
+    }
+    if !MV_WaitScreenChanged(before, 5000, MV_WIN_FFCV_ANY) {
+        MV_Log("FfcvContaPopup_AbrirEConfigurar", "Inserir Conta nao produziu transicao observavel", false)
         return false
     }
 
@@ -125,25 +130,15 @@ FfcvContaPopup_ConfigurarDropdowns(tipoConta) {
         return false
 
     if (tipoConta = "Internamento") {
-        Send "{Tab 3}"
-        Sleep FFCVP_KEY_SETTLE_MS
-        Send "{Down 2}"
-        Sleep FFCVP_KEY_SETTLE_MS
-        Send "{Tab}"
-        Sleep FFCVP_KEY_SETTLE_MS
-        Send "{Tab 2}"
-        Sleep FFCVP_KEY_SETTLE_MS
+        for keys in ["{Tab 3}", "{Down 2}", "{Tab}", "{Tab 2}"] {
+            if !MV_SendAndWait(MV_WIN_FFCV_ANY, keys, FFCVP_CONTA_SUBMIT_TIMEOUT_MS, , "configuração do popup")
+                return false
+        }
     } else if (tipoConta = "Emergência" || tipoConta = "Ambulatório") {
-        Send "{Tab 3}"
-        Sleep FFCVP_KEY_SETTLE_MS
-        Send "{Down 2}"
-        Sleep FFCVP_KEY_SETTLE_MS
-        Send "{Tab 2}"
-        Sleep FFCVP_KEY_SETTLE_MS
-        Send "{Up 2}"
-        Sleep FFCVP_KEY_SETTLE_MS
-        Send "{Tab}"
-        Sleep FFCVP_KEY_SETTLE_MS
+        for keys in ["{Tab 3}", "{Down 2}", "{Tab 2}", "{Up 2}", "{Tab}"] {
+            if !MV_SendAndWait(MV_WIN_FFCV_ANY, keys, FFCVP_CONTA_SUBMIT_TIMEOUT_MS, , "configuração do popup")
+                return false
+        }
     } else {
         MV_Log("FfcvContaPopup_ConfigurarDropdowns",
             "tipo desconhecido=" tipoConta, false)
@@ -171,15 +166,21 @@ FfcvContaPopup_LimparCampoEEnviar(numConta) {
         return Map("ok", false, "erro", "FFCV nao ficou ativa.", "report",
             " FFCV nao ficou ativa antes de limpar/enviar a conta " numConta ".\n")
 
-    Click(FFCVP_CAMPO_CONTA_X + 15, FFCVP_CAMPO_CONTA_Y + 8, 1)
-    Sleep FFCVP_FIELD_FOCUS_SETTLE_MS
-    Send("{Home}{Shift down}{End}{Shift up}{Backspace}")
-    Sleep FFCVP_FIELD_CLEAR_SETTLE_MS
-    SendText numConta
-    Send "{Enter}"
+    if !MV_SetTextAndWait(MV_WIN_FFCV_ANY, FFCVP_CAMPO_CONTA_X + 15, FFCVP_CAMPO_CONTA_Y + 8,
+        numConta, FFCVP_CONTA_SUBMIT_TIMEOUT_MS,
+        (hwnd, state) => FfcvContaPopup_GetCampoContaText() = numConta,
+        "campo de conta preenchido")
+        return Map("ok", false, "erro", "Campo da conta nao confirmou o valor digitado.", "report",
+            " Campo da conta nao confirmou a conta " numConta ".\n")
+
+    if !MV_SendEnterAndWait(MV_WIN_FFCV_ANY, FFCVP_CONTA_SUBMIT_TIMEOUT_MS,
+        (hwnd, state) => Dialog_ActiveModalTitle() != "" || FfcvContaPopup_GetCampoContaText() = "",
+        "envio da conta")
+        return Map("ok", false, "erro", "Enter nao produziu estado observavel de envio da conta.", "report",
+            " Enter sem mudanca observavel para a conta " numConta ".\n")
 
     return Map("ok", true, "erro", "", "report",
-        " Campo da conta clicado, limpo, conta digitada e Enter enviado: " numConta "\n")
+        " Campo da conta confirmado, Enter enviado e estado de resultado observado: " numConta "\n")
 }
 
 /*
@@ -241,7 +242,7 @@ FfcvContaPopup_WaitSubmitOutcome(timeoutMs, submittedConta := "") {
                 " Timeout aguardando modal ou popup estavel apos Enter.\n")
         }
 
-        Sleep 15
+        Sleep MV_POLL_MS
     }
 }
 
@@ -264,8 +265,10 @@ FfcvContaPopup_WaitReady(timeoutMs) {
     if !ready
         return Map("ok", false, "erro", "Popup de conta nao ficou visivel apos clique em Inserir Conta.", "elapsed", A_TickCount - startedAt)
 
-    ; Micro-settle: aguardar estabilidade mínima do popup.
-    Sleep FFCVP_CONTA_STABLE_MS
+    ; A estabilidade é confirmada por estado observado, não por atraso fixo.
+    stable := FfcvContaPopup_WaitStable(Max(timeoutMs - (A_TickCount - startedAt), 1))
+    if !stable["ok"]
+        return Map("ok", false, "erro", stable["erro"], "elapsed", A_TickCount - startedAt)
     return Map("ok", true, "erro", "", "elapsed", A_TickCount - startedAt)
 }
 
@@ -288,34 +291,15 @@ FfcvContaPopup_WaitStable(timeoutMs) {
         if (A_TickCount >= deadline)
             return Map("ok", false, "erro", "Popup de conta nao estabilizou em " timeoutMs "ms apos abrir.")
 
-        Sleep 20
+        Sleep MV_POLL_MS
     }
 }
 
 FfcvContaPopup_Close(timeoutMs := 5000) {
-    Send "{Alt down}2{Alt up}"
-    Sleep FFCVP_KEY_SETTLE_MS
+    if !MV_SendAndWait(MV_WIN_FFCV_ANY, "{Alt down}2{Alt up}", timeoutMs,
+        (hwnd, state) => !Popup_ContaVisible(), "popup de conta fechado")
+        return false
 
-    startedAt := A_TickCount
-    deadline := startedAt + timeoutMs
-
-    Loop {
-        ThrowIfAppStopped()
-        if !Popup_ContaVisible() {
-            Sleep FFCVP_CONTA_STABLE_MS
-            if !Popup_ContaVisible() {
-                MV_Log("FfcvContaPopup_Close",
-                    "popup fechado em " (A_TickCount - startedAt) "ms", true)
-                return true
-            }
-        }
-
-        if (A_TickCount >= deadline) {
-            MV_Log("FfcvContaPopup_Close",
-                "timeout apos " timeoutMs "ms", false)
-            return false
-        }
-
-        Sleep 50
-    }
+    MV_Log("FfcvContaPopup_Close", "popup fechado com mudança, estabilidade e predicado", true)
+    return true
 }

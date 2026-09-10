@@ -66,27 +66,25 @@ MOVDOC_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
 
 MovDoc_AbrirTelaBaixa() {
     MV_ActivateModule(MV_WIN_MOVDOC_ANY)
-    if !MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
+    if !MV_WaitScreenStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
         return false
 
     ; Atalho validado no macro 02: Manutenção → Protocolação → Baixa.
-    Send "{Alt down}mpb{Alt up}"
-
-    if !MV_Poll(() => WinExist(MV_WIN_MOVDOC_BAIXA), MV_TIMEOUT_LOAD)
+    if !MV_SendAndWait(MV_WIN_MOVDOC_ANY, "{Alt down}mpb{Alt up}", MV_TIMEOUT_LOAD * 1000,
+        , "abertura da tela Baixa")
         return false
-
-    return MV_WaitWindowStable(MV_WIN_MOVDOC_BAIXA, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD)
+    return !!MV_WaitScreenStable(MV_WIN_MOVDOC_BAIXA, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
 }
 
 MovDoc_SetProtocoloByClick(protocolo) {
     if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
         return false
 
-    Click(MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, 1)
-    Sleep MOVDOC_KEY_SETTLE_MS
-    SendText protocolo
-    Sleep MOVDOC_KEY_SETTLE_MS
-    return true
+    return !!MV_SetTextAndWait(MV_WIN_MOVDOC_BAIXA,
+        MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, protocolo,
+        MOVDOC_KEY_SETTLE_MS * 20,
+        (hwnd, state) => InStr(MV_GetFocusedControlText(MV_WIN_MOVDOC_BAIXA), String(protocolo)) > 0,
+        "protocolo preenchido")
 }
 
 MovDoc_LerGrid(protocolo, primeiraLinha?) {
@@ -136,14 +134,14 @@ MovDoc_FinalizarBaixa() {
     )
 
     if (checked = 0 || checked = "") {
-        if !MV_ClickControlAt(
-            MV_WIN_MOVDOC_BAIXA,
-            MOVDOC_CHECK_RECEBIDO_CLASS,
-            MOVDOC_CHECK_RECEBIDO_X,
-            MOVDOC_CHECK_RECEBIDO_Y
-        )
+        if !MV_ClickAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS,
+            MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y, 5000,
+            (hwnd, state) => MV_ControlCheckedAt(MV_WIN_MOVDOC_BAIXA,
+                MOVDOC_CHECK_RECEBIDO_CLASS, MOVDOC_CHECK_RECEBIDO_X,
+                MOVDOC_CHECK_RECEBIDO_Y) = 1, "checkbox Recebido marcado")
             return false
     } else if (checked = 1) {
+        beforeCheck := MV_CaptureScreenState(MV_WIN_MOVDOC_BAIXA)
         if !MV_DoubleClickControlAt(
             MV_WIN_MOVDOC_BAIXA,
             MOVDOC_CHECK_RECEBIDO_CLASS,
@@ -151,23 +149,22 @@ MovDoc_FinalizarBaixa() {
             MOVDOC_CHECK_RECEBIDO_Y
         )
             return false
+        if !MV_WaitScreenChanged(beforeCheck, 5000, MV_WIN_MOVDOC_BAIXA)
+            return false
+        if !MV_WaitScreenStable(MV_WIN_MOVDOC_BAIXA, MV_TARGET_STABLE_MS, 5000)
+            return false
     } else {
         return false
     }
 
-    Sleep MOVDOC_KEY_SETTLE_MS
-
     ; Fluxo validado: checkbox → F10 → clicar campo Protocolo → F7.
-    Send "{F10}"
-    Sleep MOVDOC_KEY_SETTLE_MS
+    if !MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F10", 5000, , "baixa confirmada")
+        return false
 
     if !_FocusProtocolo()
         return false
 
-    Sleep MOVDOC_KEY_SETTLE_MS
-    Send "{F7}"
-    Sleep MOVDOC_KEY_SETTLE_MS
-    return true
+    return !!MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F7", 5000, , "retorno ao próximo protocolo")
 }
 
 MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida) {
@@ -189,7 +186,7 @@ MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida) {
         if (A_TickCount >= deadline)
             return false
 
-        Sleep 100
+        Sleep MV_POLL_MS
     }
 }
 
@@ -212,8 +209,9 @@ MovDoc_GridValueValid(valor, campo := "") {
 
 _AvancarBloco() {
     ultimoY := MOVDOC_GRID_ROWS_Y[MOVDOC_GRID_ROWS_Y.Length]
-    Click(MOVDOC_CONTA_X + 15, ultimoY + 8, 1)
-    Sleep MOVDOC_KEY_SETTLE_MS
+    if !MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CONTA_X + 15, ultimoY + 8, 5000,
+        , "última linha da grade selecionada")
+        return Map("popup", false, "erro", "grade nao confirmou selecao da ultima linha")
 
     Loop MOVDOC_GRID_ROWS_Y.Length {
         ThrowIfAppStopped()
@@ -222,8 +220,9 @@ _AvancarBloco() {
             return Map("popup", true)
         }
 
-        Send "{Down}"
-        Sleep MOVDOC_KEY_SETTLE_MS
+        if !MV_SendAndWait(MV_WIN_MOVDOC_BAIXA, "{Down}", 5000,
+            , "avanço de linha da grade")
+            return Map("popup", false, "erro", "grade nao confirmou avanço de linha")
     }
 
     if Dialog_MovDocPopupVisible() {
@@ -232,8 +231,9 @@ _AvancarBloco() {
     }
 
     primeiroY := MOVDOC_GRID_ROWS_Y[1]
-    Click(MOVDOC_CONTA_X + 15, primeiroY + 8, 1)
-    Sleep MOVDOC_KEY_SETTLE_MS
+    if !MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CONTA_X + 15, primeiroY + 8, 5000,
+        , "primeira linha da grade selecionada")
+        return Map("popup", false, "erro", "grade nao confirmou selecao da primeira linha")
     return Map("popup", false)
 }
 
@@ -269,17 +269,21 @@ _FocusProtocolo() {
     if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
         return false
 
-    Click(MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, 1)
-    return true
+    return !!MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA,
+        MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, 5000,
+        , "campo Protocolo focado")
 }
 
 _LerCampoGrid(x, y, campo := "", fastTimeoutMs := 150, fallbackTimeoutMs := 300) {
     if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
         return ""
 
-    Click(x + 15, y + 8, 1)
-    Sleep MOVDOC_KEY_SETTLE_MS
-    Send("{Home}{Shift down}{End}{Shift up}")
+    if !MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA, x + 15, y + 8, fastTimeoutMs,
+        , "célula da grade focada")
+        return ""
+    if !MV_SendAndWait(MV_WIN_MOVDOC_BAIXA, "{Home}{Shift down}{End}{Shift up}", fastTimeoutMs,
+        , "texto da célula selecionado")
+        return ""
 
     valor := MV_CopyFocusedText(fastTimeoutMs)
     if MovDoc_GridValueValid(valor, campo)

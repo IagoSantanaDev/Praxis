@@ -103,18 +103,20 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
     if !MV_EnsureFFCV()
         throw Error("FFCV nao ficou ativa para gerar o relatorio de contas.")
 
-    Send "!e"
-    Sleep MV_KEY_SETTLE_MS
-    Send "{Enter 2}"
-    if !MV_Poll(() => WinExist("Relatórios Personalizado ahk_exe ifrun60.EXE"), MV_TIMEOUT_LOAD)
-        throw Error("Janela Relatórios Personalizado nao apareceu.")
+    if !MV_SendAndWait(MV_WIN_FFCV_ANY, "!e", MV_TIMEOUT_LOAD * 1000, , "menu de relatórios aberto")
+        throw Error("Menu de relatorios nao produziu transicao observavel.")
+    if !MV_SendAndWait(MV_WIN_FFCV_ANY, "{Enter 2}", MV_TIMEOUT_LOAD * 1000, , "relatório personalizado selecionado")
+        throw Error("Seleção do relatório nao produziu transicao observavel.")
+    if !MV_WaitScreenStable("Relatórios Personalizado ahk_exe ifrun60.EXE", MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
+        throw Error("Janela Relatórios Personalizado nao estabilizou.")
     relHwnd := WinExist("Relatórios Personalizado ahk_exe ifrun60.EXE")
 
     MV_EnsureWindowActive("Relatórios Personalizado ahk_exe ifrun60.EXE")
     downRelatorio := Protocolar_IsHospitalar(tipo) ? 177 : 121
-    Send "{Down " downRelatorio "}"
-    Sleep MV_KEY_SETTLE_MS
-    Send "!1"
+    if !MV_SendAndWait("Relatórios Personalizado ahk_exe ifrun60.EXE", "{Down " downRelatorio "}", 5000, , "relatório posicionado")
+        throw Error("Nao foi possivel posicionar o relatório.")
+    if !MV_SendAndWait("Relatórios Personalizado ahk_exe ifrun60.EXE", "!1", 30000, , "geração de arquivo solicitada")
+        throw Error("Nao foi possivel abrir a geração do arquivo.")
 
     reportHwnd := Protocolar_WaitWindowWithControls("EXECUTASQL.exe", "TEdit1", "TBitBtn2", 60)
     if !reportHwnd
@@ -127,9 +129,8 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
     button := MV_FirstControlByClass(reportTitle, "TBitBtn2")
     if !button
         throw Error("Botao Gerar Arquivo nao encontrado.")
-    try ControlClick button,,,,, "NA"
-    catch as e
-        throw Error("Falha ao gerar arquivo FFCV: " e.Message)
+    if !MV_ClickHwndAndWait(reportTitle, button, 30000, , "arquivo gerado")
+        throw Error("Falha ao gerar arquivo FFCV.")
 
     saveHwnd := Protocolar_WaitWindowWithControls("", "Edit1", "Button2", 45)
     if !saveHwnd
@@ -141,9 +142,8 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
     saveButton := MV_FirstControlByClass(saveTitle, "Button2")
     if !saveButton
         throw Error("Botao Salvar nao encontrado.")
-    try ControlClick saveButton,,,,, "NA"
-    catch as e
-        throw Error("Falha ao salvar CSV: " e.Message)
+    if !MV_ClickHwndAndWait(saveTitle, saveButton, 30000, , "CSV salvo")
+        throw Error("Falha ao salvar CSV.")
 
     infoHwnd := Protocolar_WaitWindowWithControls("EXECUTASQL.exe", "Button1", "", 30)
     if !infoHwnd
@@ -152,14 +152,13 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
     infoButton := MV_FirstControlByClass("ahk_id " infoHwnd, "Button1")
     if !infoButton
         throw Error("Botao de confirmacao Information nao encontrado.")
-    try ControlClick infoButton,,,,, "NA"
-    catch as e
-        throw Error("Falha ao confirmar geração do CSV: " e.Message)
+    if !MV_ClickHwndAndWait("ahk_id " infoHwnd, infoButton, 30000, , "geração do CSV confirmada")
+        throw Error("Falha ao confirmar geração do CSV.")
 
     if relHwnd {
         relButton := MV_FirstControlByClass("ahk_id " relHwnd, "Button1")
         if relButton
-            try ControlClick relButton,,,,, "NA"
+            MV_ClickHwndAndWait("ahk_id " relHwnd, relButton, 30000, , "relatório fechado")
     }
 
     if MV_Poll(() => FileExist(csvPath) || FileExist(csvAltPath), 30)
@@ -206,10 +205,10 @@ Protocolar_EnviarConta(conta) {
         A_Clipboard := conta
         if !ClipWait(1)
             throw Error("Falha ao preparar clipboard da conta " conta ".")
-        Send "^v"
-        Sleep MV_KEY_SETTLE_MS
-        Send "{Enter}"
-        Sleep MV_KEY_SETTLE_MS
+        if !MV_SendAndWait(MV_WIN_MOVDOC_ENVIO, "^v", 3000, , "conta colada")
+            throw Error("Colagem da conta nao produziu estado observavel.")
+        if !MV_SendEnterAndWait(MV_WIN_MOVDOC_ENVIO, 3000, , "conta enviada")
+            throw Error("Enter da conta nao produziu estado observavel.")
     } finally {
         A_Clipboard := previousClipboard
     }
@@ -255,63 +254,57 @@ Protocolar_AbrirTelaEnvio(setorAtual, setorEnvio, tipo := "Ambulatorial") {
     if !MV_EnsureModule(MV_WIN_MOVDOC_ANY)
         return false
 
-    Send "{Alt down}mpe{Alt up}"
-    if !MV_Poll(() => WinExist(MV_WIN_MOVDOC_ENVIO), MV_TIMEOUT_LOAD)
+    if !MV_SendAndWait(MV_WIN_MOVDOC_ANY, "{Alt down}mpe{Alt up}", MV_TIMEOUT_LOAD * 1000,
+        , "abertura da Protocolação de Envio")
+        return false
+    if !MV_WaitScreenStable(MV_WIN_MOVDOC_ENVIO, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
         return false
     if !MV_EnsureWindowActive(MV_WIN_MOVDOC_ENVIO)
         return false
 
-    SendText setorAtual
-    Send "{Enter}"
-    Sleep MV_KEY_SETTLE_MS
-    SendText setorEnvio
-    Sleep MV_KEY_SETTLE_MS
+    if !MV_SendTextAndWait(MV_WIN_MOVDOC_ENVIO, setorAtual, 3000, , "setor atual preenchido")
+        return false
+    if !MV_SendEnterAndWait(MV_WIN_MOVDOC_ENVIO, 3000, , "setor atual confirmado")
+        return false
+    if !MV_SendTextAndWait(MV_WIN_MOVDOC_ENVIO, setorEnvio, 3000, , "setor de envio preenchido")
+        return false
 
     hwnd := MV_FirstControlByClass(MV_WIN_MOVDOC_ENVIO, "Button2")
     if !hwnd
         return false
-    try ControlClick hwnd,,,,, "NA"
-    catch
+    if !MV_ClickHwndAndWait(MV_WIN_MOVDOC_ENVIO, hwnd, 5000, , "setores confirmados")
+        return false
+    if !MV_SendAndWait(MV_WIN_MOVDOC_ENVIO, "{Tab 2}", 3000, , "tipo de atendimento posicionado")
         return false
 
-    Sleep MV_KEY_SETTLE_MS
-    Send "{Tab 2}"
-
     if (StrLower(tipo) = "internamento" || StrLower(tipo) = "hospitalar") {
-        Sleep MV_KEY_SETTLE_MS
-        Send "+{Tab 2}"
-        Sleep MV_KEY_SETTLE_MS
-        Send "{Up 2}"
-        Sleep MV_KEY_SETTLE_MS
-        Send "+{Tab 2}"
+        if !MV_SendAndWait(MV_WIN_MOVDOC_ENVIO, "+{Tab 2}", 3000, , "tipo hospitalar reposicionado")
+            return false
+        if !MV_SendAndWait(MV_WIN_MOVDOC_ENVIO, "{Up 2}", 3000, , "tipo hospitalar selecionado")
+            return false
+        if !MV_SendAndWait(MV_WIN_MOVDOC_ENVIO, "+{Tab 2}", 3000, , "tipo hospitalar confirmado")
+            return false
     }
     return true
 }
 
 Protocolar_FinalizarEnvio() {
-    Send "!1"
     reportTitle := "Relatório de Registro de Envio ahk_exe ifrun60.EXE"
-    if !MV_Poll(() => WinExist(reportTitle), MV_TIMEOUT_LOAD)
+    if !MV_SendAndWait(MV_WIN_MOVDOC_ENVIO, "!1", MV_TIMEOUT_LOAD * 1000, , "finalização do envio")
+        return false
+    if !MV_WaitScreenStable(reportTitle, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
         return false
 
     reportButton := MV_FirstControlByClass(reportTitle, "Button2")
     if !reportButton
         return false
-    try ControlClick reportButton,,,,, "NA"
-    catch
-        return false
-
-    return MV_WaitWindowGone(reportTitle, MV_TIMEOUT_LOAD)
+    return MV_CloseWindowAndWait(reportTitle, () => MV_ClickHwnd(reportButton),
+        MV_WIN_MOVDOC_ENVIO, MV_TIMEOUT_LOAD * 1000, "relatório de registro fechado")
 }
 
 Protocolar_RemoverRegistroVazio() {
     hwnd := MV_FirstControlByClass(MV_WIN_MOVDOC_ENVIO, "ui60Viewcore_W3211")
     if !hwnd
         return false
-    try {
-        ControlClick hwnd,,,,, "NA"
-        return true
-    } catch {
-        return false
-    }
+    return MV_ClickHwndAndWait(MV_WIN_MOVDOC_ENVIO, hwnd, 5000, , "registro vazio selecionado")
 }

@@ -65,7 +65,8 @@ TissXml_ClickBySpec(winTitle, classNN, x, y)
     Delega para a versão canônica MV_ClickBySpec (components/Controls.ahk).
 */
 TissXml_ClickBySpec(winTitle, classNN, x, y) {
-    return MV_ClickBySpec(winTitle, classNN, x, y)
+    return !!MV_ClickAndWait(winTitle, classNN, x, y, RP_FINAL_ACTION_TIMEOUT_MS,
+        , "ação de tela XML/TISS")
 }
 
 TissXml_WaitXmlQueryReady(timeoutMs := 30000) {
@@ -166,8 +167,8 @@ TissXml_ClickModalButtonByText(winTitle, buttonText) {
     hwnd := MV_FindButtonByText(winTitle, buttonText)
     if !hwnd
         return false
-    ControlClick hwnd,,,,, "NA"
-    return true
+    return MV_ClickModalAndWait(winTitle, hwnd, RP_FINAL_ACTION_TIMEOUT_MS,
+        "", "modal XML/TISS respondido")
 }
 
 ; ════════════════════════════════════════════════════════════════
@@ -200,16 +201,21 @@ TissXml_Gerar(numRemessa) {
 
     if !TissXml_SetTextByClickNoClear(WIN_XML, XML_CAMPO_REMESSA_X, XML_CAMPO_REMESSA_Y, numRemessa)
         return Map("ok", false, "erro", "Nao consegui preencher a remessa na tela XML/TISS.")
-    Sleep RP_KEY_SETTLE_MS
-    Send "{F8}"
+    if !MV_SendFunctionAndWait(WIN_XML, "F8", RP_FINAL_ACTION_TIMEOUT_MS, , "consulta XML/TISS")
+        return Map("ok", false, "erro", "F8 nao produziu uma transicao observavel na consulta XML/TISS.")
+    if !MV_WaitScreenStable(WIN_XML, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+        return Map("ok", false, "erro", "Tela XML/TISS nao estabilizou apos F8.")
 
     queryReady := TissXml_WaitXmlQueryReady(RP_FINAL_ACTION_TIMEOUT_MS)
     if !queryReady["ok"]
         return Map("ok", false, "erro", "Consulta XML/TISS nao estabilizou: " queryReady["erro"])
     Notify("Consulta XML/TISS estabilizada em " queryReady["elapsed"] "ms.")
 
+    beforeFaturamento := MV_CaptureScreenState(WIN_XML)
     if !TissXml_ClickBySpec(WIN_XML, XML_BTN_FATURAMENTO, XML_BTN_FATURAMENTO_X, XML_BTN_FATURAMENTO_Y)
         return Map("ok", false, "erro", "Nao consegui acionar o botao Faturamento na tela XML/TISS.")
+    if !MV_WaitScreenChanged(beforeFaturamento, MV_TIMEOUT_LOAD * 1000)
+        return Map("ok", false, "erro", "Faturamento nao produziu uma transicao observavel.")
 
     faturamento := TissXml_WaitPathForm(MV_TIMEOUT_LOAD)
     if !faturamento["ok"]
@@ -236,10 +242,7 @@ TissXml_Gerar(numRemessa) {
     if !TissXml_ClickBySpec(WIN_XML_PATH_FORM, XML_FORM_BTN_VOLTAR, XML_FORM_BTN_VOLTAR_X, XML_FORM_BTN_VOLTAR_Y)
         return Map("ok", false, "erro", "Nao consegui voltar da tela de XML gerado.")
 
-    if !MV_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
-        Notify("Aviso: a tela de XML nao confirmou estabilidade apos Voltar; tentando sair mesmo assim.")
-
-    Send "{Esc}"
-    Sleep MV_DELAY_INPUT
+    if !MV_SendAndWait(WIN_XML_PATH_FORM, "{Esc}", RP_FINAL_ACTION_TIMEOUT_MS, , "saída do formulário XML")
+        return Map("ok", false, "erro", "Esc nao produziu estado observavel de saída do XML.")
     return Map("ok", true, "path", xmlPath)
 }
