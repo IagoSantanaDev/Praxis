@@ -286,3 +286,71 @@ Sequência recomendada: (1) S03 remove a duplicidade P0 e normaliza polling/find
 - [ ] falhas de janela, controle, clipboard, modal e timeout têm retorno observável;
 - [ ] validações AHK disponíveis foram executadas e seus resultados foram registrados;
 - [ ] nenhuma fonte foi apagada apenas por semelhança textual.
+
+## 10. Parsing, registries e fronteiras de macros
+
+Esta seção complementa os contratos de interação com as famílias identificadas no mapa S01. Semelhança textual não é motivo suficiente para apagar uma função: a regra é distinguir fonte única, wrapper de compatibilidade, semântica de domínio e placeholder.
+
+### 10.1 Parsing de listas e parsers de domínio
+
+| Família | Fonte canônica / estado | Regra de canonização | Fatia | Risco / limite |
+|---|---|---|---|---|
+| Lista CSV simples | `lib/globals/mv/ParseUtils.ahk:ParseListaCsv` | **Fonte única.** `StrSplit` por vírgula, `Trim` e descarte de vazios; não criar variante para `remessas` ou `protocolos`. | S03 | O contrato é CSV simples; não interpretar pipe, linhas ou campos compostos aqui. |
+| Protocolos de remessa | `lib/modules/remessa_protocolo/RPParsers.ahk:ParseProtocolos` | Wrapper de domínio preservado: delega para `ParseListaCsv`. `RP_RecordTiming`, `RP_ConvenioMajoritario`, `RP_FiltrarContasPorConvenio` e relatórios continuam semântica RP. | S03 | Confirmar callers antes de remover o nome público. |
+| Remessas do Protocolar | `lib/modules/protocolar/ProtocolarParsers.ahk:Protocolar_ParseRemessas` | Wrapper de compatibilidade preservado: delega para `ParseListaCsv`. `Protocolar_Abort` delega para `MV_Abort(msg, true)` e não é parser duplicado. | S03 | Conferir callers e contrato de status antes de substituir o símbolo. |
+| Resultado FXML | `lib/modules/fechar_xml/FecharXmlParsers.ahk` | **Não canonizar nem apagar.** `FXML_ParseXmlSaveResult` e `FXML_ParseFfcvConfirmResult` são placeholders; `FXML_ValidateParams` e `FXML_ParseFlowResult` pertencem ao futuro orquestrador. | S05 | O `success=false` do placeholder não prova falha de produção; implementar somente com contrato real de `TissXmlScreen`/`FfcvScreen`. |
+| Contas dos macros | `test_macros/11_ffcv_remessa_inserir_imprimir.ahk:ParseContasTeste` | Manter local: aceita `Array`, fallback, linhas, pipe e extração numérica. Não transformar em parser global por semelhança com CSV. | S04 | Entrada `Prot. | Conta | Convênio` tem semântica de fixture diferente de `ParseListaCsv`. |
+| Tipos de conta | `lib/app/ScriptRegistry.ahk`/`MVConstants.ahk` versus macros `03`/`11` | Preservar a divergência para migração e validação; não corrigir macros nesta fatia. | S04 | Alteração silenciosa pode enviar tipo errado ao Oracle Forms. |
+
+**Contrato validado pelo Context7.** A referência oficial AHK v2 confirma `StrSplit`/`Trim` como primitivas de string e `RegExMatch` como busca com retorno de posição/objeto de match. A canonização mantém a transformação mínima de `ParseListaCsv` e não coloca regras de domínio nos wrappers.
+
+### 10.2 Registries e configuração
+
+- `lib/app/ScriptRegistry.ahk` é o **catálogo canônico**: `gScripts` registra os três scripts e `ValidateScripts` valida `Array`/`Map`, IDs, tipos (`text`, `select`, `date`), formatos e opções. Não duplicar o catálogo nos registries de módulo.
+- `RPRegistry.ahk`, `ProtocolarRegistry.ahk` e `FecharXmlRegistry.ahk` são shims de `#Include`, não registros paralelos. `FecharXmlRegistry.ahk` documenta que `FXML_Registry()` foi removida por ser órfã; não reintroduzi-la.
+- `lib/config/Settings.ahk` é a fonte única para `config.ini`, com cache `gSettingsCache`; não criar leituras diretas concorrentes sem justificativa de compatibilidade.
+- `lib/globals/mv/FFCV_ErrorTemplates.ahk` é o registro canônico de referências visuais/OCR. Artefatos gerados podem ser embutidos no build; `test_macros/13_ffcv_error_popup_detect.ahk` continua ferramenta de diagnóstico, não registry.
+
+Antes de remover símbolo, provar com `rg` todos os callers em `lib/`, `main.ahk`, `tools/` e `test_macros/`, incluindo includes e chamadas indiretas pelo `Dispatcher`. A ausência de chamada não autoriza remover shim que seja include do catálogo.
+
+### 10.3 Fronteiras e migração dos macros
+
+| Macro / família | Compatibilidade / escopo local | Canonização futura | Fatia |
+|---|---|---|---|
+| `_mv_control_probe.ahk` | Harness de teste com `MV_Test_FindControlByClientPoint`, busca por classe e ações opcionais; deve permanecer isolado para probe/relatório. | Compor `MV_FindControlAtPoint`, `MV_ClickBySpec` e helpers após resolver o P0 de duas definições em `Controls.ahk`. | S03 |
+| `03_ffcv_manutencao_remessas.ahk` | Usa teclado/atalhos deliberadamente porque `EditN` do Oracle Forms varia; `T_Poll` e `TIPO_CODIGO` são contratos de teste. | Migrar polling/click só quando houver equivalência provada; manter teclado para campos variáveis e validar tipos. | S03/S04 |
+| `11_ffcv_remessa_inserir_imprimir.ahk` | `ParseContasTeste`, `T_PollMs`, `FindControlByClassPrefixAtPoint`, `ClickBySpec`, waits e relatórios têm semântica de teste e `DO_ACTION`. | Delegar busca/click/polling à lib; preservar parser de fixture, relatório e parada em blocker. | S03/S04 |
+| `12_fechar_remessa_gerar_xml.ahk` | Waits de Entrega/TISS/XML, teclado, modais e placeholder de saída são específicos do fluxo. | Migrar polling/click/set-text/modal à lib em S04; resolver FXML, includes e OCR em S05. | S04/S05 |
+| `13_ffcv_error_popup_detect.ahk` | Diagnóstico visual; chama `FFCV_ErrorTemplates`, não trata texto do Forms como fonte confiável e não fecha modal por padrão. | Preservar como ferramenta; consolidar includes/API OCR e referências geradas em S05. | S05 |
+| `20_login_nav_movdoc_ffcv.ahk` | Caller adicional de polling e estabilidade, fora do conjunto principal desta tarefa. | Incluir no inventário para evitar migração parcial de `T_Poll`/`WaitWindowStable`. | S03 |
+
+### 10.4 Includes/API OCR obsoletos e limites
+
+- O caminho antigo de OCR/API é **compatibilidade obsoleta**, não fonte canônica: o build embute `Praxis_OcrReferences.ahk` e `Praxis_OcrProbe.ahk`, enquanto `FFCV_ErrorTemplates.ahk` mantém fallback de arquivo e chama `tools/ocr-probe.ps1` via PowerShell quando necessário.
+- `tools/ocr-probe.ps1` e `tools/build-ocr-error-references.ps1` permanecem a superfície operacional. S05 deve conferir includes opcionais, artefatos gerados e callers antes de remover qualquer API OCR antiga.
+- `WinGetText`/Window Spy podem expor apenas `&OK` em modais desenhados `ui60Drawn`; a classificação confiável permanece OCR local/templates e deve deixar erro observável quando referências, subprocesso, JSON ou idioma falharem.
+- Não corrigir agora includes dos macros, divergência dos tipos, placeholders FXML ou caminhos OCR. São trabalho de S04/S05, não de produção nesta fatia.
+
+### 10.5 Matriz S03–S05 e checklist de callers
+
+| Família | Regra | Dono |
+|---|---|---|
+| Poll/find/click/activation | escolher `lib/globals/mv`, preservar wrappers de domínio e resolver P0 antes de remover | S03 |
+| `ParseListaCsv` e aliases RP/Protocolar | manter fonte única; provar callers antes de remover aliases | S03 |
+| Set-text, waits, modais e relatórios | delegar primitivas, preservar mapas/relatórios/fallbacks | S04 |
+| `ParseContasTeste`, macros e tipos | manter fixtures locais e migrar equivalências provadas | S04 |
+| FXML, registries órfãos e OCR/includes | implementar com contratos reais; retirar APIs obsoletas após prova de ausência | S05 |
+
+Checklist obrigatório antes de qualquer remoção:
+
+- [ ] `rg` de definição e caller em `lib/`, `main.ahk`, `tools/` e `test_macros/`;
+- [ ] includes diretos e indiretos conferidos, inclusive `ScriptRegistry`/`Dispatcher`;
+- [ ] assinatura, unidade (`Secs`/`Ms`) e sentinela de retorno comparadas com esta especificação;
+- [ ] wrappers classificados como API de domínio, fixture de teste ou shim de include;
+- [ ] entradas vazias, duplicadas, malformadas e timeout cobertas por prova estática ou teste existente;
+- [ ] `tools/build-praxis.ps1`, `tools/find-implicit-locals.ps1` e `tools/find-top-level-calls.ps1` executados quando aplicável;
+- [ ] bloqueios P0/P1 e placeholders continuam reportados, sem serem apresentados como resolvidos.
+
+### 10.6 Prova de cobertura documental T02
+
+A especificação T02 cobre explicitamente `ParseListaCsv`, `FecharXmlParsers`, `test_macros` e a sequência de migração S03, S04 e S05. Esses marcadores são rastreadores de cobertura do documento, não APIs novas nem autorização para remover wrappers sem o checklist de callers.
