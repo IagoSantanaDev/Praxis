@@ -48,41 +48,6 @@ MV_ControlCheckedAt(winTitle, classNN, clientX, clientY, tolerance := 14) {
         return ""
 }
 
-MV_FindControlByClientPoint(winTitle, classNN, targetX, targetY, tolerance := 14) {
-    try hwnds := WinGetControlsHwnd(winTitle)
-    catch
-        return 0
-
-    bestHwnd := 0
-    bestDist := 999999
-
-    for hwnd in hwnds {
-        try ctrlClass := ControlGetClassNN(hwnd)
-        catch
-            continue
-
-        if (ctrlClass != classNN)
-            continue
-
-        try ControlGetPos &cx, &cy, &cw, &ch, hwnd
-        catch
-            continue
-
-        if (targetX >= cx && targetX <= cx + cw && targetY >= cy && targetY <= cy + ch)
-            return hwnd
-
-        centerX := cx + (cw / 2)
-        centerY := cy + (ch / 2)
-        dist := Sqrt((targetX - centerX) ** 2 + (targetY - centerY) ** 2)
-        if (dist < bestDist) {
-            bestDist := dist
-            bestHwnd := hwnd
-        }
-    }
-
-    return (bestHwnd && bestDist <= tolerance) ? bestHwnd : 0
-}
-
 MV_Poll(condFn, timeoutSecs) {
     global MV_POLL_MS
     deadline := A_TickCount + timeoutSecs * 1000
@@ -316,9 +281,32 @@ MV_FindButtonByText(winTitle, buttonText) {
     return 0
 }
 
+; Tenta preencher por ClassNN via ControlSetText e usa clique físico como fallback.
+; O fallback preserva o contrato para campos Oracle Forms que não aceitam WM_SETTEXT.
+MV_SetTextByControl(winTitle, classNN, value, fallbackX := "", fallbackY := "", clear := true) {
+    if (classNN != "" && classNN != "CLASSNN") {
+        hwnd := MV_FirstControlByClass(winTitle, classNN)
+        if hwnd {
+            try {
+                ControlSetText value, hwnd
+                try {
+                    if (Trim(ControlGetText(hwnd)) = Trim(String(value)))
+                        return true
+                } catch {
+                    return true
+                }
+            } catch {
+            }
+        }
+    }
+
+    if (fallbackX = "" || fallbackY = "")
+        return false
+    return MV_SetTextByClick(winTitle, fallbackX, fallbackY, value, clear)
+}
+
 ; Preenche um campo por clique físico + teclado (clear opcional).
-; Canônica única de TissXml_SetTextByClickAt (clear=true) e
-; TissXml_SetTextByClickNoClear (clear=false) e FfcvContaPopup_LimparCampoEEnviar.
+; É o fallback para campos que não aceitam ControlSetText.
 MV_SetTextByClick(winTitle, x, y, value, clear := true) {
     if !MV_EnsureWindowActive(winTitle)
         return false

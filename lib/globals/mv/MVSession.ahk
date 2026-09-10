@@ -25,22 +25,25 @@ CoordMode("Mouse", "Client")
 ;  API PÚBLICA
 ; ════════════════════════════════════════════════════════════════
 
+MV_EnsureModule(moduleWin, stableMs := 0, timeoutSecs := 0) {
+    if (stableMs = 0)
+        stableMs := MV_MODULE_STABLE_MS
+    if (timeoutSecs = 0)
+        timeoutSecs := MV_TIMEOUT_LOAD
+
+    if !WinExist(moduleWin)
+        return false
+
+    MV_ActivateModule(moduleWin)
+    return MV_WaitWindowStable(moduleWin, stableMs, timeoutSecs)
+}
+
 MV_EnsureMovDoc() {
-    if WinExist(MV_WIN_MOVDOC_ANY) {
-        MV_ActivateModule(MV_WIN_MOVDOC_ANY)
-        if MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
-            return true
-    }
-    return false
+    return MV_EnsureModule(MV_WIN_MOVDOC_ANY)
 }
 
 MV_EnsureFFCV() {
-    if WinExist(MV_WIN_FFCV_ANY) {
-        MV_ActivateModule(MV_WIN_FFCV_ANY)
-        if MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
-            return true
-    }
-    return false
+    return MV_EnsureModule(MV_WIN_FFCV_ANY)
 }
 
 ; ════════════════════════════════════════════════════════════════

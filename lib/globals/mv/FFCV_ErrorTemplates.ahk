@@ -6,10 +6,12 @@
 #Requires AutoHotkey v2.0
 #Warn All, OutputDebug
 
+#Include %A_LineFile%\..\MVConstants.ahk
+
 global gEmbeddedOcrReferencesBase64 := ""
 global gEmbeddedOcrProbeBase64 := ""
-#Include *i ..\..\..\build\generated\Praxis_OcrReferences.ahk
-#Include *i ..\..\..\build\generated\Praxis_OcrProbe.ahk
+#Include *i %A_LineFile%\..\..\..\..\build\generated\Praxis_OcrReferences.ahk
+#Include *i %A_LineFile%\..\..\..\..\build\generated\Praxis_OcrProbe.ahk
 
 ; Cadastro compartilhado de erros do FFCV Inserir Conta por OCR.
 ;

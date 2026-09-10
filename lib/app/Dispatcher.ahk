@@ -9,7 +9,7 @@
 ; ─── Dependencies ─────────────────────────────────────────────
 #Include ..\..\lib\modules\remessa_protocolo\RPRegistry.ahk
 #Include ..\..\lib\modules\protocolar\ProtocolarRegistry.ahk
-#Include ..\..\lib\modules\fechar_xml\FecharXml.ahk
+#Include ..\..\lib\modules\fechar_xml\FecharXmlRegistry.ahk
 #Include ..\..\lib\vendor\JSON.ahk
 
 ; ─── Dispatcher: AHK → JS bridge ─────────────────────────────

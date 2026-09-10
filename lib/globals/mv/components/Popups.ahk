@@ -10,8 +10,8 @@
 ;  MV POPUPS — wrappers de deteccao e fechamento de popups/modais
 ; ════════════════════════════════════════════════════════════════
 
-#Include ..\components\Controls.ahk
-#Include ..\MVConstants.ahk
+#Include %A_LineFile%\..\Controls.ahk
+#Include %A_LineFile%\..\..\MVConstants.ahk
 
 ; Constantes do popup "Informacoes da Conta" ficam em MVConstants.ahk
 ; (MV_POPUP_*), junto de MV_TIPO_CONTA e dos timings MV_CONTA_*.
