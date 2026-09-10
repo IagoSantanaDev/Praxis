@@ -90,11 +90,18 @@ function New-EmbeddedBase64Module {
     )
 
     $encoded = ConvertTo-Base64Utf8 -Text $Text
+    $chunkSize = 8000
     $lines = @(
         '; Gerado automaticamente por tools/build-praxis.ps1.',
         '; Não edite manualmente.',
-        "$VariableName := `"$encoded`""
+        "$VariableName := `"`""
     )
+
+    for ($offset = 0; $offset -lt $encoded.Length; $offset += $chunkSize) {
+        $length = [Math]::Min($chunkSize, $encoded.Length - $offset)
+        $chunk = $encoded.Substring($offset, $length)
+        $lines += "$VariableName .= `"$chunk`""
+    }
 
     $outputDir = Split-Path -Parent $OutputPath
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
@@ -468,7 +475,8 @@ function New-AhkIntegrityManifest {
     # Emitir manifesto AHK: Map de path->SHA256 e variaveis indexadas FileSHA256_<index>
     $lines = @(
         '; Gerado automaticamente por tools/build-praxis.ps1.',
-        '; Não edite manualmente. Este arquivo é embutido no Praxis.exe pelo Ahk2Exe.'
+        '; Não edite manualmente. Este arquivo é embutido no Praxis.exe pelo Ahk2Exe.',
+        'global gIntegrityExpectedFiles'
     )
 
     for ($i = 0; $i -lt $allFiles.Count; $i++) {

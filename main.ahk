@@ -10,18 +10,6 @@
 ; ─── Project root (used by all #Include directives below) ────
 global gRoot := A_ScriptDir
 
-for arg in A_Args {
-    if (arg = "--integrity-check" || arg = "--check") {
-        ; Check interno do EXE compilado: usa o manifesto embutido
-        ; (build/generated/Praxis_IntegrityManifest.ahk) e o A_ScriptDir
-        ; do executável. Não depende de AutoHotkey instalado no destino e
-        ; não distribui cli-check.ahk no stage.
-        ; Exit codes: 0 = OK; 70 = recurso ausente/alterado (docs/DISTRIBUTION.md).
-        IntegrityDoCheck()
-        ExitApp 0
-    }
-}
-
 ; ─── Includes (ordem importa) ────────────────────────────────
 ; AppState.ahk deve vir antes do manifesto e do App.ahk, 
 ; pois ambos dependem dos globais e variáveis declarados nele.
@@ -36,6 +24,18 @@ for arg in A_Args {
 #Include lib\app\App.ahk
 #Include lib\app\ScriptRegistry.ahk
 #Include lib\config\Paths.ahk
+
+for arg in A_Args {
+    if (arg = "--integrity-check" || arg = "--check") {
+        ; Check interno do EXE compilado: usa o manifesto embutido
+        ; (build/generated/Praxis_IntegrityManifest.ahk) e o A_ScriptDir
+        ; do executável. Não depende de AutoHotkey instalado no destino e
+        ; não distribui cli-check.ahk no stage.
+        ; Exit codes: 0 = OK; 70 = recurso ausente/alterado (docs/DISTRIBUTION.md).
+        IntegrityDoCheck()
+        ExitApp 0
+    }
+}
 
 ; Cancelamento global: Esc interrompe a execução atual definitivamente.
 ; A próxima execução passa por TryBeginAppRun(), que limpa gStopRequested.
