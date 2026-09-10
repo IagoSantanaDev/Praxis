@@ -5,10 +5,10 @@
 
 #Requires AutoHotkey v2.0
 #Warn All, OutputDebug
-#Include ..\..\..\..\lib\globals\mv\MVSession.ahk
-#Include ..\FFCV_ErrorTemplates.ahk
-#Include ..\components\Popups.ahk
-#Include ..\components\Dialogs.ahk
+#Include %A_LineFile%\..\..\MVSession.ahk
+#Include %A_LineFile%\..\..\FFCV_ErrorTemplates.ahk
+#Include %A_LineFile%\..\..\components\Popups.ahk
+#Include %A_LineFile%\..\..\components\Dialogs.ahk
 
 ; ════════════════════════════════════════════════════════════════
 ;  FFCV CONTA POPUP — "INFORMAÇÕES DA CONTA" DENTRO DO FFCV

@@ -5,8 +5,8 @@
 
 #Requires AutoHotkey v2.0
 #Warn All, OutputDebug
-#Include ..\..\..\..\lib\globals\mv\MVSession.ahk
-#Include ..\components\Dialogs.ahk
+#Include %A_LineFile%\..\..\MVSession.ahk
+#Include %A_LineFile%\..\..\components\Dialogs.ahk
 
 ; ════════════════════════════════════════════════════════════════
 ;  MOV DOC SCREEN — PROTOCOLAÇÃO / BAIXA DE DOCUMENTOS
@@ -278,17 +278,13 @@ _LerCampoGrid(x, y, campo := "", fastTimeoutMs := 150, fallbackTimeoutMs := 300)
     Sleep MOVDOC_KEY_SETTLE_MS
     Send("{Home}{Shift down}{End}{Shift up}")
 
-    valor := _CopySelecionado(fastTimeoutMs)
+    valor := MV_CopyFocusedText(fastTimeoutMs)
     if MovDoc_GridValueValid(valor, campo)
         return valor
 
-    valor := _CopySelecionado(fallbackTimeoutMs)
+    valor := MV_CopyFocusedText(fallbackTimeoutMs)
     if MovDoc_GridValueValid(valor, campo)
         return valor
 
     return ""
-}
-
-_CopySelecionado(timeoutMs := 500) {
-    return MV_CopyFocusedText(timeoutMs)
 }

@@ -5,11 +5,11 @@
 
 #Requires AutoHotkey v2.0
 #Warn All, OutputDebug
-#Include ..\..\..\..\lib\globals\mv\MVSession.ahk
-#Include ..\components\Dialogs.ahk
-#Include ..\components\Popups.ahk
-#Include FfcvScreen.ahk
-#Include ..\..\..\..\lib\config\Paths.ahk
+#Include %A_LineFile%\..\..\MVSession.ahk
+#Include %A_LineFile%\..\..\components\Dialogs.ahk
+#Include %A_LineFile%\..\..\components\Popups.ahk
+#Include %A_LineFile%\..\FfcvScreen.ahk
+#Include %A_LineFile%\..\..\..\..\..\lib\config\Paths.ahk
 
 ; ── Internal helpers ─────────────────────────────────────────
 ; Verifica se um controle esta visivel e acessivel em coords XY.
@@ -53,11 +53,11 @@ RP_XML_QUERY_MIN_WAIT_MS   := FFCV_XML_QUERY_MIN_WAIT_MS
 ; ════════════════════════════════════════════════════════════════
 
 TissXml_SetTextByClickAt(winTitle, x, y, value) {
-    return MV_SetTextByClick(winTitle, x, y, value, true)
+    return MV_SetTextByControl(winTitle, "Edit1", value, x, y, true)
 }
 
 TissXml_SetTextByClickNoClear(winTitle, x, y, value) {
-    return MV_SetTextByClick(winTitle, x, y, value, false)
+    return MV_SetTextByControl(winTitle, "Edit1", value, x, y, false)
 }
 
 /*
@@ -139,12 +139,12 @@ TissXml_HandleSaveModals() {
         popup := Dialog_ActiveModalTitle()
 
         ; Modal de sobrescrita: tem Sim e Nao. Regra: nao sobrescrever.
-        if TissXml_ModalHasButton(popup, "&Sim") && TissXml_ModalHasButton(popup, "&Nao") {
+        if MV_FindButtonByText(popup, "&Sim") && MV_FindButtonByText(popup, "&Nao") {
             if TissXml_ClickModalButtonByText(popup, "&Nao")
                 Notify("Modal Sim/Nao respondido com Nao.")
             else
                 return false
-        } else if TissXml_ModalHasButton(popup, "&OK") {
+        } else if MV_FindButtonByText(popup, "&OK") {
             if TissXml_ClickModalButtonByText(popup, "&OK")
                 Notify("Modal OK fechado.")
             else
@@ -166,11 +166,6 @@ TissXml_ClickModalButtonByText(winTitle, buttonText) {
     ControlClick hwnd,,,,, "NA"
     return true
 }
-
-TissXml_ModalHasButton(winTitle, buttonText) {
-    return MV_FindButtonByText(winTitle, buttonText) != 0
-}
-
 
 ; ════════════════════════════════════════════════════════════════
 ;  Funcoes publicas — extraidas de RemessaProtocolo.ahk

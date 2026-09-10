@@ -5,11 +5,11 @@
 
 #Requires AutoHotkey v2.0
 #Warn All, OutputDebug
-#Include ..\..\..\..\lib\globals\mv\MVSession.ahk
-#Include ..\FFCV_ErrorTemplates.ahk
-#Include ..\components\Popups.ahk
-#Include ..\components\Dialogs.ahk
-#Include FfcvContaPopup.ahk
+#Include %A_LineFile%\..\..\MVSession.ahk
+#Include %A_LineFile%\..\..\FFCV_ErrorTemplates.ahk
+#Include %A_LineFile%\..\..\components\Popups.ahk
+#Include %A_LineFile%\..\..\components\Dialogs.ahk
+#Include %A_LineFile%\..\FfcvContaPopup.ahk
 
 ; ════════════════════════════════════════════════════════════════
 ;  FFCV SCREEN — MANUTENÇÃO DE REMESSA / FECHAMENTO DE REMESSAS
@@ -169,6 +169,16 @@ Ffcv_AbrirManutencaoRemessa() {
     return MV_WaitWindowStable(MV_WIN_FFCV_REMESSA, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD)
 }
 
+Ffcv_AbrirTelaEntregaRemessas() {
+    if !MV_EnsureFFCV()
+        return false
+
+    Send "{Alt down}le{Alt up}"
+    if !MV_Poll(() => WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_LOAD)
+        return false
+    return MV_WaitWindowStable(WIN_FFCV_DATAS, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD)
+}
+
 Ffcv_CarregarConvenio(convenioNum) {
     MV_ActivateModule(MV_WIN_FFCV_ANY)
     Send "{F7}"
@@ -239,8 +249,8 @@ Ffcv_AbrirTelaTISS() {
 
     startedAt := A_TickCount
 
-    ; Atalho esperado: Lançamentos → Monitoração de Faturamento - TISS.
-    Send "{Alt down}lt{Alt up}{Enter}"
+    ; Atalho validado em Fluxos/FecharEXML: Lançamentos → Monitoração de Faturamento - TISS.
+    Send "{Alt down}lmm{Enter}{Alt up}"
 
     ok := MV_Poll(() => WinExist(WIN_XML), MV_TIMEOUT_LOAD)
     if ok
@@ -249,44 +259,94 @@ Ffcv_AbrirTelaTISS() {
 }
 
 Ffcv_SairTelaEntregaPendente() {
-    ; M1 (auditoria 2026-06-27): FFCV_ENTREGA_SAIR_ATALHO esta como placeholder "^q"
-    ; desde M001. Se nao foi corrigido, falhar cedo com erro explicito em vez de
-    ; enviar Ctrl+Q arbitrariamente e potencialmente corromper o estado da tela.
-    if (FFCV_ENTREGA_SAIR_ATALHO = "^q") {
-        Notify("PENDENTE: atalho de saida da tela Entrega de Remessas ainda nao foi mapeado (FFCV_ENTREGA_SAIR_ATALHO). Use Window Spy para descobrir a combinacao correta e atualizar a constante antes de continuar ate XML.")
+    if !MV_EnsureWindowActive(WIN_FFCV_DATAS)
         return false
-    }
-    if (Trim(FFCV_ENTREGA_SAIR_ATALHO) = "") {
-        Notify("Pendente: atalho para sair da tela Entrega de Remessas ainda não mapeado. Preencha FFCV_ENTREGA_SAIR_ATALHO para continuar até XML.")
-        return false
-    }
 
-    if !_EnsureWindowActive(WIN_FFCV_DATAS) {
-        Notify("Não consegui ativar a tela Entrega de Remessas para enviar o atalho de saída.")
-        return false
-    }
+    ; Fluxos/FecharEXML e FecharEXMLOLD comprovam Ctrl+Q como saída da tela.
+    ControlSend "^q",, WIN_FFCV_DATAS
+    if MV_Poll(() => !WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
+        return true
 
-    Send FFCV_ENTREGA_SAIR_ATALHO
+    Send "^q"
+    if MV_Poll(() => !WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
+        return true
+
+    try WinClose WIN_FFCV_DATAS
     return MV_Poll(() => !WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_ACOE)
 }
 
-Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc) {
-    if !_EnsureWindowActive(WIN_FFCV_DATAS)
+Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false) {
+    datas := Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto)
+    if !datas["ok"]
+        return datas
+
+    checked := MV_ControlCheckedAt(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y, 20)
+    if (checked = 0) {
+        if !MV_ClickBySpec(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y)
+            return Map("ok", false, "erro", "Nao consegui marcar Fechar contas sem imprimir faturas.", "remessa", "")
+    } else if (checked = "") {
+        return Map("ok", false, "erro", "Nao consegui ler o estado da opcao de fechamento.", "remessa", "")
+    }
+
+    if !MV_ClickBySpec(WIN_FFCV_DATAS, DATAS_BTN_CONFIRMAR, DATAS_BTN_CONFIRMAR_X, DATAS_BTN_CONFIRMAR_Y)
+        return Map("ok", false, "erro", "Nao consegui confirmar a entrega da remessa.", "remessa", "")
+
+    if !MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), MV_TIMEOUT_ACOE)
+        return Map("ok", false, "erro", "Popup de confirmacao da entrega nao apareceu.", "remessa", "")
+    if !_ClickNaoModal()
+        return Map("ok", false, "erro", "Nao consegui responder o popup de confirmacao da entrega.", "remessa", "")
+    if !MV_WaitModalGone(FFCV_FINAL_ACTION_TIMEOUT_MS)
+        return Map("ok", false, "erro", "Popup de confirmacao da entrega nao fechou.", "remessa", "")
+
+    if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
+        return Map("ok", false, "erro", "Relatorio de atendimentos da remessa nao apareceu.", "remessa", "")
+    if !MV_EnsureWindowActive(WIN_CAPA_REMESSA)
+        return Map("ok", false, "erro", "Relatorio de atendimentos nao ficou ativo.", "remessa", "")
+    reportButton := MV_FirstControlByClass(WIN_CAPA_REMESSA, "Button2")
+    if !reportButton
+        return Map("ok", false, "erro", "Botao Imprimir do relatorio nao foi encontrado.", "remessa", "")
+    try ControlClick reportButton,,,,, "NA"
+    catch
+        return Map("ok", false, "erro", "Falha ao iniciar impressao do relatorio da remessa.", "remessa", "")
+    if !MV_WaitWindowGone(WIN_CAPA_REMESSA, MV_TIMEOUT_LOAD)
+        return Map("ok", false, "erro", "Relatorio da remessa nao concluiu.", "remessa", "")
+
+    return Map("ok", true, "erro", "", "remessa", datas["remessa"])
+}
+
+Ffcv_PrepararEntregaPorProtocolo() {
+    ; Ponte usada depois da ultima conta: inicia diretamente no atalho
+    ; "5 - Entregar Rem." da Parte 1 recuperada.
+    Send "{Alt down}5{Alt up}"
+    return MV_Poll(() => WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_LOAD)
+}
+
+Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto := false) {
+    if !MV_EnsureWindowActive(WIN_FFCV_DATAS)
         return Map("ok", false, "erro", "Tela de datas não ficou ativa para preencher entrega/vencimento.", "remessa", "")
 
-    ; Contrato validado no teste 12:
-    ; ancorar foco em Data de Entrega, Shift+Tab seleciona Remessa, Tab volta
-    ; para Data de Entrega, Enter avança para Data Prevista. Não usar Ctrl+A.
-    Click(DATAS_CAMPO_ENTREGA_X + 15, DATAS_CAMPO_ENTREGA_Y + 8, 1)
-    Sleep FFCV_KEY_SETTLE_MS
+    if lerRemessaDireto {
+        try numRemessa := Trim(ControlGetText(DATAS_CAMPO_REMESSA, WIN_FFCV_DATAS))
+        catch
+            numRemessa := ""
+        if (numRemessa = "")
+            return Map("ok", false, "erro", "Nao consegui ler Edit5 da tela Entrega de Remessas.", "remessa", "")
 
-    Send("+{Tab}")
-    Sleep FFCV_KEY_SETTLE_MS
-    numRemessa := _CopyFocusedNumericText(600)
-    if (numRemessa = "")
-        return Map("ok", false, "erro", "Não consegui copiar o número da remessa via Shift+Tab na tela de datas.", "remessa", "")
-
-    Send("{Tab}")
+        try ControlFocus DATAS_CAMPO_ENTREGA, WIN_FFCV_DATAS
+        catch
+            return Map("ok", false, "erro", "Nao consegui focar a data de entrega.", "remessa", "")
+    } else {
+        ; Contrato validado no teste 12: ancorar foco em Data de Entrega,
+        ; Shift+Tab seleciona Remessa e Tab volta para Data de Entrega.
+        Click(DATAS_CAMPO_ENTREGA_X + 15, DATAS_CAMPO_ENTREGA_Y + 8, 1)
+        Sleep FFCV_KEY_SETTLE_MS
+        Send("+{Tab}")
+        Sleep FFCV_KEY_SETTLE_MS
+        numRemessa := MV_CopyFocusedText(600, true)
+        if (numRemessa = "")
+            return Map("ok", false, "erro", "Não consegui copiar o número da remessa via Shift+Tab na tela de datas.", "remessa", "")
+        Send("{Tab}")
+    }
     Sleep FFCV_KEY_SETTLE_MS
     SendText dataEntrega
     Sleep FFCV_KEY_SETTLE_MS
@@ -300,11 +360,11 @@ Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc) {
 }
 
 Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc) {
-    if !_EnsureWindowActive(MV_WIN_FFCV_ANY)
+    if !MV_EnsureWindowActive(MV_WIN_FFCV_ANY)
         return Map("ok", false, "erro", "FFCV nao ficou ativa antes de abrir a tela de fechar remessa/datas.", "remessa", "")
 
     startedAt := A_TickCount
-    if !_ClickBySpec(MV_WIN_FFCV_ANY, FFCV_BTN_ABRIR_DATAS, 464, 458)
+    if !MV_ClickBySpec(MV_WIN_FFCV_ANY, FFCV_BTN_ABRIR_DATAS, 464, 458)
         return Map("ok", false, "erro", "Nao consegui clicar em Entregar Remessa.", "remessa", "")
 
     if !MV_Poll(() => WinExist(WIN_FFCV_DATAS), MV_TIMEOUT_LOAD)
@@ -318,32 +378,32 @@ Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc) {
 
     checkedFecharContas := MV_ControlCheckedAt(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y, 20)
     if (checkedFecharContas = 0) {
-        if !_ClickBySpec(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y)
+        if !MV_ClickBySpec(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y)
             return Map("ok", false, "erro", "Nao consegui marcar 'Fechar contas sem imprimir faturas'.", "remessa", "")
     } else if (checkedFecharContas = "") {
         return Map("ok", false, "erro", "Nao consegui ler o estado de 'Fechar contas sem imprimir faturas'.", "remessa", "")
     }
     Sleep MV_DELAY_INPUT
 
-    if !_ClickBySpec(WIN_FFCV_DATAS, DATAS_BTN_CONFIRMAR, DATAS_BTN_CONFIRMAR_X, DATAS_BTN_CONFIRMAR_Y)
+    if !MV_ClickBySpec(WIN_FFCV_DATAS, DATAS_BTN_CONFIRMAR, DATAS_BTN_CONFIRMAR_X, DATAS_BTN_CONFIRMAR_Y)
         return Map("ok", false, "erro", "Nao consegui confirmar a entrega da remessa.", "remessa", "")
 
-    if !_WaitAnyModalOrDelay(MV_TIMEOUT_ACOE)
+    if !MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), MV_TIMEOUT_ACOE)
         return Map("ok", false, "erro", "Popup de confirmacao nao apareceu.", "remessa", "")
     if !_ClickNaoModal()
         return Map("ok", false, "erro", "Nao consegui clicar Nao no popup de confirmacao.", "remessa", "")
-    if !_WaitModalGone(FFCV_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitModalGone(FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Popup de confirmacao nao fechou em tempo.", "remessa", "")
 
     if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
         return Map("ok", false, "erro", "Tela de impressao nao apareceu.", "remessa", "")
-    if !_EnsureWindowActive(WIN_CAPA_REMESSA)
+    if !MV_EnsureWindowActive(WIN_CAPA_REMESSA)
         return Map("ok", false, "erro", "Tela de impressao nao ficou ativa para confirmar.", "remessa", "")
     if !MV_WaitOracleSettled(WIN_CAPA_REMESSA, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Tela de impressao nao estabilizou antes do Enter.", "remessa", "")
 
     Send "{Enter}"
-    if !_WaitWindowGone(WIN_CAPA_REMESSA, FFCV_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitWindowGone(WIN_CAPA_REMESSA, FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Enter enviado, mas a tela de impressao nao fechou em tempo.", "remessa", "")
 
     if !MV_WaitOracleSettled(WIN_FFCV_DATAS, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
@@ -367,15 +427,6 @@ Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc) {
 ; ── Shared helpers (also used by RemessaProtocolo) ────────────
 
 /*
-_ClickBySpec(winTitle, classNN, x, y)
-    Click by ClassNN + client coords; fallback direct Click.
-    Delega para a versão canônica MV_ClickBySpec (components/Controls.ahk).
-*/
-_ClickBySpec(winTitle, classNN, x, y) {
-    return MV_ClickBySpec(winTitle, classNN, x, y)
-}
-
-/*
 _ClickNaoModal()
     Click "Nao" button in active modal or WIN_XML_POPUP_SIMNAO.
 */
@@ -387,19 +438,6 @@ _ClickNaoModal() {
         return MV_ClickFirstControl(popup, XML_BTN_NAO)
     return false
 }
-
-_WaitAnyModalOrDelay(timeoutSecs) {
-    return MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), timeoutSecs)
-}
-
-_WaitModalGone(timeoutMs := 30000) {
-    return MV_WaitModalGone(timeoutMs)
-}
-
-_WaitWindowGone(winTitle, timeoutMs := 30000) {
-    return MV_WaitWindowGone(winTitle, timeoutMs)
-}
-
 
 ; ════════════════════════════════════════════════════════════════
 ;  Funções internas (privadas do módulo)
@@ -415,21 +453,6 @@ FFCV_WaitLoad()
 FFCV_WaitLoad() {
     Sleep FFCV_KEY_SETTLE_MS
     return WinExist(MV_WIN_FFCV_ANY)
-}
-
-/*
-_CopyFocusedNumericText(timeoutMs)
-    Seleciona o texto focado com Ctrl+C, extrai o primeiro número
-    contíguo e retorna. Usado para copiar o número da remessa na
-    tela de datas.
-    @return String numérica ou "" em timeout.
-*/
-_CopyFocusedNumericText(timeoutMs := 600) {
-    return MV_CopyFocusedText(timeoutMs, true)
-}
-
-_EnsureWindowActive(winTitle, timeoutSecs := 3) {
-    return MV_EnsureWindowActive(winTitle, timeoutSecs)
 }
 
 _TipoContaCodigo(tipoConta) {
