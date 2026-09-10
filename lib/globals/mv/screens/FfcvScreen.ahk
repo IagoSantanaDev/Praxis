@@ -42,7 +42,6 @@
 ; Usar diretamente nos callers; manter refs locais para compatibilidade.
 WIN_FFCV_DATAS         := "Cadastro: Faturas e Remessas"
 WIN_FFCV_DATAS_OK      := "Mensagem ao Usuário do MV 2000"
-WIN_CAPA_REMESSA       := "Relatório de Atendimentos da Remessa"
 WIN_XML                := "Monitoração de Faturamento - TISS"
 WIN_XML_PATH_FORM      := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
 WIN_XML_POPUP_SIMNAO   := "Mensagem ao Usuário do MV 2000"
@@ -255,29 +254,15 @@ Ffcv_ImprimirRelatorioAtendimentos() {
         return false
     }
 
-    before := MV_CaptureScreenState(MV_WIN_FFCV_ANY)
-    if !MV_ClickControlAt(MV_WIN_FFCV_ANY, FFCV_BTN_IMPRIMIR, FFCV_BTN_IMPRIMIR_X, FFCV_BTN_IMPRIMIR_Y) {
-        Notify("Não consegui clicar em Relatório Atendimentos.")
+    try {
+        return MV_PrintDeliveryReport(
+            "Impressão do relatório de atendimentos em andamento...",
+            MV_WIN_FFCV_ANY,
+            FFCV_BTN_IMPRIMIR)
+    } catch as err {
+        Notify(err.Message)
         return false
     }
-    if !MV_WaitScreenChanged(before, MV_TIMEOUT_LOAD * 1000)
-        return false
-    if !MV_WaitScreenStable(WIN_CAPA_REMESSA, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
-        return false
-
-    if !MV_CloseWindowAndWait(WIN_CAPA_REMESSA, Ffcv_ConfirmarRelatorioAction,
-        MV_WIN_FFCV_ANY, MV_TIMEOUT_LOAD * 1000, "relatório de atendimentos confirmado")
-        return false
-    Notify("Relatório de atendimentos confirmado para impressão.")
-    return true
-}
-
-Ffcv_ConfirmarRelatorioAction() {
-    if !WinExist(WIN_CAPA_REMESSA)
-        return false
-    WinActivate WIN_CAPA_REMESSA
-    Send "{Enter}"
-    return true
 }
 
 Ffcv_AbrirTelaTISS() {
@@ -352,16 +337,11 @@ Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false) {
     if !MV_WaitModalGone(FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Popup de confirmacao da entrega nao fechou.", "remessa", "")
 
-    if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
-        return Map("ok", false, "erro", "Relatorio de atendimentos da remessa nao apareceu.", "remessa", "")
-    if !MV_EnsureWindowActive(WIN_CAPA_REMESSA)
-        return Map("ok", false, "erro", "Relatorio de atendimentos nao ficou ativo.", "remessa", "")
-    reportButton := MV_FirstControlByClass(WIN_CAPA_REMESSA, "Button2")
-    if !reportButton
-        return Map("ok", false, "erro", "Botao Imprimir do relatorio nao foi encontrado.", "remessa", "")
-    if !MV_ClickModalAndWait(WIN_CAPA_REMESSA, reportButton, MV_TIMEOUT_LOAD,
-        WIN_FFCV_DATAS, "impressão do relatório da remessa")
-        return Map("ok", false, "erro", "Falha ao iniciar impressao do relatorio da remessa.", "remessa", "")
+    try {
+        MV_PrintDeliveryReport("Impressão da remessa " datas["remessa"] " em andamento...")
+    } catch as err {
+        return Map("ok", false, "erro", err.Message, "remessa", "")
+    }
 
     return Map("ok", true, "erro", "", "remessa", datas["remessa"])
 }
@@ -454,16 +434,11 @@ Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc) {
     if !MV_WaitModalGone(FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Popup de confirmacao nao fechou em tempo.", "remessa", "")
 
-    if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
-        return Map("ok", false, "erro", "Tela de impressao nao apareceu.", "remessa", "")
-    if !MV_EnsureWindowActive(WIN_CAPA_REMESSA)
-        return Map("ok", false, "erro", "Tela de impressao nao ficou ativa para confirmar.", "remessa", "")
-    if !MV_WaitOracleSettled(WIN_CAPA_REMESSA, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
-        return Map("ok", false, "erro", "Tela de impressao nao estabilizou antes do Enter.", "remessa", "")
-
-    if !MV_CloseWindowAndWait(WIN_CAPA_REMESSA, Ffcv_ConfirmarRelatorioAction,
-        WIN_FFCV_DATAS, FFCV_FINAL_ACTION_TIMEOUT_MS, "impressão da remessa confirmada")
-        return Map("ok", false, "erro", "Enter enviado, mas a tela de impressao nao fechou em tempo.", "remessa", "")
+    try {
+        MV_PrintDeliveryReport("Impressão da remessa " Trim(numRemessa) " em andamento...")
+    } catch as err {
+        return Map("ok", false, "erro", err.Message, "remessa", "")
+    }
 
     if !MV_WaitOracleSettled(WIN_FFCV_DATAS, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "A tela de Entrega de Remessas nao estabilizou para sair.", "remessa", "")

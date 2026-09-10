@@ -21,6 +21,13 @@ MV_WIN_MOVDOC_BAIXA   := "Protocolação de Baixa de Documentos ahk_exe ifrun60.
 MV_WIN_MOVDOC_ENVIO   := "Protocolação de Envio de Documentos ahk_exe ifrun60.EXE"
 MV_WIN_FFCV_REMESSA   := "MV2000i - Faturamento ahk_exe ifrun60.EXE"
 
+; ── Relatório de atendimentos da remessa ─────────────────────
+; Contrato compartilhado por todos os fluxos que imprimem remessa.
+MV_WIN_RELATORIO_REMESSA   := "Relatório de Atendimentos da Remessa ahk_exe ifrun60.EXE"
+MV_WIN_PROGRESSO_RELATORIO := "Andamento do Relatório ahk_exe RWRBE60.EXE"
+MV_PROCESSO_RELATORIO      := "RWRBE60.EXE"
+MV_BTN_IMPRIMIR_RELATORIO  := "Button2"
+
 ; ── Controles de popups conhecidos ────────────────────────────
 MV_MODAL_OK_CLASS     := "Button1"
 MV_CLASS_MODAL_FORMS  := "ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"

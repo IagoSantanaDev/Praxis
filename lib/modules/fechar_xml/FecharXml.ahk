@@ -90,21 +90,17 @@ RunFecharXML(params) {
 }
 
 FXML_ImprimirRelatorioInicial() {
-    button := MV_FirstControlByClass(MV_WIN_FFCV_ANY, "Button9")
-    if !button
+    if !MV_FirstControlByClass(MV_WIN_FFCV_ANY, "Button9")
         return true
 
-    try ControlClick button,,,,, "NA"
-    catch
+    try {
+        MV_PrintDeliveryReport(
+            "Impressão inicial do relatório em andamento...",
+            MV_WIN_FFCV_ANY,
+            "Button9")
+        return true
+    } catch as err {
+        Notify(err.Message)
         return false
-
-    if !MV_Poll(() => WinExist(WIN_CAPA_REMESSA), MV_TIMEOUT_LOAD)
-        return false
-    reportButton := MV_FirstControlByClass(WIN_CAPA_REMESSA, "Button2")
-    if !reportButton
-        return false
-    try ControlClick reportButton,,,,, "NA"
-    catch
-        return false
-    return MV_WaitWindowGone(WIN_CAPA_REMESSA, MV_TIMEOUT_LOAD)
+    }
 }

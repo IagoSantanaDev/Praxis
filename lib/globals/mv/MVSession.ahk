@@ -21,6 +21,7 @@ CoordMode("Mouse", "Client")
 #Include %A_LineFile%\..\MVConstants.ahk
 #Include %A_LineFile%\..\components\Controls.ahk
 #Include %A_LineFile%\..\MVSync.ahk
+#Include %A_LineFile%\..\components\ReportPrint.ahk
 
 ; ════════════════════════════════════════════════════════════════
 ;  API PÚBLICA
