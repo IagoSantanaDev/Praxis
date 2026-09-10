@@ -31,7 +31,11 @@ global gScripts := [  ; catalog of available scripts — read by InitializeApp()
                 "format","yyyy-MM-dd"),
             Map("id","data_vencimento","label","Data de Vencimento",
                 "tipo","date",   "obrigatorio",false,
-                "format","yyyy-MM-dd")
+                "format","yyyy-MM-dd"),
+            Map("id","imprimir_apos_inserir", "label","Imprimir após inserir",
+                "tipo","checkbox", "obrigatorio",false, "padrao",true),
+            Map("id","um_protocolo_uma_remessa", "label","Um Protocolo = Uma Remessa",
+                "tipo","checkbox", "obrigatorio",false, "padrao",false)
         ]
     ),
     Map(
@@ -50,11 +54,12 @@ global gScripts := [  ; catalog of available scripts — read by InitializeApp()
                 "tipo","text",  "obrigatorio",true,
                 "hint","Ex: 365"),
             Map("id","tipo",        "label","Tipo de Atendimento",
-                "tipo","select", "obrigatorio",false,
+                "tipo","select", "obrigatorio",true,
                 "opcoes",["Ambulatorial","Internamento"]),
             Map("id","finalizar_envio", "label","Imprimir/Salvar Envio",
-                "tipo","select", "obrigatorio",false,
-                "opcoes",["Não","Sim"])
+                "tipo","checkbox", "obrigatorio",false, "padrao",true),
+            Map("id","uma_remessa_um_protocolo", "label","Uma Remessa = Um Protocolo",
+                "tipo","checkbox", "obrigatorio",false, "padrao",false)
         ]
     ),
     Map(
@@ -66,18 +71,16 @@ global gScripts := [  ; catalog of available scripts — read by InitializeApp()
             Map("id","remessas",      "label","Número das Remessas",
                 "tipo","text", "obrigatorio",true,
                 "hint","Ex: 511458, 514015"),
-            Map("id","data_entrega",  "label","Data de Entrega",
-                "tipo","date", "obrigatorio",true,
+            Map("id","data_entrega",  "label","Data de Pagamento",
+                "tipo","date", "obrigatorio",false,
                 "format","yyyy-MM-dd"),
             Map("id","data_vencimento","label","Data de Vencimento",
                 "tipo","date", "obrigatorio",false,
                 "format","yyyy-MM-dd"),
             Map("id","fechar",        "label","Fechar Remessa",
-                "tipo","select", "obrigatorio",false,
-                "opcoes",["Sim","Não"]),
+                "tipo","checkbox", "obrigatorio",false, "padrao",true),
             Map("id","gerar_xml",     "label","Gerar XML",
-                "tipo","select", "obrigatorio",false,
-                "opcoes",["Sim","Não"])
+                "tipo","checkbox", "obrigatorio",false, "padrao",true)
         ]
     )
 ]

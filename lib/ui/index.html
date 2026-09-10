@@ -182,6 +182,9 @@ button, input, select { font: inherit; color: inherit; }
 .form-grid { display: flex; flex-direction: column; gap: 14px; max-width: 420px; }
 
 .form-field { display: flex; flex-direction: column; gap: 4px; }
+.form-field.checkbox { flex-direction: row; align-items: center; gap: 8px; }
+.form-field.checkbox .form-label { order: 2; }
+.form-checkbox { width: 16px; height: 16px; accent-color: var(--accent); }
 .form-label { font-size: var(--fs-sm); font-weight: 600; color: var(--txt); }
 .form-label .req { color: var(--red); margin-left: 3px; font-weight: 700; }
 
@@ -319,7 +322,7 @@ button, input, select { font: inherit; color: inherit; }
     <div class="s-sep"></div>
     <span id="s-script">Nenhum módulo selecionado</span>
     <div class="s-sep"></div>
-    <span>v1.0.0</span>
+    <span>v2.0.0</span>
   </div>
 </div>
 
@@ -420,6 +423,9 @@ const FieldInputTemplates = {
     return `<select class="form-select" id="p-${p.id}"${req?' required':''}>
               <option value="">Selecione…</option>${opts}</select>`;
   },
+  checkbox(p) {
+    return `<input class="form-checkbox" type="checkbox" id="p-${p.id}"${p.padrao?' checked':''}>`;
+  },
   default(p, req) {
     const hint = p.hint ?? '';
     return `<input class="form-input" type="${p.tipo}" id="p-${p.id}"
@@ -432,23 +438,24 @@ function renderField(p) {
   const build = FieldInputTemplates[p.tipo] ?? FieldInputTemplates.default;
   const input = build(p, req);
 
+  const checkbox = p.tipo === 'checkbox';
   return `
-    <div class="form-field">
-      <label class="form-label" for="p-${p.id}">${esc(p.label)}${req?'<span class="req" aria-hidden="true">*</span>':''}</label>
+    <div class="form-field${checkbox?' checkbox':''}">
       ${input}
+      <label class="form-label" for="p-${p.id}">${esc(p.label)}${req?'<span class="req" aria-hidden="true">*</span>':''}</label>
     </div>`;
 }
 
 function clearForm() {
   if (!current) return;
-  current.params.forEach(p => { const el = document.getElementById(`p-${p.id}`); if(el) el.value=''; });
+  current.params.forEach(p => { const el = document.getElementById(`p-${p.id}`); if(!el) return; if(p.tipo === 'checkbox') el.checked = !!p.padrao; else el.value=''; });
 }
 
 function collectParams() {
   const params = {};
   for (const p of current.params) {
     const el  = document.getElementById(`p-${p.id}`);
-    const val = el?.value?.trim() ?? '';
+    const val = p.tipo === 'checkbox' ? (el?.checked ? 'true' : 'false') : (el?.value?.trim() ?? '');
     if (p.obrigatorio && !val) {
       appendLog(`Campo obrigatório não preenchido: ${p.label}`, 'w');
       el?.focus();
