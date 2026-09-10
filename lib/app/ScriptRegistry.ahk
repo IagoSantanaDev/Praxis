@@ -6,12 +6,9 @@
 ; Uso, cópia, modificação, redistribuição ou engenharia reversa somente com autorização expressa.
 
 ; ─── Script registry ──────────────────────────────────────────
-; Centraliza o registro dos scripts disponíveis; cada módulo declara seus
-; próprios handlers nos respectivos registries.
-
-#Include ..\..\lib\modules\remessa_protocolo\RPRegistry.ahk
-#Include ..\..\lib\modules\protocolar\ProtocolarRegistry.ahk
-#Include ..\..\lib\modules\fechar_xml\FecharXmlRegistry.ahk
+; Centraliza o catálogo dos scripts disponíveis. Os handlers dos módulos
+; são carregados uma única vez por Dispatcher.ahk; este arquivo não inclui
+; registries de módulo para evitar redefinições durante a composição do entry point.
 
 global gScripts := [  ; catalog of available scripts — read by InitializeApp() via Dispatcher
     Map(
@@ -51,7 +48,13 @@ global gScripts := [  ; catalog of available scripts — read by InitializeApp()
                 "hint","Ex: 34"),
             Map("id","setor_envio", "label","Setor de Envio",
                 "tipo","text",  "obrigatorio",true,
-                "hint","Ex: 365")
+                "hint","Ex: 365"),
+            Map("id","tipo",        "label","Tipo de Atendimento",
+                "tipo","select", "obrigatorio",false,
+                "opcoes",["Ambulatorial","Internamento"]),
+            Map("id","finalizar_envio", "label","Imprimir/Salvar Envio",
+                "tipo","select", "obrigatorio",false,
+                "opcoes",["Não","Sim"])
         ]
     ),
     Map(
@@ -67,8 +70,14 @@ global gScripts := [  ; catalog of available scripts — read by InitializeApp()
                 "tipo","date", "obrigatorio",true,
                 "format","yyyy-MM-dd"),
             Map("id","data_vencimento","label","Data de Vencimento",
-                "tipo","date", "obrigatorio",true,
-                "format","yyyy-MM-dd")
+                "tipo","date", "obrigatorio",false,
+                "format","yyyy-MM-dd"),
+            Map("id","fechar",        "label","Fechar Remessa",
+                "tipo","select", "obrigatorio",false,
+                "opcoes",["Sim","Não"]),
+            Map("id","gerar_xml",     "label","Gerar XML",
+                "tipo","select", "obrigatorio",false,
+                "opcoes",["Sim","Não"])
         ]
     )
 ]

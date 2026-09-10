@@ -66,7 +66,7 @@ MV_FindControlByClientPoint(winTitle, classNN, targetX, targetY, tolerance := 14
 ```
 
 - **Contrato pretendido:** busca por `ClassNN` exata e delega a `MV_FindControlAtPoint(..., "")`.
-- **Bloqueio P0:** existem **duas definições** desta função em `components/Controls.ahk`. A definição inicial contém uma implementação própria; a definição posterior, no bloco `HELPERS CANÔNICOS`, delega à função canônica. Em AHK v2, essa duplicidade precisa ser removida antes de qualquer migração dependente. S03 deve manter uma única definição e provar os callers antes de apagar a primeira.
+- **P0 resolvido:** `components/Controls.ahk` mantém uma única definição pública de `MV_FindControlByClientPoint`, delegada ao helper canônico `MV_FindControlAtPoint`. A contagem de definições e os callers foram verificados após a consolidação em S03.
 - **Retorno e erros:** iguais aos de `MV_FindControlAtPoint`.
 - **Não fazer nesta tarefa:** não editar a fonte para resolver o bloqueio.
 
@@ -104,17 +104,18 @@ MV_ClickBySpec(winTitle, classNN, x, y)
 - **Exceções:** o fallback físico está protegido por `try/catch` e devolve `false`.
 - **Regra:** callers de domínio podem adaptar a especificação, mas não devem reimplementar a sequência busca → ativação → fallback.
 
-### `MV_SetTextByClick`
+### `MV_SetTextByControl` e `MV_SetTextByClick`
 
 ```ahk
+MV_SetTextByControl(winTitle, classNN, value, fallbackX := "", fallbackY := "", clear := true)
 MV_SetTextByClick(winTitle, x, y, value, clear := true)
 ```
 
-- **Entrada:** janela, ponto de cliente usado pelo clique físico, texto e flag de limpeza.
-- **Comportamento:** exige `MV_EnsureWindowActive`; clica com deslocamento `(x + 15, y + 8)`, aguarda `MV_KEY_SETTLE_MS`; com `clear=true`, envia Home, Ctrl+Shift+End e Backspace, aguarda novamente; por fim usa `SendText value`.
-- **Retorno:** `false` se a janela não pôde ser ativada; `true` após emitir a sequência de entrada.
+- **`MV_SetTextByControl`:** tenta `ControlSetText` no primeiro controle da classe exata; se o controle não existir ou rejeitar a operação, usa `MV_SetTextByClick` quando as coordenadas de fallback foram fornecidas.
+- **`MV_SetTextByClick`:** exige `MV_EnsureWindowActive`; clica com deslocamento `(x + 15, y + 8)`, aguarda `MV_KEY_SETTLE_MS`; com `clear=true`, envia Home, Ctrl+Shift+End e Backspace, aguarda novamente; por fim usa `SendText value`.
+- **Retorno:** `false` quando não há controle/fallback utilizável ou a janela não pôde ser ativada; `true` após emitir a operação.
 - **Globals:** `MV_KEY_SETTLE_MS` vem de `MVConstants.ahk` e vale `100` ms atualmente.
-- **Limitação:** a implementação atual não lê o texto de volta; callers que exigem confirmação devem compor `MV_CopyFocusedText` ou uma leitura específica.
+- **Limitação:** a implementação não lê o texto de volta; callers que exigem confirmação devem compor `MV_CopyFocusedText` ou uma leitura específica.
 - **Wrappers permitidos:** equivalentes de domínio como `TissXml_SetTextByClickAt`, `TissXml_SetTextByClickNoClear` e preenchimento do popup, desde que preservem a semântica `clear` e não dupliquem a sequência.
 
 ### `MV_CopyFocusedText`
@@ -178,9 +179,9 @@ MV_EnsureWindowActive(winTitle, timeoutSecs := 3)
 - **Dependências:** `WinExist`, `WinActivate`, `WinActive`, `MV_Poll` e `MV_POLL_MS`.
 - **Uso:** pré-condição de `MV_SetTextByClick` e fallback de `MV_ClickBySpec`; não substituir por `WinActivate` sem espera.
 
-### `MV_EnsureModule` - contrato-alvo, ainda não implementado
+### `MV_EnsureModule`
 
-A fonte atual expõe `MV_EnsureMovDoc()` e `MV_EnsureFFCV()`, mas **não define `MV_EnsureModule`**. O contrato canônico a ser decidido em S03 deve generalizar os dois sem inventar uma API paralela:
+A fonte canônica generaliza `MV_EnsureMovDoc()` e `MV_EnsureFFCV()` sem alterar os aliases públicos:
 
 ```ahk
 MV_EnsureModule(moduleWin, stableMs := MV_MODULE_STABLE_MS, timeoutSecs := MV_TIMEOUT_LOAD)
@@ -190,7 +191,7 @@ MV_EnsureModule(moduleWin, stableMs := MV_MODULE_STABLE_MS, timeoutSecs := MV_TI
 - Deve retornar booleano e propagar `false` para ausência, falha de ativação ou timeout.
 - `stableMs` é milissegundos; `timeoutSecs` é segundos.
 - Os wrappers `MV_EnsureMovDoc` e `MV_EnsureFFCV` podem permanecer como aliases de domínio durante a migração, caso callers públicos ainda os usem.
-- **Não tratar este contrato-alvo como implementação existente:** a ausência é risco de compatibilidade e deve ser resolvida com prova de callers em S03.
+- **Estado:** implementado em `MVSession.ahk`; os callers existentes continuam usando os aliases de domínio, que delegam para a fonte única.
 
 ### `MV_Abort`
 
@@ -265,16 +266,16 @@ A migração deve conferir o grafo real de includes em cada caller, porque AHK i
 
 ### 8.1 Prova estática desta revisão
 
-A revisão confirma a existência deste documento e dos cinco arquivos-fonte listados no cabeçalho, encontra cada contrato exigido nas seções anteriores, confirma a referência **Context7** e conta duas definições de `MV_FindControlByClientPoint` em `Controls.ahk`. Essa contagem é evidência do bloqueio, não uma correção.
+A revisão confirma a existência deste documento e dos cinco arquivos-fonte listados no cabeçalho, encontra cada contrato exigido nas seções anteriores, confirma a referência **Context7** e agora encontra uma única definição de `MV_FindControlByClientPoint` em `Controls.ahk`. A implementação canônica delega para `MV_FindControlAtPoint` com classe exata, preservando a assinatura pública e os callers existentes. O caminho `tools/cli-check.ps1` está ausente; não deve ser tratado como um quarto script disponível nem como substituto dos três validadores existentes.
 
-- **P0 — duplicidade de `MV_FindControlByClientPoint`:** resolver em S03, com contagem estática de definições e smoke de callers antes/depois. Até lá, não alegar canonização concluída.
+- **P0 — duplicidade de `MV_FindControlByClientPoint`:** resolvido na etapa S03 inicial; a contagem estática e a busca de callers passaram antes/depois da remoção. O wrapper público permanece como delegação para a fonte única.
 - **P1 - unidades de timeout heterogêneas:** manter nomes `timeoutSecs`, `timeoutMs` e `stableMs`; revisar cada caller antes de converter.
 - **P1 - erro mascarado por sentinelas:** `0`, `false` e `""` têm significados diferentes; preservar o contrato e registrar razões nos wrappers.
 - **P1 - include implícito de `Dialog_ActiveModalTitle`:** tornar o grafo explícito antes de consolidar waits.
 - **P2 - wrappers públicos:** inventariar callers antes de apagar aliases de popup, MOV DOC, FFCV e TISS.
 - **P2 - efeitos globais da sessão:** carregar configurações de `MVSession.ahk` uma vez e provar que macros isolados continuam com as mesmas coordenadas.
 
-Sequência recomendada: (1) S03 remove a duplicidade P0 e normaliza polling/find/click/activation; (2) S04 consolida texto, waits e modais preservando mapas/relatórios; (3) S05 resolve includes obsoletos, OCR e contratos de macros, depois revisa constantes e parsers relacionados. Cada etapa deve comparar callers, executar os três scripts nativos de validação disponíveis no repositório quando aplicável e não transformar um wrapper compatível em duplicata removível sem evidência.
+Sequência recomendada: (1) S03 removeu a duplicidade P0 e deixou a busca de classe exata delegada à fonte única; (2) S04 consolida texto, waits e modais preservando mapas/relatórios; (3) S05 resolve includes obsoletos, OCR e contratos de macros, depois revisa constantes e parsers relacionados. Cada etapa deve comparar callers, executar os três scripts nativos de validação disponíveis no repositório quando aplicável e não transformar um wrapper compatível em duplicata removível sem evidência.
 
 ## 9. Checklist para cada remoção futura
 
@@ -297,8 +298,8 @@ Esta seção complementa os contratos de interação com as famílias identifica
 |---|---|---|---|---|
 | Lista CSV simples | `lib/globals/mv/ParseUtils.ahk:ParseListaCsv` | **Fonte única.** `StrSplit` por vírgula, `Trim` e descarte de vazios; não criar variante para `remessas` ou `protocolos`. | S03 | O contrato é CSV simples; não interpretar pipe, linhas ou campos compostos aqui. |
 | Protocolos de remessa | `lib/modules/remessa_protocolo/RPParsers.ahk:ParseProtocolos` | Wrapper de domínio preservado: delega para `ParseListaCsv`. `RP_RecordTiming`, `RP_ConvenioMajoritario`, `RP_FiltrarContasPorConvenio` e relatórios continuam semântica RP. | S03 | Confirmar callers antes de remover o nome público. |
-| Remessas do Protocolar | `lib/modules/protocolar/ProtocolarParsers.ahk:Protocolar_ParseRemessas` | Wrapper de compatibilidade preservado: delega para `ParseListaCsv`. `Protocolar_Abort` delega para `MV_Abort(msg, true)` e não é parser duplicado. | S03 | Conferir callers e contrato de status antes de substituir o símbolo. |
-| Resultado FXML | `lib/modules/fechar_xml/FecharXmlParsers.ahk` | **Não canonizar nem apagar.** `FXML_ParseXmlSaveResult` e `FXML_ParseFfcvConfirmResult` são placeholders; `FXML_ValidateParams` e `FXML_ParseFlowResult` pertencem ao futuro orquestrador. | S05 | O `success=false` do placeholder não prova falha de produção; implementar somente com contrato real de `TissXmlScreen`/`FfcvScreen`. |
+| Remessas do Protocolar | `lib/modules/protocolar/ProtocolarParsers.ahk:Protocolar_ParseRemessas` | Wrapper de compatibilidade preservado: delega para `ParseListaCsv`; `Protocolar_ExtractContasFromCsv` escolhe `CD_REG_AMB` para Ambulatorial e `CONTA` para Hospitalar/Internamento, normaliza BOM/cabeçalho, suporta aspas e deduplicação. `Protocolar_Abort` delega para `MV_Abort(msg, true)`. | S03/S05 | O relatório FFCV usa índice 121 para Ambulatorial e 177 para Hospitalar/Internamento; o CSV é consumido antes da tela Protocolação de Envio. |
+| Resultado FXML | `lib/modules/fechar_xml/FecharXml.ahk` + `FecharXmlParsers.ahk` | `RunFecharXML` valida remessas/datas, seleciona cada remessa, confirma entrega e chama `TissXml_Gerar`; `FXML_ParseFlowResult` agrega os XMLs. Parsers de payload bruto continuam placeholders não usados. | S05 | O orquestrador usa diretamente os Maps de `Ffcv_ConfirmarEntregaRemessa` e `TissXml_Gerar`; não inventar parser de payload inexistente. |
 | Contas dos macros | `test_macros/11_ffcv_remessa_inserir_imprimir.ahk:ParseContasTeste` | Manter local: aceita `Array`, fallback, linhas, pipe e extração numérica. Não transformar em parser global por semelhança com CSV. | S04 | Entrada `Prot. | Conta | Convênio` tem semântica de fixture diferente de `ParseListaCsv`. |
 | Tipos de conta | `lib/app/ScriptRegistry.ahk`/`MVConstants.ahk` versus macros `03`/`11` | Preservar a divergência para migração e validação; não corrigir macros nesta fatia. | S04 | Alteração silenciosa pode enviar tipo errado ao Oracle Forms. |
 
@@ -329,7 +330,7 @@ Antes de remover símbolo, provar com `rg` todos os callers em `lib/`, `main.ahk
 - O caminho antigo de OCR/API é **compatibilidade obsoleta**, não fonte canônica: o build embute `Praxis_OcrReferences.ahk` e `Praxis_OcrProbe.ahk`, enquanto `FFCV_ErrorTemplates.ahk` mantém fallback de arquivo e chama `tools/ocr-probe.ps1` via PowerShell quando necessário.
 - `tools/ocr-probe.ps1` e `tools/build-ocr-error-references.ps1` permanecem a superfície operacional. S05 deve conferir includes opcionais, artefatos gerados e callers antes de remover qualquer API OCR antiga.
 - `WinGetText`/Window Spy podem expor apenas `&OK` em modais desenhados `ui60Drawn`; a classificação confiável permanece OCR local/templates e deve deixar erro observável quando referências, subprocesso, JSON ou idioma falharem.
-- Não corrigir agora includes dos macros, divergência dos tipos, placeholders FXML ou caminhos OCR. São trabalho de S04/S05, não de produção nesta fatia.
+- Includes de produção e caminhos OCR devem permanecer explícitos e verificáveis; os placeholders FXML e a divergência de tipos continuam fora desta consolidação até existir contrato real.
 
 ### 10.5 Matriz S03–S05 e checklist de callers
 
