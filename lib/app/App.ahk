@@ -78,7 +78,7 @@ App_Run() {
     ; Criar ambiente WebView2 com timeout
     try {
         AwaitPromise(
-            WebView2.CreateEnvironmentAsync(),
+            WebView2.CreateEnvironmentAsync(0, "", "", webViewLoader),
             WEBVIEW2_ENV_TIMEOUT_MS,
             "Timeout ao criar ambiente WebView2."
         )
