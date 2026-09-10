@@ -27,7 +27,7 @@ RunProtocolar(params) {
     setorAtual := Trim(params["setor_atual"])
     setorEnvio := Trim(params["setor_envio"])
     tipo := params.Has("tipo") ? Trim(String(params["tipo"])) : "Ambulatorial"
-    finalizarEnvio := params.Has("finalizar_envio") && StrLower(Trim(String(params["finalizar_envio"]))) = "sim"
+    finalizarEnvio := Protocolar_OptionEnabled(params, "finalizar_envio", true)
     csvPath := params.Has("csv_path")
         ? Trim(String(params["csv_path"]))
         : ""
@@ -91,11 +91,11 @@ RunProtocolar(params) {
 }
 
 Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
-    workDir := Config_GetPath("WorkDir")
-    csvPath := workDir "\Envio.CSV"
-    csvAltPath := workDir "\Envio.CSV.CSV"
+    documentsDir := Config_GetPath("Documents")
+    csvPath := documentsDir "\Envio.CSV"
+    csvAltPath := documentsDir "\Envio.CSV.CSV"
 
-    for oldPath in [csvPath, csvAltPath, workDir "\Envio"] {
+    for oldPath in [csvPath, csvAltPath, documentsDir "\Envio"] {
         if FileExist(oldPath)
             try FileDelete oldPath
     }
@@ -135,7 +135,7 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
     if !saveHwnd
         throw Error("Janela Salvar Como nao apareceu.")
     saveTitle := "ahk_id " saveHwnd
-    if !MV_SetTextByControl(saveTitle, "Edit1", workDir "\Envio", "", "", true)
+    if !MV_SetTextByControl(saveTitle, "Edit1", documentsDir "\Envio", "", "", true)
         throw Error("Nao foi possivel preencher o nome do CSV.")
 
     saveButton := MV_FirstControlByClass(saveTitle, "Button2")
@@ -164,7 +164,14 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
 
     if MV_Poll(() => FileExist(csvPath) || FileExist(csvAltPath), 30)
         return FileExist(csvPath) ? csvPath : csvAltPath
-    throw Error("O CSV nao apareceu no WorkDir após salvar.")
+    throw Error("O CSV nao apareceu em Documents após salvar.")
+}
+
+Protocolar_OptionEnabled(params, key, defaultValue := false) {
+    if !params.Has(key) || Trim(String(params[key])) = ""
+        return defaultValue
+    value := StrLower(Trim(String(params[key])))
+    return !(value = "false" || value = "0" || value = "nao" || value = "não")
 }
 
 Protocolar_WaitWindowWithControls(processName, requiredClass, optionalClass := "", timeoutSecs := 20) {

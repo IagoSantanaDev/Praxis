@@ -55,6 +55,7 @@ RunRemessaProtocolo(params) {
     dataEntrega  := params["data_entrega"]
     dataVenc     := params["data_vencimento"]
     numRemessa   := Trim(params["num_remessa"])
+    imprimirAposInserir := RP_OptionEnabled(params, "imprimir_apos_inserir", true)
     temDatas     := (dataEntrega != "" && dataVenc != "")
 
     if (protocolos.Length = 0)
@@ -138,7 +139,7 @@ RunRemessaProtocolo(params) {
         if !xml["ok"]
             return RP_Abort(xml["erro"])
         RP_RecordTiming(timings, "Gerar XML", stageStart)
-    } else {
+    } else if imprimirAposInserir {
         stageStart := A_TickCount
         Ffcv_ImprimirRelatorioAtendimentos()
         RP_RecordTiming(timings, "Imprimir relatorio", stageStart)
@@ -148,6 +149,13 @@ RunRemessaProtocolo(params) {
     RP_RecordTiming(timings, "Total", totalStart, protocolos.Length " protocolo(s), " totalContasFFCV " conta(s)")
     gRunning := false
     Done(ErrosMensagem(erros, timings))
+}
+
+RP_OptionEnabled(params, key, defaultValue := false) {
+    if !params.Has(key) || Trim(String(params[key])) = ""
+        return defaultValue
+    value := StrLower(Trim(String(params[key])))
+    return !(value = "false" || value = "0" || value = "nao" || value = "não")
 }
 
 ErrosMensagem(erros, timings) {

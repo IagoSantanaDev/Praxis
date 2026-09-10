@@ -29,6 +29,9 @@ Config_GetPath(name) {
                 try DirCreate(path)
             }
 
+        case "Documents":
+            path := A_MyDocuments
+
         case "VendorDir":
             path := baseDir "\lib\vendor"
 
