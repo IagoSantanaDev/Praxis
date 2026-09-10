@@ -105,6 +105,7 @@ MovDoc_LerGrid(protocolo, primeiraLinha?) {
     semNovasConsecutivas := 0
 
     Loop maxIteracoes {
+        ThrowIfAppStopped()
         result := _AvancarBloco()
         added := _ColetarVisiveis(protocolo, linhas, vistos)
 
@@ -175,6 +176,7 @@ MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida) {
     deadline := startedAt + 12000
 
     Loop {
+        ThrowIfAppStopped()
         conta := _LerCampoGrid(MOVDOC_CONTA_X, MOVDOC_GRID_ROWS_Y[1], "conta", 150, 300)
         convenio := _LerCampoGrid(MOVDOC_CONVENIO_X, MOVDOC_GRID_ROWS_Y[1], "convenio", 150, 300)
 
@@ -214,6 +216,7 @@ _AvancarBloco() {
     Sleep MOVDOC_KEY_SETTLE_MS
 
     Loop MOVDOC_GRID_ROWS_Y.Length {
+        ThrowIfAppStopped()
         if Dialog_MovDocPopupVisible() {
             Dialog_DismissMovDocPopup()
             return Map("popup", true)

@@ -52,6 +52,7 @@ MV_Poll(condFn, timeoutSecs) {
     global MV_POLL_MS
     deadline := A_TickCount + timeoutSecs * 1000
     Loop {
+        ThrowIfAppStopped()
         if condFn()
             return true
         if A_TickCount > deadline
@@ -78,6 +79,7 @@ MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
     lastCount := -1
 
     Loop {
+        ThrowIfAppStopped()
         modalClear := (Dialog_ActiveModalTitle() = "")
         cursorReady := (A_Cursor != "Wait" && A_Cursor != "AppStarting")
         exists := WinExist(winTitle)
@@ -110,6 +112,7 @@ MV_WaitWindowStable(winTitle, stableMs := 600, timeoutSecs := 20) {
     lastCount := -1
 
     Loop {
+        ThrowIfAppStopped()
         if WinExist(winTitle) {
             WinActivate winTitle
             try hwnds := WinGetControlsHwnd(winTitle)

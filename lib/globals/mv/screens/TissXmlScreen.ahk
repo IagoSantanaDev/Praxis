@@ -73,6 +73,7 @@ TissXml_WaitXmlQueryReady(timeoutMs := 30000) {
     stableSince := 0
 
     Loop {
+        ThrowIfAppStopped()
         modal := Dialog_ActiveModalTitle()
         if (modal != "")
             return Map("ok", false, "elapsed", A_TickCount - startedAt, "erro", "Modal apareceu apos consultar a remessa no XML/TISS: " modal)
@@ -101,6 +102,7 @@ TissXml_WaitPathForm(timeoutSecs := 20) {
     deadline := startedAt + timeoutSecs * 1000
 
     Loop {
+        ThrowIfAppStopped()
         if WinExist(WIN_XML_PATH_FORM)
             return Map("ok", true, "erro", "")
 
@@ -128,6 +130,7 @@ TissXml_HandleSaveModals()
 */
 TissXml_HandleSaveModals() {
     Loop 5 {
+        ThrowIfAppStopped()
         if !MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), 2) {
             if (A_Index = 1)
                 Notify("Nenhum modal imediatamente apos salvar XML; aguardando estabilizacao.")

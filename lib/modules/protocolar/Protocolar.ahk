@@ -46,8 +46,11 @@ RunProtocolar(params) {
         return Protocolar_Abort("Tipo de atendimento invalido. Use Ambulatorial ou Internamento.")
     if (csvPath = "") {
         try csvPath := Protocolar_GerarCsvContas(remessas, tipo)
-        catch as e
+        catch as e {
+            if (e is AppStoppedError)
+                throw e
             return Protocolar_Abort("Falha ao gerar CSV de contas: " e.Message)
+        }
     }
 
     if !FileExist(csvPath)
@@ -56,6 +59,8 @@ RunProtocolar(params) {
     try {
         contas := Protocolar_ExtractContasFromCsv(csvPath, true, tipo)
     } catch as e {
+        if (e is AppStoppedError)
+            throw e
         return Protocolar_Abort("Falha ao ler contas do CSV: " e.Message)
     }
 
@@ -165,6 +170,7 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
 Protocolar_WaitWindowWithControls(processName, requiredClass, optionalClass := "", timeoutSecs := 20) {
     startedAt := A_TickCount
     while (A_TickCount - startedAt <= timeoutSecs * 1000) {
+        ThrowIfAppStopped()
         spec := processName = "" ? "" : "ahk_exe " processName
         for hwnd in WinGetList(spec) {
             title := "ahk_id " hwnd
@@ -205,6 +211,7 @@ Protocolar_EnviarConta(conta) {
 Protocolar_EncontrarPopupUsuario(timeoutMs := 400) {
     startedAt := A_TickCount
     while (A_TickCount - startedAt <= timeoutMs) {
+        ThrowIfAppStopped()
         hwnd := WinExist("Mensagem ao Usuário do MV 2000 ahk_exe ifrun60.EXE")
         if hwnd
             return hwnd

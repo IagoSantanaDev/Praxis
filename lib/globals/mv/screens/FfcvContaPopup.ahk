@@ -200,6 +200,7 @@ FfcvContaPopup_WaitSubmitOutcome(timeoutMs, submittedConta := "") {
     emptySince := 0
 
     Loop {
+        ThrowIfAppStopped()
         ; Verificar modal Forms (erro de inserção).
         popup := Dialog_ActiveModalTitle()
         if (popup != "") {
@@ -274,6 +275,7 @@ FfcvContaPopup_WaitStable(timeoutMs) {
     stableSince := 0
 
     Loop {
+        ThrowIfAppStopped()
         if Popup_ContaVisible() {
             if (stableSince = 0)
                 stableSince := A_TickCount
@@ -298,6 +300,7 @@ FfcvContaPopup_Close(timeoutMs := 5000) {
     deadline := startedAt + timeoutMs
 
     Loop {
+        ThrowIfAppStopped()
         if !Popup_ContaVisible() {
             Sleep FFCVP_CONTA_STABLE_MS
             if !Popup_ContaVisible() {

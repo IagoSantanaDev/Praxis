@@ -37,4 +37,9 @@ for arg in A_Args {
 #Include lib\app\ScriptRegistry.ahk
 #Include lib\config\Paths.ahk
 #Include lib\config\Settings.ahk
+
+; Cancelamento global: Esc interrompe a execução atual definitivamente.
+; A próxima execução passa por TryBeginAppRun(), que limpa gStopRequested.
+Esc::StopScript()
+
 App_Run()
