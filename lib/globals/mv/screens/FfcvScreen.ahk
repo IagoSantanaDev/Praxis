@@ -199,6 +199,7 @@ Ffcv_SelecionarRemessaExistente(numRemessa) {
 }
 
 Ffcv_CriarNovaRemessa(tipoConta) {
+    global FFCV_KEY_SETTLE_MS
     Send "{F6}"
     Sleep FFCV_KEY_SETTLE_MS
 
