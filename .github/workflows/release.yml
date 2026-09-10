@@ -1,7 +1,10 @@
-# Release do Praxis a cada push em main
+# Release do Praxis a cada push nas branches mantidas.
 #
-# Gera o build portátil (Praxis.exe sem fonte) + ZIP e publica/atualiza
-# um GitHub Release único com tag rolling "continuous" (Latest):
+# Cada branch publica/atualiza seu próprio release rolling:
+#   - continuous-main
+#   - continuous-kan-03
+#
+# Cada release contém:
 #   - Praxis-Portable-<version>.zip  (pronto para uso)
 #   - SHA256SUMS.txt                 (hash do ZIP)
 #
@@ -9,13 +12,19 @@
 # signing: o modo -Release (assinado, endurecido) é feito manualmente
 # na máquina de build local com tools/build-praxis.ps1 -Release.
 #
-# Permissão contents: write é necessária para criar/atualizar o release.
+# Permissão contents: write é necessária para criar/atualizar releases.
 name: release-portable
 
 on:
   push:
-    branches: [main]
+    branches: [main, KAN-03]
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch a publicar'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -26,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
           fetch-depth: 0
 
       - name: Baixar AutoHotkey v2 (zip oficial, com fallback)
@@ -106,10 +116,21 @@ jobs:
           if (-not (Test-Path -LiteralPath $exe)) { throw "Ahk2Exe.exe não extraído: $exe" }
           "AHK2EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Build + publicar release rolling
+      - name: Definir release por branch
+        shell: powershell
+        run: |
+          $branch = "${{ github.event.inputs.branch || github.ref_name }}"
+          if ([string]::IsNullOrWhiteSpace($branch)) { $branch = "${{ github.ref_name }}" }
+          $slug = $branch.ToLowerInvariant() -replace '[^a-z0-9._-]', '-'
+          "RELEASE_BRANCH=$branch" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RELEASE_TAG=continuous-$slug" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build + publicar release rolling da branch
         shell: powershell
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File tools/publish-release.ps1 `
+            -Tag "$env:RELEASE_TAG" `
+            -Branch "$env:RELEASE_BRANCH" `
             -AutoHotkeyBasePath "$env:AHK_EXE" `
             -Ahk2ExePath "$env:AHK2EXE"
         env:

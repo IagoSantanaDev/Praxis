@@ -1,14 +1,14 @@
 ﻿<#
 .SYNOPSIS
-Gera o build portátil do Praxis (EXE sem fonte), zipla e publica/atualiza um GitHub Release único (rolling).
+Gera o build portátil do Praxis (EXE sem fonte), zipla e publica/atualiza um GitHub Release rolling por branch.
 
 .DESCRIPTION
 Fluxo:
   1. Deriva a versão (default: 1.0.0-<sha curto do HEAD>) e roda tools/build-praxis.ps1 -SkipInstaller
      (que gera dist\Praxis-<ver>\distribution\ e o ZIP portátil).
   2. Gera SHA256SUMS.txt com o hash do ZIP.
-  3. Publica (ou atualiza, com --clobber) um GitHub Release de tag fixa (default "continuous")
-     marcado como Latest — o release rolling contém sempre a versão mais recente do Praxis.
+  3. Publica (ou atualiza, com --clobber) um GitHub Release da branch informada.
+     A tag deve ser única por branch, por exemplo continuous-main ou continuous-kan-03.
 
 Autenticação:
   - No GitHub Actions, defina o env GH_TOKEN=secrets.GITHUB_TOKEN (feito pelo workflow release.yml).
@@ -26,6 +26,8 @@ param(
     [string]$Version,
 
     [string]$Tag = 'continuous',
+
+    [string]$Branch,
 
     # Repassados ao build quando o AutoHotkey/Ahk2Exe não estão no PATH
     # (caso do GitHub Actions, que baixa os zips oficiais por step).
@@ -98,6 +100,10 @@ $gitState = Get-GitHead -RepositoryRoot $ProjectRoot
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = "1.0.0-$($gitState.Short)"
 }
+if ([string]::IsNullOrWhiteSpace($Branch)) {
+    $Branch = (& git -C $ProjectRoot branch --show-current 2>$null).Trim()
+    if ([string]::IsNullOrWhiteSpace($Branch)) { $Branch = 'detached' }
+}
 if ($gitState.Dirty) {
     Write-Warning "Working tree sujo. O build registrará sourceDirty=true e o artefato pode não corresponder a um commit publicado."
 }
@@ -134,6 +140,8 @@ $NotesPath = Join-Path $ReleaseRoot 'release-notes.md'
 $notes = @(
     "# Praxis - pacote portátil (rolling)",
     "",
+    "- **Branch:** $Branch",
+    "- **Tag:** $Tag",
     "- **Versão:** $Version",
     "- **Commit:** $($gitState.Sha)",
     "- **Estado da árvore de origem:** $(if ($gitState.Dirty) {'working tree sujo'} else {'limpa'})",
@@ -141,7 +149,7 @@ $notes = @(
     "- **ZIP:** $zipName  ($($zipHash.Substring(0, 12))…)",
     "",
     "Pronto para uso: descompacte e execute `Praxis.exe` (Windows 64-bit). O PC de destino precisa do Microsoft Edge WebView2 Runtime.",
-    "Artefatos versionados são entregues como releases fixos; a tag $Tag é o release rolling atualizado a cada push em main."
+    "Este release rolling pertence exclusivamente à branch $Branch e é atualizado a cada push nela."
 ) -join [Environment]::NewLine
 Set-Content -LiteralPath $NotesPath -Value $notes -Encoding UTF8
 
@@ -158,18 +166,18 @@ if ($DryRun) {
 if (!$releaseExists) {
     Write-Step "Release '$Tag' não existe — criando"
     if ($DryRun) {
-        Write-Host "   [dry-run] gh release create $Tag $ZipPath $SumsPath --title 'Praxis $Version' --notes-file $NotesPath --latest" -ForegroundColor DarkGray
+        Write-Host "   [dry-run] gh release create $Tag $ZipPath $SumsPath --title 'Praxis $Version - $Branch' --notes-file $NotesPath" -ForegroundColor DarkGray
     } else {
-        Assert-GhSucceeded @('release', 'create', $Tag, $ZipPath, $SumsPath, '--title', "Praxis $Version", '--notes-file', $NotesPath, '--latest')
+        Assert-GhSucceeded @('release', 'create', $Tag, $ZipPath, $SumsPath, '--title', "Praxis $Version - $Branch", '--notes-file', $NotesPath)
     }
 } else {
     Write-Step "Release '$Tag' existe — atualizando assets e metadados"
     if ($DryRun) {
         Write-Host "   [dry-run] gh release upload $Tag $ZipPath $SumsPath --clobber" -ForegroundColor DarkGray
-        Write-Host "   [dry-run] gh release edit $Tag --title 'Praxis $Version' --notes-file $NotesPath --latest" -ForegroundColor DarkGray
+        Write-Host "   [dry-run] gh release edit $Tag --title 'Praxis $Version - $Branch' --notes-file $NotesPath" -ForegroundColor DarkGray
     } else {
         Assert-GhSucceeded @('release', 'upload', $Tag, $ZipPath, $SumsPath, '--clobber')
-        Assert-GhSucceeded @('release', 'edit', $Tag, '--title', "Praxis $Version", '--notes-file', $NotesPath, '--latest')
+        Assert-GhSucceeded @('release', 'edit', $Tag, '--title', "Praxis $Version - $Branch", '--notes-file', $NotesPath)
     }
 }
 
