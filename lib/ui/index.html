@@ -185,6 +185,8 @@ button, input, select { font: inherit; color: inherit; }
 .form-field { display: flex; flex-direction: column; gap: 4px; }
 .form-field.checkbox { flex-direction: row; align-items: center; gap: 8px; }
 .form-field.checkbox .form-label { order: 2; }
+.checkbox-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.checkbox-row .form-field.checkbox { width: auto; }
 .form-checkbox { width: 16px; height: 16px; accent-color: var(--accent); }
 .form-label { font-size: var(--fs-sm); font-weight: 600; color: var(--txt); }
 .form-label .req { color: var(--red); margin-left: 3px; font-weight: 700; }
@@ -405,12 +407,11 @@ function renderForm(script) {
   const required = script.params.filter(p => p.obrigatorio);
   const optional = script.params.filter(p => !p.obrigatorio);
 
-  let html = '';
-  required.forEach(p => { html += renderField(p); });
+  let html = renderFields(required);
 
   if (optional.length > 0) {
     html += `<div class="form-section-sep">Opcional</div>`;
-    optional.forEach(p => { html += renderField(p); });
+    html += renderFields(optional);
   }
 
   document.getElementById('form-grid').innerHTML = html;
@@ -419,7 +420,7 @@ function renderForm(script) {
 // ─── Templates de campo ─────────────────────────────────────
 // Um tipo de campo = uma função que recebe o param e devolve o markup do input.
 // Adicionar um novo `tipo` (ex.: "number", "textarea") é adicionar uma entrada aqui —
-// renderField() e renderForm() não mudam.
+// renderField() e renderFields() não mudam.
 const FieldInputTemplates = {
   select(p, req) {
     const opts = p.opcoes.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
@@ -436,16 +437,39 @@ const FieldInputTemplates = {
   }
 };
 
+function renderFields(params) {
+  let html = '';
+  let checkboxGroup = [];
+
+  const flushCheckboxGroup = () => {
+    if (checkboxGroup.length === 0) return;
+    html += checkboxGroup.length === 1
+      ? renderField(checkboxGroup[0])
+      : `<div class="checkbox-row">${checkboxGroup.map(renderField).join('')}</div>`;
+    checkboxGroup = [];
+  };
+
+  params.forEach(p => {
+    if (p.tipo === 'checkbox') checkboxGroup.push(p);
+    else {
+      flushCheckboxGroup();
+      html += renderField(p);
+    }
+  });
+  flushCheckboxGroup();
+  return html;
+}
+
 function renderField(p) {
   const req   = p.obrigatorio;
   const build = FieldInputTemplates[p.tipo] ?? FieldInputTemplates.default;
   const input = build(p, req);
 
   const checkbox = p.tipo === 'checkbox';
+  const label = `<label class="form-label" for="p-${p.id}">${esc(p.label)}${req?'<span class="req" aria-hidden="true">*</span>':''}</label>`;
   return `
     <div class="form-field${checkbox?' checkbox':''}">
-      ${input}
-      <label class="form-label" for="p-${p.id}">${esc(p.label)}${req?'<span class="req" aria-hidden="true">*</span>':''}</label>
+      ${checkbox ? input + label : label + input}
     </div>`;
 }
 
