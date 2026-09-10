@@ -32,23 +32,18 @@ AwaitPromise(promise, timeoutMs, timeoutMessage) {
     if !IsObject(promise)
         throw Error("AwaitPromise recebeu valor invalido.")
 
-    for prop in ["isFulfilled", "isRejected"] {
-        if !HasProp(promise, prop)
-            throw Error("Promise invalida. Propriedade ausente: " . prop)
-    }
-
     if !HasMethod(promise, "await")
         throw Error("Promise invalida. Metodo ausente: await")
 
     startTick := A_TickCount
-
-    while !promise.isFulfilled && !promise.isRejected {
+    while !ObjHasOwnProp(promise, "status") {
         if (A_TickCount - startTick >= timeoutMs)
             throw Error(timeoutMessage)
-
         Sleep AWAIT_POLL_MS
     }
 
+    ; Promise.ahk marca o resultado como propriedade própria somente ao
+    ; concluir; await() então preserva o erro original em caso de rejeição.
     return promise.await()
 }
 
