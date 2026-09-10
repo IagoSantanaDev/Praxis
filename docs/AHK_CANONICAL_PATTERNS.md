@@ -1,0 +1,288 @@
+# Padrões canônicos de interação MV em AutoHotkey v2
+
+**Status:** especificação para as migrações S03–S05
+**Revisão de auditoria:** 2026-09-10; contratos e fontes rechecados por prova estática read-only.
+**Escopo desta versão:** contratos das primitivas MV compartilhadas. Nenhuma fonte de produção é alterada por esta especificação.
+**Fontes locais:** `lib/globals/mv/MVConstants.ahk`, `lib/globals/mv/components/Controls.ahk`, `lib/globals/mv/components/Dialogs.ahk`, `lib/globals/mv/components/Popups.ahk` e `lib/globals/mv/MVSession.ahk`.
+
+## 1. Regra de canonização
+
+A fonte única de interação deve permanecer em `lib/globals/mv/`:
+
+- `MVConstants.ahk`: títulos, classes, coordenadas de domínio e timings compartilhados;
+- `components/Controls.ahk`: descoberta, polling, clique, texto e espera;
+- `components/Dialogs.ahk` e `components/Popups.ahk`: semântica de domínio para modais/popups, composta sobre Controls;
+- `MVSession.ahk`: preparação da sessão, ativação e abort.
+
+Um wrapper de módulo é permitido quando acrescenta semântica de negócio, relatório ou escolha de fallback. Um wrapper que apenas repete a busca, o clique, o polling ou o timing da primitiva canônica deve ser removido na migração, depois de confirmar todos os callers.
+
+### 1.1 Convenções de tipos e unidades
+
+| Convenção | Contrato |
+|---|---|
+| `winTitle` | string de critério de janela AHK; os títulos `MV_WIN_*` usam `ahk_exe` e podem depender de `SetTitleMatchMode(2)` carregado pela sessão |
+| `classNN` | identificação exata `ClassNN`, por exemplo `Button1` ou `Edit2` |
+| `classPrefix` | prefixo de `ClassNN`, por exemplo `Edit`, `ComboBox` ou `ui60Drawn` |
+| coordenadas | inteiros em coordenadas de cliente; `MVSession.ahk` define `CoordMode("Mouse", "Client")` |
+| timeout em `Secs` | segundos, convertido internamente para milissegundos |
+| timeout em `Ms` | milissegundos; ao chamar `MV_Poll`, converter para segundos apenas no ponto de chamada |
+| retorno de busca | `HWND` inteiro ou `0` quando não encontrado/erro recuperável |
+| retorno de ação | booleano; `true` confirma a ação local, não necessariamente o estado final da UI |
+| erro de controle | falha recuperável retorna `0`, `false` ou `""` conforme o contrato; não ocultar mudança de contrato durante migração |
+
+## 2. Contratos canônicos de Controls
+
+As assinaturas abaixo conferem com a implementação atual de `components/Controls.ahk`. Os comentários de migração não representam mudanças realizadas nesta tarefa.
+
+### `MV_Poll`
+
+```ahk
+MV_Poll(condFn, timeoutSecs)
+```
+
+- **Entrada:** callback sem argumentos e timeout explícito em segundos.
+- **Comportamento:** avalia `condFn()` imediatamente; repete após `MV_POLL_MS`; encerra quando o callback for truthy ou quando `A_TickCount` ultrapassar o deadline.
+- **Retorno:** `true` se a condição foi satisfeita; `false` por timeout.
+- **Globals/dependências:** lê `MV_POLL_MS`, definido em `MVConstants.ahk` e normalmente igual a `100` ms.
+- **Exceções:** exceção lançada pelo callback não é capturada por `MV_Poll`; sobe para o caller. O caller decide se deve tratar como falha de fluxo.
+- **Regra:** não passar milissegundos diretamente. Para um limite em ms, usar `timeoutMs / 1000`.
+
+### `MV_FindControlAtPoint`
+
+```ahk
+MV_FindControlAtPoint(winTitle, classNN, targetX, targetY, tolerance := 14, classPrefix := "")
+```
+
+- **Entrada:** janela, classe exata ou prefixo, ponto de cliente e tolerância em pixels.
+- **Comportamento:** enumera `WinGetControlsHwnd(winTitle)`, filtra por classe exata quando `classPrefix` é vazio ou por prefixo quando não vazio, obtém posição com `ControlGetPos` e devolve o controle que contém o ponto. Fora do retângulo, escolhe o mais próximo somente se a distância ao centro for `<= tolerance`.
+- **Retorno:** `HWND` do controle ou `0`.
+- **Erros:** falhas em `WinGetControlsHwnd`, `ControlGetClassNN` ou `ControlGetPos` são tratadas localmente: a busca inteira retorna `0` no primeiro caso; controles individuais são ignorados nos demais.
+- **Dependências:** primitivas nativas `WinGetControlsHwnd`, `ControlGetClassNN` e `ControlGetPos`; coordenadas devem ser do cliente da janela.
+
+### `MV_FindControlByClientPoint`
+
+```ahk
+MV_FindControlByClientPoint(winTitle, classNN, targetX, targetY, tolerance := 14)
+```
+
+- **Contrato pretendido:** busca por `ClassNN` exata e delega a `MV_FindControlAtPoint(..., "")`.
+- **Bloqueio P0:** existem **duas definições** desta função em `components/Controls.ahk`. A definição inicial contém uma implementação própria; a definição posterior, no bloco `HELPERS CANÔNICOS`, delega à função canônica. Em AHK v2, essa duplicidade precisa ser removida antes de qualquer migração dependente. S03 deve manter uma única definição e provar os callers antes de apagar a primeira.
+- **Retorno e erros:** iguais aos de `MV_FindControlAtPoint`.
+- **Não fazer nesta tarefa:** não editar a fonte para resolver o bloqueio.
+
+### `MV_FirstControlByClass`
+
+```ahk
+MV_FirstControlByClass(winTitle, classNN)
+```
+
+- **Entrada:** critério de janela e `ClassNN` exata.
+- **Retorno:** primeiro `HWND` encontrado, ou `0`.
+- **Erros:** falha ao enumerar controles retorna `0`; falha ao ler a classe de um controle ignora esse controle.
+- **Uso permitido:** base de `MV_ClickFirstControl` e wrapper `Popup_FirstControlByClass`; o wrapper de popup é compatível e não é uma duplicata a apagar enquanto for API de domínio.
+
+### `MV_ClickFirstControl`
+
+```ahk
+MV_ClickFirstControl(winTitle, classNN)
+```
+
+- **Comportamento:** chama `MV_FirstControlByClass`; se houver `HWND`, executa `ControlClick hwnd,,,,, "NA"`.
+- **Retorno:** `false` sem controle; `true` quando o comando de clique foi aceito.
+- **Limitação:** `true` não prova que a janela mudou ou que um modal fechou; o caller deve usar `MV_Poll` para observar o estado final.
+- **Dependências:** `MV_FirstControlByClass` e primitiva nativa `ControlClick` com opção `NA`.
+
+### `MV_ClickBySpec`
+
+```ahk
+MV_ClickBySpec(winTitle, classNN, x, y)
+```
+
+- **Validação:** rejeita classe vazia, placeholder `CLASSNN` e coordenadas vazias.
+- **Estratégia:** tenta `MV_ClickControlAt` com tolerância de `20`; se falhar, exige janela existente, ativa-a, aguarda `WinActive` por até `3` segundos e executa `Click(x, y, 1)`.
+- **Retorno:** `true` se o clique por controle ou físico for emitido; `false` para entrada inválida, janela ausente, falha de ativação, timeout ou exceção.
+- **Exceções:** o fallback físico está protegido por `try/catch` e devolve `false`.
+- **Regra:** callers de domínio podem adaptar a especificação, mas não devem reimplementar a sequência busca → ativação → fallback.
+
+### `MV_SetTextByClick`
+
+```ahk
+MV_SetTextByClick(winTitle, x, y, value, clear := true)
+```
+
+- **Entrada:** janela, ponto de cliente usado pelo clique físico, texto e flag de limpeza.
+- **Comportamento:** exige `MV_EnsureWindowActive`; clica com deslocamento `(x + 15, y + 8)`, aguarda `MV_KEY_SETTLE_MS`; com `clear=true`, envia Home, Ctrl+Shift+End e Backspace, aguarda novamente; por fim usa `SendText value`.
+- **Retorno:** `false` se a janela não pôde ser ativada; `true` após emitir a sequência de entrada.
+- **Globals:** `MV_KEY_SETTLE_MS` vem de `MVConstants.ahk` e vale `100` ms atualmente.
+- **Limitação:** a implementação atual não lê o texto de volta; callers que exigem confirmação devem compor `MV_CopyFocusedText` ou uma leitura específica.
+- **Wrappers permitidos:** equivalentes de domínio como `TissXml_SetTextByClickAt`, `TissXml_SetTextByClickNoClear` e preenchimento do popup, desde que preservem a semântica `clear` e não dupliquem a sequência.
+
+### `MV_CopyFocusedText`
+
+```ahk
+MV_CopyFocusedText(timeoutMs := 600, extrairNumero := false)
+```
+
+- **Comportamento:** limpa `A_Clipboard`, envia Ctrl+C e aguarda `ClipWait(timeoutMs / 1000)`.
+- **Retorno:** `""` no timeout; texto aparado (`Trim`) no sucesso; com `extrairNumero=true`, primeiro grupo `\d+` ou `""` se não houver número.
+- **Globals/efeito:** altera o clipboard global do processo e depende do controle atualmente focado.
+- **Unidade:** argumento em milissegundos; `ClipWait` recebe segundos.
+- **Falhas:** timeout é representado por string vazia; não confundir string vazia com campo realmente vazio sem um contrato adicional.
+
+### `MV_ControlCheckedAt`
+
+```ahk
+MV_ControlCheckedAt(winTitle, classNN, clientX, clientY, tolerance := 14)
+```
+
+- **Comportamento:** localiza o controle com `MV_FindControlByClientPoint` e lê `ControlGetChecked`.
+- **Retorno:** valor de `ControlGetChecked` quando há controle; `""` quando não há controle ou a leitura lança exceção.
+- **Semântica:** `""` é estado de falha/desconhecido, não deve ser convertido silenciosamente em `false`.
+- **Dependências:** busca por ponto e primitiva nativa `ControlGetChecked`.
+
+### `MV_WaitWindowStable`
+
+```ahk
+MV_WaitWindowStable(winTitle, stableMs := 600, timeoutSecs := 20)
+```
+
+- **Comportamento:** enquanto dentro do timeout, verifica existência, ativa a janela, enumera controles e considera estabilidade quando a janela está ativa e a contagem de controles permanece igual por `stableMs`.
+- **Retorno:** `true` após estabilidade; `false` quando o timeout expira.
+- **Unidades:** `stableMs` em milissegundos; `timeoutSecs` em segundos.
+- **Globals:** lê `MV_POLL_MS`.
+- **Erros:** falha de enumeração usa lista vazia; isso pode produzir um estado estável falso se o caller não distinguir janela sem controles de falha nativa. A migração deve preservar ou tornar essa distinção explícita.
+
+### `MV_WaitOracleSettled`
+
+```ahk
+MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000)
+```
+
+- **Comportamento:** exige simultaneamente janela existente, nenhum modal via `Dialog_ActiveModalTitle`, cursor diferente de `Wait`/`AppStarting` e contagem de controles estável por `stableMs`.
+- **Retorno:** `true` quando o Oracle Forms está assentado; `false` no timeout.
+- **Unidades:** todos os parâmetros desta função são milissegundos, exceto nenhum; `timeoutMs` não deve ser tratado como segundos.
+- **Dependências:** `Dialog_ActiveModalTitle`, `WinExist`, `WinGetControlsHwnd`, `A_Cursor`, `MV_POLL_MS` e a disponibilidade do include de Dialogs no grafo final.
+- **Regra de migração:** não fundir com `MV_WaitWindowStable` apenas por semelhança textual; a checagem de modal e cursor é parte do contrato.
+
+## 3. Contratos de sessão e abort
+
+### `MV_EnsureWindowActive`
+
+```ahk
+MV_EnsureWindowActive(winTitle, timeoutSecs := 3)
+```
+
+- **Entrada:** critério de janela e timeout em segundos.
+- **Comportamento:** retorna `false` sem janela; caso contrário chama `WinActivate` e aguarda `WinActive` usando `MV_Poll`.
+- **Retorno:** `true` somente quando a janela fica ativa dentro do limite; `false` em ausência ou timeout.
+- **Dependências:** `WinExist`, `WinActivate`, `WinActive`, `MV_Poll` e `MV_POLL_MS`.
+- **Uso:** pré-condição de `MV_SetTextByClick` e fallback de `MV_ClickBySpec`; não substituir por `WinActivate` sem espera.
+
+### `MV_EnsureModule` - contrato-alvo, ainda não implementado
+
+A fonte atual expõe `MV_EnsureMovDoc()` e `MV_EnsureFFCV()`, mas **não define `MV_EnsureModule`**. O contrato canônico a ser decidido em S03 deve generalizar os dois sem inventar uma API paralela:
+
+```ahk
+MV_EnsureModule(moduleWin, stableMs := MV_MODULE_STABLE_MS, timeoutSecs := MV_TIMEOUT_LOAD)
+```
+
+- Deve verificar a existência de `moduleWin`, ativar a janela e chamar `MV_WaitWindowStable`.
+- Deve retornar booleano e propagar `false` para ausência, falha de ativação ou timeout.
+- `stableMs` é milissegundos; `timeoutSecs` é segundos.
+- Os wrappers `MV_EnsureMovDoc` e `MV_EnsureFFCV` podem permanecer como aliases de domínio durante a migração, caso callers públicos ainda os usem.
+- **Não tratar este contrato-alvo como implementação existente:** a ausência é risco de compatibilidade e deve ser resolvida com prova de callers em S03.
+
+### `MV_Abort`
+
+```ahk
+MV_Abort(msg, sendStatus := false)
+```
+
+- **Comportamento:** envia à UI uma mensagem de erro; opcionalmente envia status `Execução finalizada.` com `running=false`; define `gRunning := false`.
+- **Retorno:** sempre `false`, permitindo `return MV_Abort(...)` no caller.
+- **Globals:** declara e escreve `gRunning`; depende de `SendToUI` e de `gRunning` inicializado pelo host.
+- **Efeito:** é encerramento de fluxo, não exceção; não relançar como erro genérico durante a canonização.
+- **Compatibilidade:** substitui conceitualmente `Protocolar_Abort` e `RP_Abort`; manter wrappers somente se houver caller público e fazê-los delegar à função canônica.
+
+### Preparação de processo em `MVSession.ahk`
+
+Antes da API, o arquivo define `SetTitleMatchMode(2)`, `DetectHiddenText(true)`, atrasos de controle/janela/teclado e `CoordMode("Mouse", "Client")`. Esses efeitos são pré-condições globais do módulo e não devem ser repetidos em cada wrapper. O arquivo inclui `MVConstants.ahk` e `components/Controls.ahk`; `Dialogs.ahk`/`Popups.ahk` incluem Controls e Constants por sua vez, e não devem criar uma segunda fonte de constantes.
+
+## 4. Modais, popups e wrappers permitidos
+
+### `Dialogs.ahk`
+
+- `Dialog_ActiveModalTitle()` retorna o critério `MV_CLASS_MODAL_FORMS` quando `WinExist` encontra um modal, ou `""`; é o oracle usado por `MV_WaitOracleSettled` e `MV_WaitModalGone`.
+- `Dialog_ClassifyErroContaModal(winTitle := "")` resolve o modal ativo e delega a `FFCV_ClassifyErrorModal`; retorna um `Map` de classificação. O OCR é semântica de domínio e não deve ser absorvido por Controls.
+- `Dialog_MovDocPopupVisible()` é um wrapper fino de `WinExist` para o título do popup; preservar somente enquanto for API de domínio.
+- `Dialog_DismissMovDocPopup()` ativa o popup, aguarda `Popup_FirstControlByClass`, tenta `MV_ClickFirstControl`, usa Enter como fallback e confirma o fechamento com polling. É wrapper permitido porque expressa o fluxo MOV DOC; não duplicar a busca/clique.
+- O `try` atual converte falhas em `false`; mudanças futuras devem manter erro observável por `MV_Log` e não ocultar a razão.
+
+### `Popups.ahk`
+
+- `Popup_ContaVisible()` usa sentinela e coordenadas de `MVConstants`; compõe `Popup_FindControlByClassPrefixAtPoint` e `MV_FindControlByClientPoint`. É regra de domínio do popup Informações da Conta.
+- `Popup_FindControlByClassPrefixAtPoint(winTitle, classPrefix, targetX, targetY, tolerance := 35)` delega a `MV_FindControlAtPoint` com prefixo. Não é uma segunda implementação.
+- `Popup_FirstControlByClass(winTitle, classNN)` delega a `MV_FirstControlByClass`. É alias compatível; remover apenas após inventário de callers.
+- `Popup_DismissActiveModal()` retorna `Map("ok", bool, "report", string)`, trata modal ausente como sucesso, aguarda botão OK, clica, aguarda fechamento por `MV_TIMEOUT_ACOE` e estabiliza por `MV_CONTA_STABLE_MS`. O `Map` e o relatório são semântica de domínio, portanto o wrapper é permitido.
+
+## 5. Constantes e globals canônicos
+
+`MVConstants.ahk` é a única fonte para títulos de janela, classes de modal, coordenadas do popup, `MV_TIPO_CONTA` e timings. Valores atualmente relevantes:
+
+- `MV_POLL_MS = 100` ms;
+- `MV_TIMEOUT_LOAD = 15` s e `MV_TIMEOUT_ACOE = 10` s;
+- `MV_MODULE_STABLE_MS = 600` ms e `MV_TARGET_STABLE_MS = 600` ms;
+- timings de foco/limpeza/tecla e popup entre `100` e `650` ms.
+
+A divergência histórica de tipo de conta deve permanecer explícita: a fonte canônica define Internamento `1`, Emergência `2` e Ambulatório `3`; macros que usam outra ordem precisam ser migrados e validados, não corrigidos silenciosamente dentro dos helpers de interação.
+
+## 6. Primitivas nativas versus convenções do projeto
+
+### Primitivas nativas AHK v2
+
+`WinExist` retorna o `HWND` da primeira janela encontrada ou `0`; `WinActive` informa a janela ativa; `WinActivate` solicita ativação; `WinGetControlsHwnd` enumera controles; `ControlGetClassNN`, `ControlGetPos`, `ControlGetChecked`, `ControlGetText`, `ControlClick`, `Click`, `Send`, `SendText`, `ClipWait`, `Sleep`, `SetTimer`, `Critical` e `A_TickCount` são capacidades da linguagem/runtime. AHK v2 também fornece `try/catch/finally`, callbacks e `Map`.
+
+A documentação oficial consultada via **Context7** confirma, em particular, que `WinExist` retorna `0` quando não encontra janela e um `HWND` quando encontra, e que `Critical` controla interrupção de threads. A referência oficial é `https://www.autohotkey.com/docs/v2/`; as assinaturas e semântica de `Control*`, `ClipWait` e temporização devem ser rechecadas contra essa referência na migração.
+
+`SetTimer` é uma primitiva de callbacks periódicos e `Critical` é uma primitiva de proteção de thread; nenhum dos dois substitui automaticamente o polling síncrono definido por `MV_Poll`. A escolha de polling, as unidades, tolerâncias, mensagens de log, mapas de retorno e aliases são convenções deste projeto.
+
+### Convenções do projeto
+
+`MV_*`, `Popup_*` e `Dialog_*`; `MV_POLL_MS`; títulos/classes `MV_*`; coordenadas de cliente; retornos sentinela (`0`, `false`, `""`); `MV_Log`; `SendToUI`; `gRunning`; e a divisão Constants → Controls → wrappers de domínio → Session são contratos Praxis, não APIs nativas AHK. Não documentar essas convenções como se fossem garantias do runtime.
+
+## 7. Dependências de include e ordem de carregamento
+
+| Arquivo | Includes relevantes | Contrato de dependência |
+|---|---|---|
+| `MVSession.ahk` | `MVConstants.ahk`, `components/Controls.ahk` | fornece configuração global e API de sessão |
+| `Dialogs.ahk` | `Controls.ahk`, `MVConstants.ahk`, `FFCV_ErrorTemplates.ahk` | depende de `MV_Log`, polling, popup e OCR de domínio |
+| `Popups.ahk` | `Controls.ahk`, `MVConstants.ahk` | depende das primitivas canônicas e constantes do popup |
+| callers de `MV_WaitOracleSettled` | devem carregar o símbolo `Dialog_ActiveModalTitle` | a resolução do modal não pode ficar implícita em include acidental |
+
+A migração deve conferir o grafo real de includes em cada caller, porque AHK inclui arquivos e executa top-level; não adicionar uma segunda inclusão ou uma chamada top-level de entry point como atalho.
+
+## 8. Riscos, prova e sequência de migração
+
+### 8.1 Prova estática desta revisão
+
+A revisão confirma a existência deste documento e dos cinco arquivos-fonte listados no cabeçalho, encontra cada contrato exigido nas seções anteriores, confirma a referência **Context7** e conta duas definições de `MV_FindControlByClientPoint` em `Controls.ahk`. Essa contagem é evidência do bloqueio, não uma correção.
+
+- **P0 — duplicidade de `MV_FindControlByClientPoint`:** resolver em S03, com contagem estática de definições e smoke de callers antes/depois. Até lá, não alegar canonização concluída.
+- **P1 - unidades de timeout heterogêneas:** manter nomes `timeoutSecs`, `timeoutMs` e `stableMs`; revisar cada caller antes de converter.
+- **P1 - erro mascarado por sentinelas:** `0`, `false` e `""` têm significados diferentes; preservar o contrato e registrar razões nos wrappers.
+- **P1 - include implícito de `Dialog_ActiveModalTitle`:** tornar o grafo explícito antes de consolidar waits.
+- **P2 - wrappers públicos:** inventariar callers antes de apagar aliases de popup, MOV DOC, FFCV e TISS.
+- **P2 - efeitos globais da sessão:** carregar configurações de `MVSession.ahk` uma vez e provar que macros isolados continuam com as mesmas coordenadas.
+
+Sequência recomendada: (1) S03 remove a duplicidade P0 e normaliza polling/find/click/activation; (2) S04 consolida texto, waits e modais preservando mapas/relatórios; (3) S05 resolve includes obsoletos, OCR e contratos de macros, depois revisa constantes e parsers relacionados. Cada etapa deve comparar callers, executar os três scripts nativos de validação disponíveis no repositório quando aplicável e não transformar um wrapper compatível em duplicata removível sem evidência.
+
+## 9. Checklist para cada remoção futura
+
+- [ ] assinatura e unidades conferem com esta especificação;
+- [ ] `rg` encontrou todos os callers, inclusive `test_macros`;
+- [ ] há uma única definição da primitiva;
+- [ ] aliases públicos delegam ou foram removidos com prova de ausência de caller;
+- [ ] includes continuam resolvendo todos os símbolos;
+- [ ] falhas de janela, controle, clipboard, modal e timeout têm retorno observável;
+- [ ] validações AHK disponíveis foram executadas e seus resultados foram registrados;
+- [ ] nenhuma fonte foi apagada apenas por semelhança textual.
