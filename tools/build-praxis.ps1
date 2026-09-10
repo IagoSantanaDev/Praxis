@@ -413,8 +413,9 @@ function Restore-WebView2Loader {
         [string]$Vendor32Path
     )
 
-    # Ja existe em vendor/64bit ou vendor/32bit?
-    if ((Test-Path -LiteralPath $Vendor64Path) -or (Test-Path -LiteralPath $Vendor32Path)) {
+    # O pacote portátil precisa das duas arquiteturas; só reutilize o cache
+    # quando ambas as DLLs já estiverem presentes.
+    if ((Test-Path -LiteralPath $Vendor64Path) -and (Test-Path -LiteralPath $Vendor32Path)) {
         return
     }
 
@@ -470,18 +471,18 @@ function Restore-WebView2Loader {
             return
         }
 
-        $chosen = $allDlls | Where-Object { $_.FullName -match '[\\/]runtimes[\\/]win-x64[\\/]' } | Select-Object -First 1
-        if (!$chosen) {
-            $chosen = $allDlls | Where-Object { $_.FullName -match '[\\/]runtimes[\\/]' } | Select-Object -First 1
-        }
-        if (!$chosen) {
-            $chosen = $allDlls[0]
+        $chosen64 = $allDlls | Where-Object { $_.FullName -match '[\\/]runtimes[\\/]win-x64[\\/]' } | Select-Object -First 1
+        $chosen32 = $allDlls | Where-Object { $_.FullName -match '[\\/]runtimes[\\/]win-x86[\\/]' } | Select-Object -First 1
+        if (!$chosen64 -or !$chosen32) {
+            throw "O pacote WebView2 nao contem loaders win-x64 e win-x86 simultaneamente."
         }
 
-        $destDir = Split-Path -Parent $Vendor64Path
-        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        Copy-Item -LiteralPath $chosen.FullName -Destination $Vendor64Path -Force
-        Write-Host "   [nuget] WebView2Loader.dll restaurado em $Vendor64Path" -ForegroundColor DarkGray
+        $dest64 = Split-Path -Parent $Vendor64Path
+        $dest32 = Split-Path -Parent $Vendor32Path
+        New-Item -ItemType Directory -Path $dest64, $dest32 -Force | Out-Null
+        Copy-Item -LiteralPath $chosen64.FullName -Destination $Vendor64Path -Force
+        Copy-Item -LiteralPath $chosen32.FullName -Destination $Vendor32Path -Force
+        Write-Host "   [nuget] Loaders WebView2 x64/x86 restaurados" -ForegroundColor DarkGray
 
     } finally {
         if (Test-Path -LiteralPath $tempDir) {
@@ -542,7 +543,7 @@ function New-AhkIntegrityManifest {
 Write-Step 'Restaurando WebView2Loader.dll se necessario'
 $Vendor64Dll = Join-Path $ProjectRoot 'lib\vendor\64bit\WebView2Loader.dll'
 $Vendor32Dll = Join-Path $ProjectRoot 'lib\vendor\32bit\WebView2Loader.dll'
-if (!(Test-Path -LiteralPath $Vendor64Dll) -and !(Test-Path -LiteralPath $Vendor32Dll)) {
+if (!(Test-Path -LiteralPath $Vendor64Dll) -or !(Test-Path -LiteralPath $Vendor32Dll)) {
     Restore-WebView2Loader -ProjectRoot $ProjectRoot -Vendor64Path $Vendor64Dll -Vendor32Path $Vendor32Dll
 }
 
@@ -577,20 +578,14 @@ if (Test-Path -LiteralPath $ImplicitLocalsScript) {
     Write-Warning "tools/find-implicit-locals.ps1 nao encontrado; sanity check ignorado."
 }
 
-# WebView2Loader.dll: aceita caminho padrao (vendor\64bit\) ou fallback (vendor\32bit\)
-$webview2Candidates = @(
-    $Vendor64Dll,
-    $Vendor32Dll
-)
-$ResolvedWebView2Dll = $null
-foreach ($candidate in $webview2Candidates) {
-    if (Test-Path -LiteralPath $candidate) {
-        $ResolvedWebView2Dll = $candidate
-        break
+# WebView2Loader.dll: o pacote deve conter x64 e x86. O runtime
+# escolhe a pasta correta via A_PtrSize em App.ahk.
+$ResolvedWebView2Dll64 = $Vendor64Dll
+$ResolvedWebView2Dll32 = $Vendor32Dll
+foreach ($requiredLoader in @($ResolvedWebView2Dll64, $ResolvedWebView2Dll32)) {
+    if (!(Test-Path -LiteralPath $requiredLoader)) {
+        throw "WebView2Loader.dll nao encontrado: $requiredLoader"
     }
-}
-if (!$ResolvedWebView2Dll) {
-    throw "WebView2Loader.dll nao encontrado em nenhum dos caminhos pesquisados: $($webview2Candidates -join ', ')"
 }
 
 foreach ($required in @(
@@ -598,7 +593,8 @@ foreach ($required in @(
     $UiIndexPath,
     $OcrReferencesPath,
     $OcrProbePath,
-    $ResolvedWebView2Dll,
+    $ResolvedWebView2Dll64,
+    $ResolvedWebView2Dll32,
     (Join-Path $ProjectRoot 'LICENSE'),
     (Join-Path $ProjectRoot 'COPYRIGHT'),
     (Join-Path $ProjectRoot 'NOTICE.md'),
@@ -706,9 +702,11 @@ New-EmbeddedBase64Module -OutputPath $GeneratedOcrProbePath -VariableName 'gEmbe
 # (WebView2Loader + documentos legais presentes). A UI, imagens e dicionário
 # OCR são embutidos no EXE e não têm caminho em disco no pacote.
 $integrityFiles = @()
-$integrityFiles += [ordered]@{
-    relative = (Get-PortableRelativePath -BasePath $ProjectRoot -TargetPath $ResolvedWebView2Dll).Replace('\', '/')
-    path     = $ResolvedWebView2Dll
+foreach ($loaderPath in @($ResolvedWebView2Dll64, $ResolvedWebView2Dll32)) {
+    $integrityFiles += [ordered]@{
+        relative = (Get-PortableRelativePath -BasePath $ProjectRoot -TargetPath $loaderPath).Replace('\', '/')
+        path     = $loaderPath
+    }
 }
 foreach ($legalDoc in @('LICENSE', 'COPYRIGHT', 'NOTICE.md')) {
     $docPath = Join-Path $ProjectRoot $legalDoc
@@ -735,9 +733,12 @@ Wait-ForFile -Path $ExePath
 Invoke-SignFile -Path $ExePath
 
 Write-Step 'Copiando recursos distribuíveis sem código-fonte AHK'
-$stageVendorDir = Join-Path $StageDir ([System.IO.Path]::GetDirectoryName($ResolvedWebView2Dll).Replace($ProjectRoot, '').TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar))
-New-Item -ItemType Directory -Path $stageVendorDir -Force | Out-Null
-Copy-Item -LiteralPath $ResolvedWebView2Dll -Destination (Join-Path $stageVendorDir ([System.IO.Path]::GetFileName($ResolvedWebView2Dll)))
+foreach ($loaderPath in @($ResolvedWebView2Dll64, $ResolvedWebView2Dll32)) {
+    $relativeLoaderDir = [System.IO.Path]::GetDirectoryName($loaderPath).Replace($ProjectRoot, '').TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $stageLoaderDir = Join-Path $StageDir $relativeLoaderDir
+    New-Item -ItemType Directory -Path $stageLoaderDir -Force | Out-Null
+    Copy-Item -LiteralPath $loaderPath -Destination (Join-Path $stageLoaderDir ([System.IO.Path]::GetFileName($loaderPath)))
+}
 foreach ($legalSource in @(
     (Join-Path $ProjectRoot 'LICENSE'),
     (Join-Path $ProjectRoot 'COPYRIGHT'),
