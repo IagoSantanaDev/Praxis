@@ -1,9 +1,9 @@
 # Padrões canônicos de interação MV em AutoHotkey v2
 
-**Status:** especificação para as migrações S03–S05
-**Revisão de auditoria:** 2026-09-10; contratos e fontes rechecados por prova estática read-only.
-**Escopo desta versão:** contratos das primitivas MV compartilhadas. Nenhuma fonte de produção é alterada por esta especificação.
-**Fontes locais:** `lib/globals/mv/MVConstants.ahk`, `lib/globals/mv/components/Controls.ahk`, `lib/globals/mv/components/Dialogs.ahk`, `lib/globals/mv/components/Popups.ahk` e `lib/globals/mv/MVSession.ahk`.
+**Status:** especificação das primitivas canônicas de interação e sincronização MV
+**Revisão:** 2026-09-10; motor de sincronização orientado a estado incorporado e validado por compilação estática.
+**Escopo desta versão:** contratos das primitivas MV compartilhadas, do motor de transição e sua aplicação em todos os fluxos operacionais de MOV DOC, Protocolar, FFCV, popup de contas e XML/TISS.
+**Fontes locais:** `lib/globals/mv/MVConstants.ahk`, `lib/globals/mv/components/Controls.ahk`, `lib/globals/mv/components/Dialogs.ahk`, `lib/globals/mv/components/Popups.ahk`, `lib/globals/mv/MVSync.ahk` e `lib/globals/mv/MVSession.ahk`.
 
 ## 1. Regra de canonização
 
@@ -32,7 +32,7 @@ Um wrapper de módulo é permitido quando acrescenta semântica de negócio, rel
 
 ## 2. Contratos canônicos de Controls
 
-As assinaturas abaixo conferem com a implementação atual de `components/Controls.ahk`. Os comentários de migração não representam mudanças realizadas nesta tarefa.
+As assinaturas abaixo conferem com a implementação atual de `components/Controls.ahk`. Os operadores de ação descritos nesta seção são obrigatórios nos fluxos operacionais; comentários de migração restantes identificam somente riscos de domínio ou macros fora do runtime principal.
 
 ### `MV_Poll`
 
@@ -165,7 +165,23 @@ MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000)
 - **Dependências:** `Dialog_ActiveModalTitle`, `WinExist`, `WinGetControlsHwnd`, `A_Cursor`, `MV_POLL_MS` e a disponibilidade do include de Dialogs no grafo final.
 - **Regra de migração:** não fundir com `MV_WaitWindowStable` apenas por semelhança textual; a checagem de modal e cursor é parte do contrato.
 
-## 3. Contratos de sessão e abort
+## 3. Contratos do motor de sincronização
+
+`lib/globals/mv/MVSync.ahk` é incluído por `MVSession.ahk` depois de `MVConstants.ahk` e `Controls.ahk`.
+
+- `MV_CaptureScreenState(winTitle)` captura HWND, processo, classe, título e assinatura estrutural dos controles.
+- `MV_GetScreenSignature(hwnd)` inclui a identidade da janela e texto, visibilidade e habilitação dos controles; portanto, mudança no mesmo HWND pode ser detectada.
+- `MV_WaitScreenChanged(previousState, timeoutMs, winTitle)` aguarda uma assinatura ou HWND diferente; timeout retorna `false` e gera log técnico.
+- `MV_WaitScreenStable(winTitle, stableMs, timeoutMs)` exige a mesma assinatura durante a janela de estabilidade.
+- `MV_WaitExpectedState(expectedFn, winTitle, timeoutMs, description)` valida a condição operacional específica da tela após a estabilidade.
+- `MV_WaitWindowClosed(winTitle, timeoutMs)` aguarda fechamento observável sem atraso fixo.
+- `MV_ActAndWait` é o operador base: captura estado anterior, executa o callback, aguarda mudança, aguarda estabilidade e, quando informado, valida o predicado operacional.
+- `MV_ClickAndWait`, `MV_ClickAtAndWait`, `MV_ClickHwndAndWait`, `MV_ClickModalAndWait`, `MV_SendAndWait`, `MV_SendTextAndWait`, `MV_SendFunctionAndWait`, `MV_SendEnterAndWait` e `MV_SetTextAndWait` são os operadores canônicos dos fluxos.
+- Fechamentos usam `MV_CloseWindowAndWait`, que comprova o evento de janela fechada e a estabilidade da janela de retorno.
+- Os loops continuam cooperativos: chamam `ThrowIfAppStopped()` a cada polling e usam `Sleep` somente para espaçar observações, nunca como prova de conclusão.
+- A migração operacional foi aplicada a MOV DOC, Protocolar, FFCV, popup de contas e XML/TISS. Um `Send`/`ControlSend` residual só pode existir dentro do callback de uma ação canônica ou em um loop de polling.
+
+## 4. Contratos de sessão e abort
 
 ### `MV_EnsureWindowActive`
 
