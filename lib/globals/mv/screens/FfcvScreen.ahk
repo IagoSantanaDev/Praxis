@@ -456,6 +456,7 @@ FFCV_WaitLoad() {
 }
 
 _TipoContaCodigo(tipoConta) {
+    global MV_TIPO_CONTA
     ; Valor canônico em MVConstants.MV_TIPO_CONTA (Internamento->1, Emergência->2, Ambulatório->3).
     return MV_TIPO_CONTA.Has(tipoConta) ? Str(MV_TIPO_CONTA[tipoConta]) : ""
 }
