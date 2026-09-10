@@ -5,21 +5,19 @@
 
 #Requires AutoHotkey v2.0
 #Warn All, OutputDebug
-#Include ..\..\..\..\lib\globals\mv\MVSession.ahk
-#Include ..\components\Dialogs.ahk
-#Include ..\components\Popups.ahk
-#Include FfcvScreen.ahk
-#Include ..\..\..\..\lib\config\Paths.ahk
+#Include %A_LineFile%\..\..\MVSession.ahk
+#Include %A_LineFile%\..\..\components\Dialogs.ahk
+#Include %A_LineFile%\..\..\components\Popups.ahk
+#Include %A_LineFile%\..\FfcvScreen.ahk
+#Include %A_LineFile%\..\..\..\..\..\lib\config\Paths.ahk
 
 ; ── Internal helpers ─────────────────────────────────────────
-; Stub: verifica se um controle esta visivel e acessivel em coords XY.
-; Quando a implementacao real com MV_FindControlByClientPoint estiver
-; disponivel, substituir esta versao minima.
+; Verifica se um controle esta visivel e acessivel em coords XY.
+; Delega para a implementacao canonica MV_FindControlAtPoint (Controls.ahk).
 _ControlAtReady(winTitle, classNN, clientX, clientY, tolerance := 14) {
-    ; TODO: implementar com MV_FindControlByClientPoint via Controls.ahk
-    ; Por enquanto: verifica se janela existe
-    try return WinExist(winTitle) != 0
-    return false
+    if !WinExist(winTitle)
+        return false
+    return MV_FindControlAtPoint(winTitle, classNN, clientX, clientY, tolerance, "") != 0
 }
 
 ; ════════════════════════════════════════════════════════════════
@@ -41,9 +39,10 @@ _ControlAtReady(winTitle, classNN, clientX, clientY, tolerance := 14) {
 
 ; ── Timeouts (ms) ─────────────────────────────────────────────
 ; Compartilhados com callers XML em RemessaProtocolo.ahk.
-RP_KEY_SETTLE_MS         := 100
-RP_FIELD_FOCUS_SETTLE_MS := 100
-RP_FIELD_CLEAR_SETTLE_MS := 100
+; Bases em MVConstants (MV_FIELD_*); aliases preservam callers.
+RP_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
+RP_FIELD_FOCUS_SETTLE_MS := MV_FIELD_FOCUS_SETTLE_MS
+RP_FIELD_CLEAR_SETTLE_MS := MV_FIELD_CLEAR_SETTLE_MS
 
 RP_FINAL_STABLE_MS         := FFCV_FINAL_STABLE_MS
 RP_FINAL_ACTION_TIMEOUT_MS  := FFCV_FINAL_ACTION_TIMEOUT_MS
@@ -54,54 +53,19 @@ RP_XML_QUERY_MIN_WAIT_MS   := FFCV_XML_QUERY_MIN_WAIT_MS
 ; ════════════════════════════════════════════════════════════════
 
 TissXml_SetTextByClickAt(winTitle, x, y, value) {
-    if !_EnsureWindowActive(winTitle)
-        return false
-
-    Click(x + 15, y + 8, 1)
-    Sleep RP_FIELD_FOCUS_SETTLE_MS
-    Send("{Home}{Shift down}{End}{Shift up}{Backspace}")
-    Sleep RP_FIELD_CLEAR_SETTLE_MS
-    SendText value
-    Sleep RP_KEY_SETTLE_MS
-    return true
+    return MV_SetTextByControl(winTitle, "Edit1", value, x, y, true)
 }
 
 TissXml_SetTextByClickNoClear(winTitle, x, y, value) {
-    if !_EnsureWindowActive(winTitle)
-        return false
-
-    Click(x + 15, y + 8, 1)
-    Sleep RP_FIELD_FOCUS_SETTLE_MS
-    SendText value
-    Sleep RP_KEY_SETTLE_MS
-    return true
+    return MV_SetTextByControl(winTitle, "Edit1", value, x, y, false)
 }
 
 /*
 TissXml_ClickBySpec(winTitle, classNN, x, y)
-    Clica em um ponto de controle. Tenta localizacao por ClassNN + Client
-    com tolerancia 20; se falhar, usa fallback Click direto em coordenadas.
-    @return true se o click foi executado com sucesso.
+    Delega para a versão canônica MV_ClickBySpec (components/Controls.ahk).
 */
 TissXml_ClickBySpec(winTitle, classNN, x, y) {
-    if (classNN = "" || classNN = "CLASSNN" || x = "" || y = "")
-        return false
-
-    if MV_ClickControlAt(winTitle, classNN, x, y, 20)
-        return true
-
-    if !WinExist(winTitle)
-        return false
-
-    try {
-        WinActivate winTitle
-        if !MV_Poll(() => WinActive(winTitle), 3)
-            return false
-        Click(x, y, 1)
-        return true
-    } catch {
-        return false
-    }
+    return MV_ClickBySpec(winTitle, classNN, x, y)
 }
 
 TissXml_WaitXmlQueryReady(timeoutMs := 30000) {
@@ -175,12 +139,12 @@ TissXml_HandleSaveModals() {
         popup := Dialog_ActiveModalTitle()
 
         ; Modal de sobrescrita: tem Sim e Nao. Regra: nao sobrescrever.
-        if TissXml_ModalHasButton(popup, "&Sim") && TissXml_ModalHasButton(popup, "&Nao") {
+        if MV_FindButtonByText(popup, "&Sim") && MV_FindButtonByText(popup, "&Nao") {
             if TissXml_ClickModalButtonByText(popup, "&Nao")
                 Notify("Modal Sim/Nao respondido com Nao.")
             else
                 return false
-        } else if TissXml_ModalHasButton(popup, "&OK") {
+        } else if MV_FindButtonByText(popup, "&OK") {
             if TissXml_ClickModalButtonByText(popup, "&OK")
                 Notify("Modal OK fechado.")
             else
@@ -196,47 +160,12 @@ TissXml_HandleSaveModals() {
 }
 
 TissXml_ClickModalButtonByText(winTitle, buttonText) {
-    try hwnds := WinGetControlsHwnd(winTitle)
-    catch
+    hwnd := MV_FindButtonByText(winTitle, buttonText)
+    if !hwnd
         return false
-
-    for hwnd in hwnds {
-        try ctrlClass := ControlGetClassNN(hwnd)
-        catch
-            continue
-        if (SubStr(ctrlClass, 1, 6) != "Button")
-            continue
-        try text := ControlGetText(hwnd)
-        catch
-            continue
-        if (text = buttonText) {
-            ControlClick hwnd,,,,, "NA"
-            return true
-        }
-    }
-    return false
+    ControlClick hwnd,,,,, "NA"
+    return true
 }
-
-TissXml_ModalHasButton(winTitle, buttonText) {
-    try hwnds := WinGetControlsHwnd(winTitle)
-    catch
-        return false
-
-    for hwnd in hwnds {
-        try ctrlClass := ControlGetClassNN(hwnd)
-        catch
-            continue
-        if (SubStr(ctrlClass, 1, 6) != "Button")
-            continue
-        try text := ControlGetText(hwnd)
-        catch
-            continue
-        if (text = buttonText)
-            return true
-    }
-    return false
-}
-
 
 ; ════════════════════════════════════════════════════════════════
 ;  Funcoes publicas — extraidas de RemessaProtocolo.ahk

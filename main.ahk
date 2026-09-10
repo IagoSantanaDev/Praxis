@@ -30,11 +30,9 @@ for arg in A_Args {
 #Include lib\app\IntegrityCheck.ahk
 #Include lib\ui\UiBridge.ahk
 #Include lib\ui\UiLog.ahk
-; Ordem importa: UiBridge (e seu include transitivo de Dispatcher) ANTES de App.
-; Include explicito de Dispatcher restaurado por defesa em profundidade —
-; UiBridge.ahk:9 tambem carrega Dispatcher, mas explicitar aqui elimina o
-; acoplamento implicito fragil contra reordenacao futura dos includes.
-#Include lib\app\Dispatcher.ahk
+; Ordem importa: UiBridge carrega Dispatcher antes de App. O include
+; transitivo é a única entrada do Dispatcher para evitar redefinição de
+; funções quando o entry point é composto.
 #Include lib\app\App.ahk
 #Include lib\app\ScriptRegistry.ahk
 #Include lib\config\Paths.ahk

@@ -9,19 +9,19 @@
 
 ; ─── Notificacoes visuais (log / progress / done) ─────────────
 
-; ─── Logging stubs ──────────────────────────────────────────
-; Log_Info, Log_Warn e Log_Error sao chamados em diversos modulos MV via #Include
-; mas nunca definidos. stubs aqui satisfazem #Warn e mantem retrocompatibilidade.
+; ─── Logging MV ─────────────────────────────────────────────
+; Mantém a API usada pelos módulos MV, mas encaminha para o logger
+; canônico do Dispatcher em vez de descartar diagnósticos.
 Log_Info(msg) {
-    ; no-op: todas as chamadas estao dentro de try{}.
+    DispatchLog("info", "mv_log", Map("message", String(msg)))
 }
 
 Log_Warn(msg) {
-    ; no-op: todas as chamadas estao dentro de try{}.
+    DispatchLog("warn", "mv_log", Map("message", String(msg)))
 }
 
 Log_Error(msg) {
-    ; no-op: todas as chamadas estao dentro de try/catch.
+    DispatchLog("error", "mv_log", Map("message", String(msg)))
 }
 
 ; ─── Notificacoes visuais (log / progress / done) ─────────────

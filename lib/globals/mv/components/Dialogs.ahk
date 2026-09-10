@@ -10,9 +10,9 @@
 ;  MV DIALOGS — wrappers de modais Forms e OCR de erros
 ; ════════════════════════════════════════════════════════════════
 
-#Include ..\components\Controls.ahk
-#Include ..\MVConstants.ahk
-#Include ..\FFCV_ErrorTemplates.ahk
+#Include %A_LineFile%\..\Controls.ahk
+#Include %A_LineFile%\..\..\MVConstants.ahk
+#Include %A_LineFile%\..\..\FFCV_ErrorTemplates.ahk
 
 ; ── Títulos de janela de modais Forms (derivados de RemessaProtocolo) ──
 DIALOG_MODAL_FORMS_CLASS := MV_CLASS_MODAL_FORMS

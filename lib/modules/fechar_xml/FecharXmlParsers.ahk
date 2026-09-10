@@ -5,6 +5,7 @@
 
 #Requires AutoHotkey v2.0
 #Warn All, OutputDebug
+#Include %A_LineFile%\..\..\..\globals\mv\ParseUtils.ahk
 ; Parsers para extração e validação de dados provenientes dos
 ; screens orquestrados (TissXmlScreen, FfcvScreen).
 ; Centraliza transformação de dados brutos em estruturas tipadas.
@@ -51,12 +52,36 @@ FXML_ParseFfcvConfirmResult(raw) {
 */
 FXML_ValidateParams(params) {
     errors := []
-    if !IsObject(params) {
-        errors.Push("params deve ser um objeto Map")
+    if !(params is Map) {
+        errors.Push("params deve ser um Map")
         return Map("valid", false, "errors", errors)
     }
-    ; TODO: adicionar validações específicas quando params for implementado
-    return Map("valid", errors.Length == 0, "errors", errors)
+
+    if !params.Has("remessas") || Trim(String(params["remessas"])) = ""
+        errors.Push("Parametro obrigatorio ausente: remessas")
+
+    fechar := FXML_OptionEnabled(params, "fechar", true)
+    gerarXml := FXML_OptionEnabled(params, "gerar_xml", true)
+    if !fechar && !gerarXml
+        errors.Push("Marque Fechar Remessa ou Gerar XML.")
+
+    if fechar {
+        for key in ["data_entrega", "data_vencimento"] {
+            if !params.Has(key) || Trim(String(params[key])) = ""
+                errors.Push("Parametro obrigatorio ausente: " key)
+        }
+    }
+
+    return Map("valid", errors.Length = 0, "errors", errors)
+}
+
+FXML_OptionEnabled(params, key, defaultValue := true) {
+    if !params.Has(key) || Trim(String(params[key])) = ""
+        return defaultValue
+
+    value := StrLower(Trim(String(params[key])))
+    return !(value = "nao" || value = "não" || value = "false" || value = "0")
+
 }
 
 /*

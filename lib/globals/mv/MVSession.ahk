@@ -25,22 +25,25 @@ CoordMode("Mouse", "Client")
 ;  API PÚBLICA
 ; ════════════════════════════════════════════════════════════════
 
+MV_EnsureModule(moduleWin, stableMs := 0, timeoutSecs := 0) {
+    if (stableMs = 0)
+        stableMs := MV_MODULE_STABLE_MS
+    if (timeoutSecs = 0)
+        timeoutSecs := MV_TIMEOUT_LOAD
+
+    if !WinExist(moduleWin)
+        return false
+
+    MV_ActivateModule(moduleWin)
+    return MV_WaitWindowStable(moduleWin, stableMs, timeoutSecs)
+}
+
 MV_EnsureMovDoc() {
-    if WinExist(MV_WIN_MOVDOC_ANY) {
-        MV_ActivateModule(MV_WIN_MOVDOC_ANY)
-        if MV_WaitWindowStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
-            return true
-    }
-    return false
+    return MV_EnsureModule(MV_WIN_MOVDOC_ANY)
 }
 
 MV_EnsureFFCV() {
-    if WinExist(MV_WIN_FFCV_ANY) {
-        MV_ActivateModule(MV_WIN_FFCV_ANY)
-        if MV_WaitWindowStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD)
-            return true
-    }
-    return false
+    return MV_EnsureModule(MV_WIN_FFCV_ANY)
 }
 
 ; ════════════════════════════════════════════════════════════════
@@ -52,4 +55,22 @@ MV_ActivateModule(moduleWin) {
         WinActivate moduleWin
         MV_Poll(() => WinActive(moduleWin), 3)
     }
+}
+
+; ════════════════════════════════════════════════════════════════
+;  ERRO / ABORT
+; ════════════════════════════════════════════════════════════════
+
+; Aborta a execução de um módulo: envia erro à UI, encerra o estado de
+; running (gRunning) e retorna false. Canônica única de Protocolar_Abort
+; (ProtocolarParsers.ahk) e RP_Abort (RemessaProtocolo.ahk).
+; sendStatus=true emite também a mensagem de status "Execução finalizada."
+; (comportamento original do Protocolar).
+MV_Abort(msg, sendStatus := false) {
+    global gRunning
+    SendToUI(Map("type", "error", "message", msg))
+    if (sendStatus)
+        SendToUI(Map("type", "status", "message", "Execução finalizada.", "running", false))
+    gRunning := false
+    return false
 }
