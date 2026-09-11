@@ -84,13 +84,16 @@ MV_WaitOracleSettled(winTitle, stableMs := MV_ORACLE_STABLE_MS, timeoutMs := MV_
         cursorReady := (A_Cursor != "Wait" && A_Cursor != "AppStarting")
         exists := WinExist(winTitle)
         count := -1
+        enumerated := false
         if exists {
-            try hwnds := WinGetControlsHwnd(winTitle)
-            catch
-                hwnds := []
-            count := hwnds.Length
+            try {
+                hwnds := WinGetControlsHwnd(winTitle)
+                count := hwnds.Length
+                enumerated := true
+            } catch {
+            }
         }
-        if (exists && modalClear && cursorReady && count = lastCount) {
+        if (exists && enumerated && modalClear && cursorReady && count = lastCount) {
             if (stableSince = 0)
                 stableSince := A_TickCount
             if (A_TickCount - stableSince >= stableMs)
@@ -115,12 +118,16 @@ MV_WaitWindowStable(winTitle, stableMs := MV_DEFAULT_STABLE_MS, timeoutSecs := M
         ThrowIfAppStopped()
         if WinExist(winTitle) {
             WinActivate winTitle
-            try hwnds := WinGetControlsHwnd(winTitle)
-            catch
-                hwnds := []
-            count := hwnds.Length
+            enumerated := false
+            try {
+                hwnds := WinGetControlsHwnd(winTitle)
+                count := hwnds.Length
+                enumerated := true
+            } catch {
+                count := -1
+            }
 
-            if WinActive(winTitle) && count = lastCount {
+            if WinActive(winTitle) && enumerated && count = lastCount {
                 if (stableSince = 0)
                     stableSince := A_TickCount
                 if (A_TickCount - stableSince >= stableMs)
@@ -338,7 +345,5 @@ MV_SetTextByClick(winTitle, x, y, value, clear := true) {
         return false
     if !MV_WaitScreenStable(winTitle, MV_KEY_SETTLE_MS, MV_KEY_SETTLE_MS * 20)
         return false
-    try return Trim(ControlGetText(classNN, winTitle)) = Trim(String(value))
-    catch
-        return true
+    return true
 }

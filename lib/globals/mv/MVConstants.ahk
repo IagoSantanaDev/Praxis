@@ -65,6 +65,18 @@ MV_TIPO_CONTA := Map(
     "Emergência",   2,
     "Ambulatório",  3)
 
+MV_TipoContaCodigo(tipoConta) {
+    normalized := StrLower(Trim(String(tipoConta)))
+    canonicalName := normalized = "internamento" ? "Internamento"
+        : normalized = "emergencia" || normalized = "emergência" ? "Emergência"
+        : normalized = "ambulatorio" || normalized = "ambulatório" ? "Ambulatório"
+        : ""
+
+    if (canonicalName = "" || !MV_TIPO_CONTA.Has(canonicalName))
+        throw Error("Tipo de conta invalido: " tipoConta ". Use Internamento, Emergencia ou Ambulatorio.")
+    return String(MV_TIPO_CONTA[canonicalName])
+}
+
 MV_KEY_SETTLE_MS         := 100
 
 ; ── Timings do popup de conta ───────────────────────────────────

@@ -404,19 +404,5 @@ _ClickNaoModal() {
 ; ════════════════════════════════════════════════════════════════
 
 _TipoContaCodigo(tipoConta) {
-    normalized := StrLower(Trim(String(tipoConta)))
-
-    ; Conversao local para evitar dependencia de escopo/global durante o
-    ; preenchimento Oracle Forms. Contrato: Internamento=1, Emergencia=2,
-    ; Ambulatorio=3.
-    switch normalized {
-        case "internamento":
-            return "1"
-        case "emergencia", "emergência":
-            return "2"
-        case "ambulatorio", "ambulatório":
-            return "3"
-        default:
-            throw Error("Tipo de conta invalido: " tipoConta ". Use Internamento, Emergencia ou Ambulatorio.")
-    }
+    return MV_TipoContaCodigo(tipoConta)
 }
