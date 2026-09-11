@@ -55,7 +55,7 @@ MV_EnsureFFCV() {
 MV_ActivateModule(moduleWin) {
     if WinExist(moduleWin) {
         WinActivate moduleWin
-        MV_Poll(() => WinActive(moduleWin), 3)
+        MV_Poll(() => WinActive(moduleWin), MV_WINDOW_ACTIVATE_TIMEOUT_SECS)
     }
 }
 
@@ -64,8 +64,7 @@ MV_ActivateModule(moduleWin) {
 ; ════════════════════════════════════════════════════════════════
 
 ; Aborta a execução de um módulo: envia erro à UI, encerra o estado de
-; running (gRunning) e retorna false. Canônica única de Protocolar_Abort
-; (ProtocolarParsers.ahk) e RP_Abort (RemessaProtocolo.ahk).
+; running (gRunning) e retorna false.
 ; sendStatus=true emite também a mensagem de status "Execução finalizada."
 ; (comportamento original do Protocolar).
 MV_Abort(msg, sendStatus := false) {

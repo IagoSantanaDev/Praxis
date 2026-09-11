@@ -14,9 +14,8 @@
 #Include %A_LineFile%\..\..\MVConstants.ahk
 #Include %A_LineFile%\..\..\FFCV_ErrorTemplates.ahk
 
-; ── Títulos de janela de modais Forms (derivados de RemessaProtocolo) ──
-DIALOG_MODAL_FORMS_CLASS := MV_CLASS_MODAL_FORMS
-DIALOG_MOVDOC_POPUP      := "Forms " MV_CLASS_MODAL_FORMS
+; ── Título de janela do popup modal Forms ────────────────────
+DIALOG_MOVDOC_POPUP := "Forms " MV_CLASS_MODAL_FORMS
 
 ; ── Helpers de logging interno ────────────────────────────────
 ; Usa MV_Log de components/Controls.ahk (consolidado em 2026-06-26).
@@ -28,8 +27,8 @@ DIALOG_MOVDOC_POPUP      := "Forms " MV_CLASS_MODAL_FORMS
 ; Detecta se algum modal Forms (ui60Modal_W32) está ativo.
 ; Retorna o WinTitle do modal se existir, ou string vazia caso contrário.
 Dialog_ActiveModalTitle() {
-    result := WinExist(DIALOG_MODAL_FORMS_CLASS)
-        ? DIALOG_MODAL_FORMS_CLASS
+    result := WinExist(MV_CLASS_MODAL_FORMS)
+        ? MV_CLASS_MODAL_FORMS
         : ""
     MV_Log("Dialog_ActiveModalTitle", "modal ativo=" (result != ""), result != "")
     return result
@@ -69,7 +68,8 @@ Dialog_DismissMovDocPopup() {
 
         WinActivate DIALOG_MOVDOC_POPUP
 
-        if !MV_Poll(() => Popup_FirstControlByClass(DIALOG_MOVDOC_POPUP, MV_MODAL_OK_CLASS) != 0, 5) {
+        if !MV_Poll(() => MV_FirstControlByClass(DIALOG_MOVDOC_POPUP, MV_MODAL_OK_CLASS) != 0,
+            MV_DIALOG_BUTTON_TIMEOUT_SECS) {
             MV_Log("Dialog_DismissMovDocPopup", "OK botao nao ficou disponivel", false)
             return false
         }
@@ -79,7 +79,7 @@ Dialog_DismissMovDocPopup() {
             Send "{Enter}"
         }
 
-        result := MV_Poll(() => !WinExist(DIALOG_MOVDOC_POPUP), 3)
+        result := MV_Poll(() => !WinExist(DIALOG_MOVDOC_POPUP), MV_WINDOW_ACTIVATE_TIMEOUT_SECS)
         MV_Log("Dialog_DismissMovDocPopup", "popup fechado=" result, result)
         return result
     }

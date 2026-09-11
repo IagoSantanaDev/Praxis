@@ -145,8 +145,8 @@ MV_WaitWindowStable(winTitle, stableMs := MV_DEFAULT_STABLE_MS, timeoutSecs := M
 ; ════════════════════════════════════════════════════════════════
 
 ; Extende a busca por ponto com prefixo de ClassNN.
-; Consolida Popup_FindControlByClassPrefixAtPoint (Popups.ahk) numa única
-; implementação. classPrefix="" (default) = busca por classe exata;
+; Busca por ponto com prefixo de ClassNN. classPrefix="" (default)
+; busca por classe exata;
 ; classPrefix="Edit"/"ComboBox"/"ui60Drawn" = prefixo.
 MV_FindControlAtPoint(winTitle, classNN, targetX, targetY, tolerance := 14, classPrefix := "") {
     try hwnds := WinGetControlsHwnd(winTitle)
@@ -193,7 +193,7 @@ MV_FindControlByClientPoint(winTitle, classNN, targetX, targetY, tolerance := 14
 }
 
 ; Primeiro controle com a classe ClassNN exata na janela (hwnd ou 0).
-; Base única de MV_ClickFirstControl e Popup_FirstControlByClass.
+; Base única para localizar o primeiro controle por ClassNN.
 MV_FirstControlByClass(winTitle, classNN) {
     try hwnds := WinGetControlsHwnd(winTitle)
     catch
@@ -220,7 +220,7 @@ MV_ClickBySpec(winTitle, classNN, x, y) {
         return false
     try {
         WinActivate winTitle
-        if !MV_Poll(() => WinActive(winTitle), 3)
+        if !MV_Poll(() => WinActive(winTitle), MV_WINDOW_ACTIVATE_TIMEOUT_SECS)
             return false
         Click(x, y, 1)
         return true

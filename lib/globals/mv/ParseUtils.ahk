@@ -9,9 +9,7 @@
 ; ════════════════════════════════════════════════════════════════
 ;  MV PARSE UTILS — helpers de parsing compartilhados
 ; ════════════════════════════════════════════════════════════════
-; Fonte única para parsing de listas CSV simples. Consolidado de
-; Protocolar_ParseRemessas (ProtocolarParsers.ahk) e ParseProtocolos
-; (RPParsers.ahk), que eram cópias idênticas (2026-09-09).
+; Fonte única para parsing de listas CSV simples dos módulos MV.
 
 ; Divide uma string separada por vírgula em lista limpa (Trim + descarta vazios).
 ; Canônica da família de parsers de lista dos módulos MV.

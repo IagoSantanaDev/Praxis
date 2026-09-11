@@ -149,10 +149,6 @@ MV_WaitExpectedState(expectedFn, winTitle := "", timeoutMs := MV_DEFAULT_TIMEOUT
     }
 }
 
-MV_WaitWindowChanged(previousState, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
-    return MV_WaitScreenChanged(previousState, timeoutMs)
-}
-
 MV_WaitWindowClosed(winTitle, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     startedAt := A_TickCount
     Loop {
