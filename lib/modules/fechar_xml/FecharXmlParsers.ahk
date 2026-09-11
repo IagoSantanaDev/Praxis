@@ -60,8 +60,8 @@ FXML_ValidateParams(params) {
     if !params.Has("remessas") || Trim(String(params["remessas"])) = ""
         errors.Push("Parametro obrigatorio ausente: remessas")
 
-    fechar := FXML_OptionEnabled(params, "fechar", true)
-    gerarXml := FXML_OptionEnabled(params, "gerar_xml", true)
+    fechar := MV_OptionEnabled(params, "fechar", true)
+    gerarXml := MV_OptionEnabled(params, "gerar_xml", true)
     if !fechar && !gerarXml
         errors.Push("Marque Fechar Remessa ou Gerar XML.")
 
@@ -73,15 +73,6 @@ FXML_ValidateParams(params) {
     }
 
     return Map("valid", errors.Length = 0, "errors", errors)
-}
-
-FXML_OptionEnabled(params, key, defaultValue := true) {
-    if !params.Has(key) || Trim(String(params[key])) = ""
-        return defaultValue
-
-    value := StrLower(Trim(String(params[key])))
-    return !(value = "nao" || value = "não" || value = "false" || value = "0")
-
 }
 
 /*

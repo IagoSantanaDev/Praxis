@@ -68,31 +68,7 @@ Protocolar_NormalizeCsvHeaderName(name) {
 }
 
 Protocolar_SplitSemicolonCsvLine(line) {
-    fields := []
-    current := ""
-    quoted := false
-    index := 1
-
-    while (index <= StrLen(line)) {
-        char := SubStr(line, index, 1)
-        if (char = Chr(34)) {
-            if (quoted && SubStr(line, index + 1, 1) = Chr(34)) {
-                current .= Chr(34)
-                index += 2
-                continue
-            }
-            quoted := !quoted
-        } else if (char = ";" && !quoted) {
-            fields.Push(current)
-            current := ""
-        } else {
-            current .= char
-        }
-        index += 1
-    }
-
-    fields.Push(current)
-    return fields
+    return MV_SplitSemicolonCsvLine(line)
 }
 
 ; ════════════════════════════════════════════════════════════════

@@ -27,8 +27,8 @@ RunProtocolar(params) {
     setorAtual := Trim(params["setor_atual"])
     setorEnvio := Trim(params["setor_envio"])
     tipo := params.Has("tipo") ? Trim(String(params["tipo"])) : "Ambulatorial"
-    finalizarEnvio := Protocolar_OptionEnabled(params, "finalizar_envio", true)
-    umaRemessaUmProtocolo := Protocolar_OptionEnabled(params, "uma_remessa_um_protocolo", false)
+    finalizarEnvio := MV_OptionEnabled(params, "finalizar_envio", true)
+    umaRemessaUmProtocolo := MV_OptionEnabled(params, "uma_remessa_um_protocolo", false)
     csvPath := params.Has("csv_path")
         ? Trim(String(params["csv_path"]))
         : ""
@@ -205,7 +205,7 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
         throw Error("Popup de remessa/Gerar Arquivo nao apareceu.")
     reportTitle := "ahk_id " reportHwnd
 
-    if !MV_SetTextByControl(reportTitle, "TEdit1", Protocolar_Join(remessas, ","), 110, 14)
+    if !MV_SetTextByControl(reportTitle, "TEdit1", MV_JoinArray(remessas, ","), 110, 14)
         throw Error("Nao foi possivel preencher as remessas no relatorio FFCV.")
 
     button := MV_FirstControlByClass(reportTitle, "TBitBtn2")
@@ -248,14 +248,7 @@ Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
     throw Error("O CSV nao apareceu em Documents após salvar.")
 }
 
-Protocolar_OptionEnabled(params, key, defaultValue := false) {
-    if !params.Has(key) || Trim(String(params[key])) = ""
-        return defaultValue
-    value := StrLower(Trim(String(params[key])))
-    return !(value = "false" || value = "0" || value = "nao" || value = "não")
-}
-
-Protocolar_WaitWindowWithControls(processName, requiredClass, optionalClass := "", timeoutSecs := 20) {
+Protocolar_WaitWindowWithControls(processName, requiredClass, optionalClass := "", timeoutSecs := MV_DEFAULT_TIMEOUT_SECS) {
     startedAt := A_TickCount
     while (A_TickCount - startedAt <= timeoutSecs * 1000) {
         ThrowIfAppStopped()
@@ -271,13 +264,6 @@ Protocolar_WaitWindowWithControls(processName, requiredClass, optionalClass := "
         Sleep MV_POLL_MS
     }
     return 0
-}
-
-Protocolar_Join(items, separator) {
-    result := ""
-    for _, item in items
-        result .= (result = "" ? "" : separator) item
-    return result
 }
 
 Protocolar_EnviarConta(conta) {

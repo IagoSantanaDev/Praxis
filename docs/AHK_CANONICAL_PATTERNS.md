@@ -251,12 +251,18 @@ Antes da API, o arquivo define `SetTitleMatchMode(2)`, `DetectHiddenText(true)`,
 
 ## 5. Constantes e globals canônicos
 
-`MVConstants.ahk` é a única fonte para títulos de janela, classes de modal, coordenadas do popup, `MV_TIPO_CONTA` e timings. Valores atualmente relevantes:
+`MVConstants.ahk` é a única fonte para títulos de janela, classes de modal, coordenadas do popup, `MV_TIPO_CONTA` e timings. Defaults compartilhados de polling e espera também devem viver ali; valores de infraestrutura do shell permanecem em `App.ahk` porque não pertencem à automação MV. Valores atualmente relevantes:
 
 - `MV_POLL_MS = 100` ms;
+- `MV_DEFAULT_TIMEOUT_MS = 30000` ms e `MV_DEFAULT_TIMEOUT_SECS = 20` s;
+- `MV_DEFAULT_STABLE_MS = 600` ms, `MV_ORACLE_STABLE_MS = 800` ms e `MV_CLIPBOARD_TIMEOUT_MS = 600` ms;
+- `MV_WINDOW_ACTIVATE_TIMEOUT_SECS = 3` s;
+- `FFCV_FINAL_STABLE_MS = 800` ms e `FFCV_FINAL_ACTION_TIMEOUT_MS = 30000` ms, compartilhados por FFCV/XML/TISS;
 - `MV_TIMEOUT_LOAD = 15` s e `MV_TIMEOUT_ACOE = 10` s;
 - `MV_MODULE_STABLE_MS = 600` ms e `MV_TARGET_STABLE_MS = 600` ms;
 - timings de foco/limpeza/tecla e popup entre `100` e `650` ms.
+
+Defaults em `timeoutMs` e `timeoutSecs` devem referenciar essas constantes quando o contrato for compartilhado. Timeouts de domínio usados uma única vez, como aparição de popup ou fechamento específico de tela, continuam junto do módulo que define o contrato; não transformar todo literal isolado em constante global.
 
 A divergência histórica de tipo de conta deve permanecer explícita: a fonte canônica define Internamento `1`, Emergência `2` e Ambulatório `3`; macros que usam outra ordem precisam ser migrados e validados, não corrigidos silenciosamente dentro dos helpers de interação.
 
@@ -321,7 +327,7 @@ Esta seção complementa os contratos de interação com as famílias identifica
 |---|---|---|---|---|
 | Lista CSV simples | `lib/globals/mv/ParseUtils.ahk:ParseListaCsv` | **Fonte única.** `StrSplit` por vírgula, `Trim` e descarte de vazios; não criar variante para `remessas` ou `protocolos`. | S03 | O contrato é CSV simples; não interpretar pipe, linhas ou campos compostos aqui. |
 | Protocolos de remessa | `lib/modules/remessa_protocolo/RPParsers.ahk:ParseProtocolos` | Wrapper de domínio preservado: delega para `ParseListaCsv`. `RP_RecordTiming`, `RP_ConvenioMajoritario`, `RP_FiltrarContasPorConvenio` e relatórios continuam semântica RP. | S03 | Confirmar callers antes de remover o nome público. |
-| Remessas do Protocolar | `lib/modules/protocolar/ProtocolarParsers.ahk:Protocolar_ParseRemessas` | Wrapper de compatibilidade preservado: delega para `ParseListaCsv`; `Protocolar_ExtractContasFromCsv` escolhe `CD_REG_AMB` para Ambulatorial e `CONTA` para Hospitalar/Internamento, normaliza BOM/cabeçalho, suporta aspas e deduplicação. `Protocolar_Abort` delega para `MV_Abort(msg, true)`. | S03/S05 | O relatório FFCV usa índice 121 para Ambulatorial e 177 para Hospitalar/Internamento; o CSV é consumido antes da tela Protocolação de Envio. |
+| Remessas do Protocolar | `lib/modules/protocolar/ProtocolarParsers.ahk:Protocolar_ParseRemessas` | Wrappers de compatibilidade preservados: `Protocolar_ParseRemessas` delega para `ParseListaCsv` e `Protocolar_SplitSemicolonCsvLine` para `MV_SplitSemicolonCsvLine`, ambas em `lib/globals/mv/ParseUtils.ahk`; `Protocolar_ExtractContasFromCsv` escolhe `CD_REG_AMB` para Ambulatorial e `CONTA` para Hospitalar/Internamento, normaliza BOM/cabeçalho, suporta aspas e deduplicação. `Protocolar_Abort` delega para `MV_Abort(msg, true)`. | S03/S05 | O relatório FFCV usa índice 121 para Ambulatorial e 177 para Hospitalar/Internamento; o CSV é consumido antes da tela Protocolação de Envio. |
 | Resultado FXML | `lib/modules/fechar_xml/FecharXml.ahk` + `FecharXmlParsers.ahk` | `RunFecharXML` valida remessas/datas, seleciona cada remessa, confirma entrega e chama `TissXml_Gerar`; `FXML_ParseFlowResult` agrega os XMLs. Parsers de payload bruto continuam placeholders não usados. | S05 | O orquestrador usa diretamente os Maps de `Ffcv_ConfirmarEntregaNaTela` e `TissXml_Gerar`; não inventar parser de payload inexistente. |
 | Contas dos macros | `test_macros/11_ffcv_remessa_inserir_imprimir.ahk:ParseContasTeste` | Manter local: aceita `Array`, fallback, linhas, pipe e extração numérica. Não transformar em parser global por semelhança com CSV. | S04 | Entrada `Prot. | Conta | Convênio` tem semântica de fixture diferente de `ParseListaCsv`. |
 | Tipos de conta | `lib/app/ScriptRegistry.ahk`/`MVConstants.ahk` versus macros `03`/`11` | Preservar a divergência para migração e validação; não corrigir macros nesta fatia. | S04 | Alteração silenciosa pode enviar tipo errado ao Oracle Forms. |

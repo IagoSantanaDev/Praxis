@@ -34,8 +34,8 @@ RunFecharXML(params) {
     remessas := ParseListaCsv(params["remessas"])
     dataEntrega := Trim(String(params["data_entrega"]))
     dataVenc := Trim(String(params["data_vencimento"]))
-    fechar := FXML_OptionEnabled(params, "fechar", true)
-    gerarXml := FXML_OptionEnabled(params, "gerar_xml", true)
+    fechar := MV_OptionEnabled(params, "fechar", true)
+    gerarXml := MV_OptionEnabled(params, "gerar_xml", true)
     results := []
 
     if !MV_EnsureFFCV()

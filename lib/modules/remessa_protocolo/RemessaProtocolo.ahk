@@ -42,11 +42,6 @@ SetDefaultMouseSpeed(0)
 ;   XML_CAMPO_REMESSA, XML_BTN_FATURAMENTO, XML_FORM_* — movidos para
 ;   globals/mv/screens/FfcvScreen.ahk.
 
-; ── Esperas da fase de fechamento/XML ─────────────────────────
-; Definidas em globals/mv/screens/FfcvScreen.ahk.
-RP_FINAL_STABLE_MS         := FFCV_FINAL_STABLE_MS
-RP_FINAL_ACTION_TIMEOUT_MS  := FFCV_FINAL_ACTION_TIMEOUT_MS
-
 RunRemessaProtocolo(params) {
     global gRunning
 
@@ -55,8 +50,8 @@ RunRemessaProtocolo(params) {
     dataEntrega  := params["data_entrega"]
     dataVenc     := params["data_vencimento"]
     numRemessa   := Trim(params["num_remessa"])
-    imprimirAposInserir := RP_OptionEnabled(params, "imprimir_apos_inserir", true)
-    umProtocoloUmaRemessa := RP_OptionEnabled(params, "um_protocolo_uma_remessa", false)
+    imprimirAposInserir := MV_OptionEnabled(params, "imprimir_apos_inserir", true)
+    umProtocoloUmaRemessa := MV_OptionEnabled(params, "um_protocolo_uma_remessa", false)
     temDatas     := (dataEntrega != "" && dataVenc != "")
 
     if (protocolos.Length = 0)
@@ -218,33 +213,19 @@ RunRemessaProtocolo(params) {
         if !xml["ok"]
             return RP_Abort(xml["erro"])
         RP_RecordTiming(timings, "Gerar XML", stageStart)
-        mapeamentoRemessas.Push(Map("remessa", result["remessa"], "protocolo", RP_JoinArray(protocolos, ", ")))
+        mapeamentoRemessas.Push(Map("remessa", result["remessa"], "protocolo", MV_JoinArray(protocolos, ", ")))
     } else if imprimirAposInserir {
         stageStart := A_TickCount
         criadaRemessa := ""
         Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa)
         RP_RecordTiming(timings, "Imprimir relatorio", stageStart)
-        mapeamentoRemessas.Push(Map("remessa", criadaRemessa != "" ? criadaRemessa : "N/I", "protocolo", RP_JoinArray(protocolos, ", ")))
+        mapeamentoRemessas.Push(Map("remessa", criadaRemessa != "" ? criadaRemessa : "N/I", "protocolo", MV_JoinArray(protocolos, ", ")))
     }
 
     Progress(100)
     RP_RecordTiming(timings, "Total", totalStart, protocolos.Length " protocolo(s), " totalContasFFCV " conta(s)")
     gRunning := false
     Done(ErrosMensagem(erros, timings, mapeamentoRemessas))
-}
-
-RP_JoinArray(arr, sep := ", ") {
-    res := ""
-    for _, item in arr
-        res .= (res = "" ? "" : sep) item
-    return res
-}
-
-RP_OptionEnabled(params, key, defaultValue := false) {
-    if !params.Has(key) || Trim(String(params[key])) = ""
-        return defaultValue
-    value := StrLower(Trim(String(params[key])))
-    return !(value = "false" || value = "0" || value = "nao" || value = "não")
 }
 
 ErrosMensagem(erros, timings, mapeamentoRemessas := []) {
