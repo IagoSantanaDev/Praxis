@@ -171,8 +171,14 @@ MV_ActAndWait(winTitle, actionFn, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn
         return false
 
     changed := MV_WaitScreenChanged(before, timeoutMs, winTitle)
-    if !changed
+    if !changed {
+        if IsSet(expectedFn) {
+            current := MV_CaptureScreenState(winTitle)
+            if (current["exists"] && expectedFn(current["hwnd"], current))
+                return true
+        }
         return false
+    }
     if !MV_WaitScreenStable(winTitle, MV_TARGET_STABLE_MS, timeoutMs)
         return false
     if IsSet(expectedFn)
@@ -193,6 +199,8 @@ MV_ClickAt(winTitle, x, y) {
         return false
     try {
         WinActivate winTitle
+        if !WinWaitActive(winTitle, , MV_WINDOW_ACTIVATE_TIMEOUT_SECS)
+            return false
         Click(x, y, 1)
         return true
     } catch {

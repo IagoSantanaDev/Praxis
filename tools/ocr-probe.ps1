@@ -97,6 +97,7 @@ try {
     $usingExistingImage = $ImagePath -ne ''
     $inputImagePath = ''
 
+    $createdScreenshotPath = $false
     if ($usingExistingImage) {
         $inputImagePath = [System.IO.Path]::GetFullPath($ImagePath)
         if (-not (Test-Path -LiteralPath $inputImagePath)) {
@@ -150,6 +151,7 @@ try {
     } else {
         if ($ScreenshotPath -eq '') {
             $ScreenshotPath = Join-Path $env:TEMP ('praxis-ocr-' + [guid]::NewGuid().ToString('N') + '.png')
+            $createdScreenshotPath = $true
         }
         $ScreenshotPath = [System.IO.Path]::GetFullPath($ScreenshotPath)
 
@@ -240,6 +242,9 @@ try {
         }
         if ($processedImagePath -ne '' -and (Test-Path -LiteralPath $processedImagePath)) {
             Remove-Item -LiteralPath $processedImagePath -Force -ErrorAction SilentlyContinue
+        }
+        if ($createdScreenshotPath -and (Test-Path -LiteralPath $ScreenshotPath)) {
+            Remove-Item -LiteralPath $ScreenshotPath -Force -ErrorAction SilentlyContinue
         }
     }
 } catch {
