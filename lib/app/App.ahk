@@ -7,6 +7,7 @@
 #Warn All, OutputDebug
 
 #Include ..\..\lib\vendor\WebView2.ahk
+#Include .\AppConstants.ahk
 
 ; ─── State (AppState carregado antes deste include) ────────────
 global gRoot
@@ -17,15 +18,6 @@ global gWorkDir    := ""
 global gEmbeddedIndexHtmlBase64 := ""
 
 #Include *i ..\..\build\generated\Praxis_Ui.ahk
-
-; ─── Timing constants ────────────────────────────────────────
-AWAIT_POLL_MS             := 100       ; intervalo de polling de AwaitPromise
-WEBVIEW2_ENV_TIMEOUT_MS   := 15000     ; timeout de WebView2.CreateEnvironment
-WEBVIEW2_CTRL_TIMEOUT_MS  := 15000     ; timeout de WebView2.CreateController
-RESIZE_DEBOUNCE_MS        := 50        ; debounce negativo de OnGuiResize
-CLOSE_HANDLER_TIMEOUT_MS  := 60000     ; deadline para handler terminar ao fechar
-POLL_EXIT_INTERVAL_MS     := 100       ; intervalo de PollExitAfterStop
-UI_CLOSE_ACK_TIMEOUT_MS   := 2000     ; prazo para a UI confirmar o fechamento
 
 ; ─── App Run ──────────────────────────────────────────────────
 AwaitPromise(promise, timeoutMs, timeoutMessage) {
