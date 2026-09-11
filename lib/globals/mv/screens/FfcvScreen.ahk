@@ -62,7 +62,6 @@ FFCV_BTN_NOVA_REM      := ""         ; preferir F6; não mapear campo variável 
 FFCV_CAMPO_DATA_REM    := ""         ; EditN variável; manter teclado no fluxo atual
 FFCV_CAMPO_TIPO        := ""         ; EditN variável; manter teclado no fluxo atual
 FFCV_BTN_SALVAR_REM    := ""         ; preferir F10; não mapear campo variável sem nova validação
-FFCV_BTN_ADICIONAR     := MV_BTN_ADICIONAR_CONTA ; 1 - Inserir Conta
 FFCV_BTN_ABRIR_DATAS   := "Button6"  ; 5 - Entregar Rem.
 FFCV_BTN_IMPRIMIR      := "Button7"  ; Relatório/Imprimir atendimentos
 FFCV_BTN_IMPRIMIR_X    := 567
@@ -125,10 +124,6 @@ XML_BTN_SAIR_TELA     := ""        ; pendente
 ; ── Performance FFCV Inserir Conta ───────────────────────────
 ; Contrato do macro 11: manter popup aberto, reagir ao modal e liberar próxima conta por estado.
 
-; ── Esperas da fase de fechamento/XML ─────────────────────────
-; Esta fase dispara processamentos pesados no Oracle Forms.
-FFCV_XML_QUERY_MIN_WAIT_MS       := 1200
-
 ; ════════════════════════════════════════════════════════════════
 ;  Predicados de estado operacional
 ; ════════════════════════════════════════════════════════════════
@@ -136,7 +131,8 @@ FFCV_XML_QUERY_MIN_WAIT_MS       := 1200
 Ffcv_IsTelaManutencaoRemessa(hwnd) {
     if !hwnd || MV_SafeWinProcess(hwnd) != "ifrun60.EXE"
         return false
-    return MV_FindControlAtPoint(hwnd, FFCV_BTN_ADICIONAR, FFCV_BTN_IMPRIMIR_X, FFCV_BTN_IMPRIMIR_Y, 40) != 0
+    return MV_FindControlAtPoint(hwnd, MV_BTN_ADICIONAR_CONTA,
+        FFCV_BTN_IMPRIMIR_X, FFCV_BTN_IMPRIMIR_Y, 40) != 0
         || MV_FindControlAtPoint(hwnd, MV_BTN_ADICIONAR_CONTA, MV_BTN_ADICIONAR_CONTA_X, MV_BTN_ADICIONAR_CONTA_Y, 40) != 0
 }
 
@@ -193,7 +189,7 @@ Ffcv_CarregarConvenio(convenioNum) {
         return false
     if !MV_SendFunctionAndWait(MV_WIN_FFCV_ANY, "F8", MV_TIMEOUT_LOAD * 1000, , "consulta de convenio")
         return false
-    return FFCV_WaitLoad()
+    return !!MV_WaitScreenStable(MV_WIN_FFCV_ANY, MV_KEY_SETTLE_MS, MV_TIMEOUT_LOAD * 1000)
 }
 
 Ffcv_SelecionarRemessaExistente(numRemessa) {
@@ -204,7 +200,7 @@ Ffcv_SelecionarRemessaExistente(numRemessa) {
         return false
     if !MV_SendFunctionAndWait(MV_WIN_FFCV_ANY, "F8", MV_TIMEOUT_LOAD * 1000, , "consulta de remessa")
         return false
-    return FFCV_WaitLoad()
+    return !!MV_WaitScreenStable(MV_WIN_FFCV_ANY, MV_KEY_SETTLE_MS, MV_TIMEOUT_LOAD * 1000)
 }
 
 Ffcv_CriarNovaRemessa(tipoConta) {
@@ -220,11 +216,11 @@ Ffcv_CriarNovaRemessa(tipoConta) {
         return false
     if !MV_SendFunctionAndWait(MV_WIN_FFCV_ANY, "F10", MV_TIMEOUT_LOAD * 1000, , "salvamento da nova remessa")
         return false
-    return FFCV_WaitLoad()
+    return !!MV_WaitScreenStable(MV_WIN_FFCV_ANY, MV_KEY_SETTLE_MS, MV_TIMEOUT_LOAD * 1000)
 }
 
 Ffcv_PosicionarAreaRemessas() {
-    return !!MV_SendAndWait(MV_WIN_FFCV_ANY, "{Tab 3}", 3000, , "área de remessas posicionada")
+    return !!MV_SendAndWait(MV_WIN_FFCV_ANY, "{Tab 3}", MV_ACTION_TIMEOUT_MS, , "área de remessas posicionada")
 }
 
 Ffcv_ImprimirRelatorioAtendimentos(&outRemessa?) {
@@ -248,7 +244,8 @@ Ffcv_ImprimirRelatorioAtendimentos(&outRemessa?) {
 Ffcv_ReiniciarManutencaoRemessa() {
     if !MV_EnsureFFCV()
         return false
-    MV_SendAndWait(MV_WIN_FFCV_ANY, "{Esc 2}", 1000, , "limpeza da tela de manutenção")
+    MV_SendAndWait(MV_WIN_FFCV_ANY, "{Esc 2}", MV_SCREEN_RESET_TIMEOUT_MS,
+        , "limpeza da tela de manutenção")
     return Ffcv_AbrirManutencaoRemessa()
 }
 
@@ -362,21 +359,21 @@ Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto := false) {
         ; Contrato validado no teste 12: ancorar foco em Data de Entrega,
         ; Shift+Tab seleciona Remessa e Tab volta para Data de Entrega.
         if !MV_ClickAtAndWait(WIN_FFCV_DATAS, DATAS_CAMPO_ENTREGA_X + 15,
-            DATAS_CAMPO_ENTREGA_Y + 8, 3000, , "data de entrega focada")
+            DATAS_CAMPO_ENTREGA_Y + 8, MV_ACTION_TIMEOUT_MS, , "data de entrega focada")
             return Map("ok", false, "erro", "Nao consegui focar a data de entrega.", "remessa", "")
-        if !MV_SendAndWait(WIN_FFCV_DATAS, "+{Tab}", 3000, , "campo de remessa selecionado")
+        if !MV_SendAndWait(WIN_FFCV_DATAS, "+{Tab}", MV_ACTION_TIMEOUT_MS, , "campo de remessa selecionado")
             return Map("ok", false, "erro", "Nao consegui selecionar a remessa.", "remessa", "")
-        numRemessa := MV_CopyFocusedText(600, true)
+        numRemessa := MV_CopyFocusedText(MV_CLIPBOARD_TIMEOUT_MS, true)
         if (numRemessa = "")
             return Map("ok", false, "erro", "Não consegui copiar o número da remessa via Shift+Tab na tela de datas.", "remessa", "")
-        if !MV_SendAndWait(WIN_FFCV_DATAS, "{Tab}", 3000, , "campo de entrega selecionado")
+        if !MV_SendAndWait(WIN_FFCV_DATAS, "{Tab}", MV_ACTION_TIMEOUT_MS, , "campo de entrega selecionado")
             return Map("ok", false, "erro", "Nao consegui retornar ao campo de entrega.", "remessa", numRemessa)
     }
-    if !MV_SendTextAndWait(WIN_FFCV_DATAS, dataEntrega, 3000, , "data de entrega preenchida")
+    if !MV_SendTextAndWait(WIN_FFCV_DATAS, dataEntrega, MV_ACTION_TIMEOUT_MS, , "data de entrega preenchida")
         return Map("ok", false, "erro", "Data de entrega nao foi confirmada.", "remessa", numRemessa)
-    if !MV_SendEnterAndWait(WIN_FFCV_DATAS, 3000, , "data de entrega validada")
+    if !MV_SendEnterAndWait(WIN_FFCV_DATAS, MV_ACTION_TIMEOUT_MS, , "data de entrega validada")
         return Map("ok", false, "erro", "Data de entrega nao foi validada.", "remessa", numRemessa)
-    if !MV_SendTextAndWait(WIN_FFCV_DATAS, dataVenc, 3000, , "data de vencimento preenchida")
+    if !MV_SendTextAndWait(WIN_FFCV_DATAS, dataVenc, MV_ACTION_TIMEOUT_MS, , "data de vencimento preenchida")
         return Map("ok", false, "erro", "Data de vencimento nao foi confirmada.", "remessa", numRemessa)
     Notify("Datas enviadas: remessa " numRemessa ", entrega " dataEntrega ", vencimento " dataVenc ".")
 
@@ -405,17 +402,6 @@ _ClickNaoModal() {
 ; ════════════════════════════════════════════════════════════════
 ;  Funções internas (privadas do módulo)
 ; ════════════════════════════════════════════════════════════════
-
-/*
-FFCV_WaitLoad()
-    Micro-settle para o Oracle Forms consumir F7/F8/F10.
-    Não há popup de confirmação nos passos de manutenção de remessa;
-    a validação real acontece na próxima ação observável.
-    Retorna true se MV_WIN_FFCV_ANY ainda existe.
-*/
-FFCV_WaitLoad() {
-    return !!MV_WaitScreenStable(MV_WIN_FFCV_ANY, MV_KEY_SETTLE_MS, MV_TIMEOUT_LOAD * 1000)
-}
 
 _TipoContaCodigo(tipoConta) {
     normalized := StrLower(Trim(String(tipoConta)))

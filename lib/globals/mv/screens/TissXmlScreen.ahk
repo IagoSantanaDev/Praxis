@@ -127,7 +127,7 @@ TissXml_HandleSaveModals() {
         if !MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), 2) {
             if (A_Index = 1)
                 Notify("Nenhum modal imediatamente apos salvar XML; aguardando estabilizacao.")
-            if MV_WaitOracleSettled(WIN_XML_PATH_FORM, FFCV_FINAL_STABLE_MS, 5000)
+            if MV_WaitOracleSettled(WIN_XML_PATH_FORM, FFCV_FINAL_STABLE_MS, MV_TRANSITION_TIMEOUT_MS)
                 return true
             continue
         }

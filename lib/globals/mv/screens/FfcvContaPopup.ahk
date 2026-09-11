@@ -56,13 +56,13 @@ FfcvContaPopup_AbrirEConfigurar(tipoConta) {
         MV_Log("FfcvContaPopup_AbrirEConfigurar", "nao consegui clicar em Inserir Conta", false)
         return false
     }
-    if !MV_WaitScreenChanged(before, 5000, MV_WIN_FFCV_ANY) {
+    if !MV_WaitScreenChanged(before, MV_TRANSITION_TIMEOUT_MS, MV_WIN_FFCV_ANY) {
         MV_Log("FfcvContaPopup_AbrirEConfigurar", "Inserir Conta nao produziu transicao observavel", false)
         return false
     }
 
     ; Aguardar popup ficar pronto.
-    ready := FfcvContaPopup_WaitReady(5000)
+    ready := FfcvContaPopup_WaitReady(MV_TRANSITION_TIMEOUT_MS)
     if !ready["ok"] {
         MV_Log("FfcvContaPopup_AbrirEConfigurar", ready["erro"], false)
         return false
@@ -70,7 +70,8 @@ FfcvContaPopup_AbrirEConfigurar(tipoConta) {
 
     ; Se modal Forms aparecer antes do popup (tela travada), tratar.
     if Dialog_ActiveModalTitle() != "" && !Popup_ContaVisible() {
-        if !MV_Poll(() => Dialog_ActiveModalTitle() = "" || Popup_ContaVisible(), 1200) {
+        if !MV_Poll(() => Dialog_ActiveModalTitle() = "" || Popup_ContaVisible(),
+            MV_CONTA_MODAL_WAIT_MS / 1000) {
             MV_Log("FfcvContaPopup_AbrirEConfigurar",
                 "modal Forms antes do popup e nao resolvido", false)
             return false
@@ -84,7 +85,7 @@ FfcvContaPopup_AbrirEConfigurar(tipoConta) {
     }
 
     ; Aguardar estabilidade mínima antes de configurar dropdowns.
-    stable := FfcvContaPopup_WaitStable(300)
+    stable := FfcvContaPopup_WaitStable(MV_CONTA_READY_SETTLE_MS)
     if !stable["ok"] {
         MV_Log("FfcvContaPopup_AbrirEConfigurar", stable["erro"], false)
         return false
@@ -224,9 +225,9 @@ FfcvContaPopup_WaitSubmitOutcome(timeoutMs, submittedConta := "") {
 }
 
 FfcvContaPopup_GetCampoContaText() {
-    hwnd := Popup_FindControlByClassPrefixAtPoint(
+    hwnd := MV_FindControlAtPoint(
         MV_WIN_FFCV_ANY, "Edit",
-        MV_POPUP_CAMPO_CONTA_X, MV_POPUP_CAMPO_CONTA_Y, 35)
+        MV_POPUP_CAMPO_CONTA_X, MV_POPUP_CAMPO_CONTA_Y, 35, "Edit")
     if !hwnd
         return ""
     try return Trim(ControlGetText(hwnd))
@@ -272,7 +273,7 @@ FfcvContaPopup_WaitStable(timeoutMs) {
     }
 }
 
-FfcvContaPopup_Close(timeoutMs := 5000) {
+FfcvContaPopup_Close(timeoutMs := MV_TRANSITION_TIMEOUT_MS) {
     if !MV_SendAndWait(MV_WIN_FFCV_ANY, "{Alt down}2{Alt up}", timeoutMs,
         (hwnd, state) => !Popup_ContaVisible(), "popup de conta fechado")
         return false

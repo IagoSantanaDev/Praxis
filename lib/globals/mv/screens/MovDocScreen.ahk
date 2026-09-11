@@ -68,7 +68,7 @@ MovDoc_AbrirTelaBaixa() {
 }
 
 MovDoc_SetProtocoloByClick(protocolo) {
-    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
+    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, MV_MOVDOC_FOCUS_TIMEOUT_SECS)
         return false
 
     return !!MV_SetTextAndWait(MV_WIN_MOVDOC_BAIXA,
@@ -82,13 +82,13 @@ MovDoc_CopiarNumeroProtocolo(winTitle := "") {
     if (winTitle = "")
         winTitle := WinExist(MV_WIN_MOVDOC_ENVIO) ? MV_WIN_MOVDOC_ENVIO : (WinExist(MV_WIN_MOVDOC_BAIXA) ? MV_WIN_MOVDOC_BAIXA : MV_WIN_MOVDOC_ANY)
 
-    if !MV_EnsureWindowActive(winTitle, 2)
+    if !MV_EnsureWindowActive(winTitle, MV_MOVDOC_FOCUS_TIMEOUT_SECS)
         return ""
 
-    if !MV_ClickAtAndWait(winTitle, MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, 3000, , "foco no campo protocolo")
+    if !MV_ClickAtAndWait(winTitle, MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, MV_ACTION_TIMEOUT_MS, , "foco no campo protocolo")
         return ""
 
-    protocolo := MV_CopyFocusedText(600, true)
+    protocolo := MV_CopyFocusedText(MV_CLIPBOARD_TIMEOUT_MS, true)
     if (protocolo = "") {
         try protocolo := Trim(MV_GetFocusedControlText(winTitle))
         catch
@@ -146,7 +146,7 @@ MovDoc_FinalizarBaixa() {
 
     if (checked = 0 || checked = "") {
         if !MV_ClickAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS,
-            MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y, 5000,
+            MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y, MV_TRANSITION_TIMEOUT_MS,
             (hwnd, state) => MV_ControlCheckedAt(MV_WIN_MOVDOC_BAIXA,
                 MOVDOC_CHECK_RECEBIDO_CLASS, MOVDOC_CHECK_RECEBIDO_X,
                 MOVDOC_CHECK_RECEBIDO_Y) = 1, "checkbox Recebido marcado")
@@ -160,33 +160,35 @@ MovDoc_FinalizarBaixa() {
             MOVDOC_CHECK_RECEBIDO_Y
         )
             return false
-        if !MV_WaitScreenChanged(beforeCheck, 5000, MV_WIN_MOVDOC_BAIXA)
+        if !MV_WaitScreenChanged(beforeCheck, MV_TRANSITION_TIMEOUT_MS, MV_WIN_MOVDOC_BAIXA)
             return false
-        if !MV_WaitScreenStable(MV_WIN_MOVDOC_BAIXA, MV_TARGET_STABLE_MS, 5000)
+        if !MV_WaitScreenStable(MV_WIN_MOVDOC_BAIXA, MV_TARGET_STABLE_MS, MV_TRANSITION_TIMEOUT_MS)
             return false
     } else {
         return false
     }
 
     ; Fluxo validado: checkbox → F10 → clicar campo Protocolo → F7.
-    if !MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F10", 5000, , "baixa confirmada")
+    if !MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F10", MV_TRANSITION_TIMEOUT_MS, , "baixa confirmada")
         return false
 
     if !_FocusProtocolo()
         return false
 
-    return !!MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F7", 5000, , "retorno ao próximo protocolo")
+    return !!MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F7", MV_TRANSITION_TIMEOUT_MS, , "retorno ao próximo protocolo")
 }
 
 MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida) {
     global
     startedAt := A_TickCount
-    deadline := startedAt + 12000
+    deadline := startedAt + MV_MOVDOC_GRID_TIMEOUT_MS
 
     Loop {
         ThrowIfAppStopped()
-        conta := _LerCampoGrid(MOVDOC_CONTA_X, MOVDOC_GRID_ROWS_Y[1], "conta", 150, 300)
-        convenio := _LerCampoGrid(MOVDOC_CONVENIO_X, MOVDOC_GRID_ROWS_Y[1], "convenio", 150, 300)
+        conta := _LerCampoGrid(MOVDOC_CONTA_X, MOVDOC_GRID_ROWS_Y[1], "conta",
+            MV_GRID_FAST_READ_TIMEOUT_MS, MV_GRID_FALLBACK_READ_TIMEOUT_MS)
+        convenio := _LerCampoGrid(MOVDOC_CONVENIO_X, MOVDOC_GRID_ROWS_Y[1], "convenio",
+            MV_GRID_FAST_READ_TIMEOUT_MS, MV_GRID_FALLBACK_READ_TIMEOUT_MS)
 
         if (conta != "" && convenio != "" && conta != protocolo && convenio != protocolo) {
             Notify("MOV DOC: primeira linha legível após F8 em " (A_TickCount - startedAt) "ms.")
@@ -220,7 +222,7 @@ MovDoc_GridValueValid(valor, campo := "") {
 
 _AvancarBloco() {
     ultimoY := MOVDOC_GRID_ROWS_Y[MOVDOC_GRID_ROWS_Y.Length]
-    if !MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CONTA_X + 15, ultimoY + 8, 5000,
+    if !MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CONTA_X + 15, ultimoY + 8, MV_TRANSITION_TIMEOUT_MS,
         , "última linha da grade selecionada")
         return Map("popup", false, "erro", "grade nao confirmou selecao da ultima linha")
 
@@ -231,7 +233,7 @@ _AvancarBloco() {
             return Map("popup", true)
         }
 
-        if !MV_SendAndWait(MV_WIN_MOVDOC_BAIXA, "{Down}", 5000,
+        if !MV_SendAndWait(MV_WIN_MOVDOC_BAIXA, "{Down}", MV_TRANSITION_TIMEOUT_MS,
             , "avanço de linha da grade")
             return Map("popup", false, "erro", "grade nao confirmou avanço de linha")
     }
@@ -242,7 +244,7 @@ _AvancarBloco() {
     }
 
     primeiroY := MOVDOC_GRID_ROWS_Y[1]
-    if !MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CONTA_X + 15, primeiroY + 8, 5000,
+    if !MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CONTA_X + 15, primeiroY + 8, MV_TRANSITION_TIMEOUT_MS,
         , "primeira linha da grade selecionada")
         return Map("popup", false, "erro", "grade nao confirmou selecao da primeira linha")
     return Map("popup", false)
@@ -277,16 +279,18 @@ _ColetarVisiveis(protocolo, linhas, vistos) {
 }
 
 _FocusProtocolo() {
-    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
+    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, MV_MOVDOC_FOCUS_TIMEOUT_SECS)
         return false
 
     return !!MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA,
-        MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, 5000,
+        MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, MV_TRANSITION_TIMEOUT_MS,
         , "campo Protocolo focado")
 }
 
-_LerCampoGrid(x, y, campo := "", fastTimeoutMs := 150, fallbackTimeoutMs := 300) {
-    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, 2)
+_LerCampoGrid(x, y, campo := "", fastTimeoutMs?, fallbackTimeoutMs?) {
+    fastTimeoutMs := IsSet(fastTimeoutMs) ? fastTimeoutMs : MV_GRID_FAST_READ_TIMEOUT_MS
+    fallbackTimeoutMs := IsSet(fallbackTimeoutMs) ? fallbackTimeoutMs : MV_GRID_FALLBACK_READ_TIMEOUT_MS
+    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA, MV_MOVDOC_FOCUS_TIMEOUT_SECS)
         return ""
 
     if !MV_ClickAtAndWait(MV_WIN_MOVDOC_BAIXA, x + 15, y + 8, fastTimeoutMs,
