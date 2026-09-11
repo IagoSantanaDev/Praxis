@@ -70,8 +70,8 @@ Popup_FirstControlByClass(winTitle, classNN) {
 ; Fecha o modal Forms ativo (ui60Modal_W32) clicando o botão OK.
 ; Retorna Map("ok", bool, "report", string).
 Popup_DismissActiveModal() {
-    popup := WinExist("Forms " MV_CLASS_MODAL_FORMS)
-        ? "Forms " MV_CLASS_MODAL_FORMS
+    popup := WinExist(DIALOG_MOVDOC_POPUP)
+        ? DIALOG_MOVDOC_POPUP
         : ""
 
     if (popup = "") {

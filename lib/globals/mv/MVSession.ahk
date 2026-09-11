@@ -69,10 +69,9 @@ MV_ActivateModule(moduleWin) {
 ; sendStatus=true emite também a mensagem de status "Execução finalizada."
 ; (comportamento original do Protocolar).
 MV_Abort(msg, sendStatus := false) {
-    global gRunning
     SendToUI(Map("type", "error", "message", msg))
     if (sendStatus)
         SendToUI(Map("type", "status", "message", "Execução finalizada.", "running", false))
-    gRunning := false
+    SetAppRunning(false)
     return false
 }

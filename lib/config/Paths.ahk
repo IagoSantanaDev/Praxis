@@ -66,6 +66,3 @@ Config_GetPath(name) {
     return path
 }
 
-; Para retrocompatibilidade com código que usa gWorkDir diretamente.
-; Inicializado sob demanda na primeira chamada.
-global gWorkDir := ""

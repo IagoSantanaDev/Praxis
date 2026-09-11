@@ -174,11 +174,8 @@ OnAppClose(thisGui) {
 ; `FinishAppExitAfterStop` é o caminho comum de finalização do `close-after-stop`,
 ; chamado por `PollExitAfterStop` quando o handler termina ou estoura o timeout.
 FinishAppExitAfterStop(reason := "") {
-    global gExitAfterStop, gExitDeadline
-
     SetTimer PollExitAfterStop, 0
-    gExitAfterStop := false
-    gExitDeadline  := 0
+    ClearAppClose()
 
     if (reason != "")
         OutputDebug "[App] " . reason

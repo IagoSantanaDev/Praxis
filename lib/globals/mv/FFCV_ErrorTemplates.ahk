@@ -342,14 +342,3 @@ FFCV_SortResultsByScoreDesc(results) {
 FFCV_Quote(value) {
     return Chr(34) StrReplace(value, Chr(34), Chr(34) Chr(34)) Chr(34)
 }
-
-FFCV_SafeWinGetText(winTitle) {
-    try text := WinGetText(winTitle)
-    catch as e
-        return "<erro WinGetText: " e.Message ">"
-
-    text := Trim(text)
-    if (text = "" || text = "&OK" || text = "&Sim`r`n&Não" || text = "&Não`r`n&Sim")
-        return text "`n<observação: Oracle Forms pode desenhar a mensagem em ui60Drawn; WinGetText pode expor só botões.>"
-    return text
-}
