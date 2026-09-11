@@ -19,7 +19,7 @@ Protocolar_ExtractContasFromCsv(path, deduplicar := true, tipo := "Ambulatorial"
 
     accountColumn := 0
     expectedColumn := Protocolar_GetCsvContaColumnName(tipo)
-    header := Protocolar_SplitSemicolonCsvLine(lines[1])
+    header := MV_SplitSemicolonCsvLine(lines[1])
     for index, column in header {
         if (Protocolar_NormalizeCsvHeaderName(column) = expectedColumn) {
             accountColumn := index
@@ -37,7 +37,7 @@ Protocolar_ExtractContasFromCsv(path, deduplicar := true, tipo := "Ambulatorial"
         if (index = 1 || Trim(line) = "")
             continue
 
-        columns := Protocolar_SplitSemicolonCsvLine(line)
+        columns := MV_SplitSemicolonCsvLine(line)
         if (columns.Length < accountColumn)
             continue
 
@@ -67,19 +67,10 @@ Protocolar_NormalizeCsvHeaderName(name) {
     return StrUpper(Trim(name))
 }
 
-Protocolar_SplitSemicolonCsvLine(line) {
-    return MV_SplitSemicolonCsvLine(line)
-}
-
 ; ════════════════════════════════════════════════════════════════
 ;  PROTOCOLAR PARSERS
 ;  Lógica de parsing para o módulo Protocolar
 ; ════════════════════════════════════════════════════════════════
-
-; Protocolar_ParseRemessas delega para a canônica ParseListaCsv (globals/mv/ParseUtils.ahk).
-Protocolar_ParseRemessas(str) {
-    return ParseListaCsv(str)
-}
 
 Protocolar_Abort(msg) {
     ; Delega para a canônica MV_Abort (MVSession.ahk) preservando o

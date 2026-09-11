@@ -45,7 +45,7 @@ SetDefaultMouseSpeed(0)
 RunRemessaProtocolo(params) {
     global gRunning
 
-    protocolos   := ParseProtocolos(params["protocolos"])
+    protocolos   := ParseListaCsv(params["protocolos"])
     tipoConta    := params["tipo_conta"]
     dataEntrega  := params["data_entrega"]
     dataVenc     := params["data_vencimento"]
@@ -55,7 +55,7 @@ RunRemessaProtocolo(params) {
     temDatas     := (dataEntrega != "" && dataVenc != "")
 
     if (protocolos.Length = 0)
-        return RP_Abort("Informe ao menos um protocolo.")
+        return MV_Abort("Informe ao menos um protocolo.")
 
     linhas := [], erros := [], timings := [], mapeamentoRemessas := []
     totalStart := stageStart := A_TickCount
@@ -70,30 +70,30 @@ RunRemessaProtocolo(params) {
             Notify("Processando protocolo " protocolo " (" idx "/" protocolos.Length ") no MOV DOC...")
 
             if !MV_EnsureMovDoc() || !MovDoc_AbrirTelaBaixa()
-                return RP_Abort("Nao foi possivel acessar o MOV DOC / abrir a tela Baixa para o protocolo " protocolo ".")
+                return MV_Abort("Nao foi possivel acessar o MOV DOC / abrir a tela Baixa para o protocolo " protocolo ".")
 
             result := ProcessarProtocolo(protocolo)
             if !result["ok"]
-                return RP_Abort(result["erro"])
+                return MV_Abort(result["erro"])
 
             linhasProtocolo := result["linhas"]
             convenioNum := RP_ConvenioMajoritario(linhasProtocolo)
             if (convenioNum = "")
-                return RP_Abort("Convenio nao identificado no MOV DOC para o protocolo " protocolo ".")
+                return MV_Abort("Convenio nao identificado no MOV DOC para o protocolo " protocolo ".")
 
             protocolContas := RP_FiltrarContasPorConvenio(linhasProtocolo, convenioNum, erros)
             totalContasFFCV := ContarContas(protocolContas)
 
             Notify("Abrindo FFCV para protocolo " protocolo " (convenio " convenioNum ")...")
             if !MV_EnsureFFCV() || !Ffcv_AbrirManutencaoRemessa()
-                return RP_Abort("Nao foi possivel acessar o FFCV / abrir Manutencao de Remessa.")
+                return MV_Abort("Nao foi possivel acessar o FFCV / abrir Manutencao de Remessa.")
 
             if !Ffcv_CarregarConvenio(convenioNum)
-                return RP_Abort("Nao consegui carregar o convenio " convenioNum " no FFCV.")
+                return MV_Abort("Nao consegui carregar o convenio " convenioNum " no FFCV.")
             Ffcv_PosicionarAreaRemessas()
 
             if !Ffcv_CriarNovaRemessa(tipoConta)
-                return RP_Abort("Erro ao criar nova remessa para o protocolo " protocolo ".")
+                return MV_Abort("Erro ao criar nova remessa para o protocolo " protocolo ".")
 
             if !InserirContasNaRemessa(protocolContas, tipoConta, erros)
                 return false
@@ -103,20 +103,20 @@ RunRemessaProtocolo(params) {
             if temDatas {
                 Notify("Fechando remessa com datas para o protocolo " protocolo "...")
                 if !Ffcv_PrepararEntregaPorProtocolo()
-                    return RP_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
+                    return MV_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
 
                 resEntrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true)
                 if !resEntrega["ok"]
-                    return RP_Abort(resEntrega["erro"])
+                    return MV_Abort(resEntrega["erro"])
 
                 criadaRemessa := resEntrega["remessa"]
                 if !Ffcv_SairTelaEntregaPendente()
-                    return RP_Abort("A tela Entrega de Remessas nao fechou apos o protocolo.")
+                    return MV_Abort("A tela Entrega de Remessas nao fechou apos o protocolo.")
 
                 Notify("Gerando XML TISS da remessa " criadaRemessa "...")
                 xml := TissXml_Gerar(criadaRemessa)
                 if !xml["ok"]
-                    return RP_Abort(xml["erro"])
+                    return MV_Abort(xml["erro"])
             } else if imprimirAposInserir {
                 Notify("Imprimindo relatorio e capturando remessa via OCR para o protocolo " protocolo "...")
                 Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa)
@@ -141,7 +141,7 @@ RunRemessaProtocolo(params) {
     ; ── FLUXO LEGADO: VÁRIOS PROTOCOLOS = UMA REMESSA ─────────────
     Notify("Garantindo MOV DOC...")
     if !MV_EnsureMovDoc() || !MovDoc_AbrirTelaBaixa()
-        return RP_Abort("Nao foi possivel acessar o MOV DOC / abrir a tela Baixa.")
+        return MV_Abort("Nao foi possivel acessar o MOV DOC / abrir a tela Baixa.")
     RP_RecordTiming(timings, "Abrir MOV DOC e tela Baixa", stageStart)
     Progress(5)
 
@@ -152,7 +152,7 @@ RunRemessaProtocolo(params) {
         Notify("Processando protocolo " protocolo " (" idx "/" protocolos.Length ")")
         result := ProcessarProtocolo(protocolo)
         if !result["ok"]
-            return RP_Abort(result["erro"])
+            return MV_Abort(result["erro"])
         for _, linha in result["linhas"]
             linhas.Push(linha)
         Notify("⏱ MOV DOC " protocolo ": " RP_FormatDuration(A_TickCount - pStart) " | " result["linhas"].Length " linha(s)")
@@ -162,7 +162,7 @@ RunRemessaProtocolo(params) {
 
     convenioNum := RP_ConvenioMajoritario(linhas)
     if (convenioNum = "")
-        return RP_Abort("Convenio nao identificado no MOV DOC.")
+        return MV_Abort("Convenio nao identificado no MOV DOC.")
     protocolContas := RP_FiltrarContasPorConvenio(linhas, convenioNum, erros)
     totalContasFFCV := ContarContas(protocolContas)
 
@@ -170,20 +170,20 @@ RunRemessaProtocolo(params) {
     stageStart := A_TickCount
     Notify("Garantindo FFCV...")
     if !MV_EnsureFFCV() || !Ffcv_AbrirManutencaoRemessa()
-        return RP_Abort("Nao foi possivel acessar o FFCV / abrir Manutencao de Remessa.")
+        return MV_Abort("Nao foi possivel acessar o FFCV / abrir Manutencao de Remessa.")
     RP_RecordTiming(timings, "Abrir FFCV", stageStart)
     Progress(50)
 
     stageStart := A_TickCount
     if !Ffcv_CarregarConvenio(convenioNum)
-        return RP_Abort("Nao consegui carregar o convenio " convenioNum " no FFCV.")
+        return MV_Abort("Nao consegui carregar o convenio " convenioNum " no FFCV.")
     Ffcv_PosicionarAreaRemessas()
     if (numRemessa != "") {
         if !Ffcv_SelecionarRemessaExistente(numRemessa)
-            return RP_Abort("Remessa " numRemessa " nao encontrada.")
+            return MV_Abort("Remessa " numRemessa " nao encontrada.")
     } else {
         if !Ffcv_CriarNovaRemessa(tipoConta)
-            return RP_Abort("Erro ao criar nova remessa.")
+            return MV_Abort("Erro ao criar nova remessa.")
     }
     RP_RecordTiming(timings, "Convenio + remessa", stageStart, "convenio " convenioNum)
     Progress(60)
@@ -199,19 +199,19 @@ RunRemessaProtocolo(params) {
         stageStart := A_TickCount
         Notify("Iniciando diretamente a ponte FecharEXMLOLD Parte 1 / Entrega de Remessas...")
         if !Ffcv_PrepararEntregaPorProtocolo()
-            return RP_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
+            return MV_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
         result := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true)
         if !result["ok"]
-            return RP_Abort(result["erro"])
+            return MV_Abort(result["erro"])
         if !Ffcv_SairTelaEntregaPendente()
-            return RP_Abort("A tela Entrega de Remessas nao fechou apos o protocolo.")
+            return MV_Abort("A tela Entrega de Remessas nao fechou apos o protocolo.")
         RP_RecordTiming(timings, "Fechar remessa + datas", stageStart, "remessa " result["remessa"])
         Progress(94)
         stageStart := A_TickCount
         Notify("Gerando XML...")
         xml := TissXml_Gerar(result["remessa"])
         if !xml["ok"]
-            return RP_Abort(xml["erro"])
+            return MV_Abort(xml["erro"])
         RP_RecordTiming(timings, "Gerar XML", stageStart)
         mapeamentoRemessas.Push(Map("remessa", result["remessa"], "protocolo", MV_JoinArray(protocolos, ", ")))
     } else if imprimirAposInserir {
@@ -269,7 +269,7 @@ InserirContasNaRemessa(protocolContas, tipoConta, erros) {
     contaIdx := okCount := erroCount := blockerCount := 0
 
     if !FfcvContaPopup_AbrirEConfigurar(tipoConta)
-        return RP_Abort("Nao consegui abrir/configurar o popup de conta no FFCV.")
+        return MV_Abort("Nao consegui abrir/configurar o popup de conta no FFCV.")
 
     for protocolo, contas in protocolContas {
         ThrowIfAppStopped()
@@ -289,19 +289,19 @@ InserirContasNaRemessa(protocolContas, tipoConta, erros) {
                 }
 
                 if !Popup_DismissActiveModal()["ok"] || !MV_Poll(() => Popup_ContaVisible(), MV_TIMEOUT_ACOE)
-                    return RP_Abort("Popup de erro nao fechado ou nao voltou apos conta " contaObj["conta"] ".")
+                    return MV_Abort("Popup de erro nao fechado ou nao voltou apos conta " contaObj["conta"] ".")
             } else if (outcome["status"] = "ready") {
                 okCount++
             } else {
-                return RP_Abort("Estado incerto apos enviar conta " contaObj["conta"] ": " outcome["erro"])
+                return MV_Abort("Estado incerto apos enviar conta " contaObj["conta"] ": " outcome["erro"])
             }
             Progress(60 + (contaIdx / totalContas) * 25)
         }
     }
 
     Notify("Resumo FFCV: ok=" okCount " erro=" erroCount " bloqueio=" blockerCount " total=" totalContas)
-    if !FfcvContaPopup_Close(5000)
-        return RP_Abort("Nao consegui fechar o popup de conta.")
+    if !FfcvContaPopup_Close(MV_TRANSITION_TIMEOUT_MS)
+        return MV_Abort("Nao consegui fechar o popup de conta.")
     return true
 }
 
@@ -310,7 +310,3 @@ InserirContasNaRemessa(protocolContas, tipoConta, erros) {
 ;  SHARED UI HELPERS
 ; ════════════════════════════════════════════════════════════════
 
-RP_Abort(msg) {
-    ; Delega para a canônica MV_Abort (MVSession.ahk).
-    return MV_Abort(msg)
-}

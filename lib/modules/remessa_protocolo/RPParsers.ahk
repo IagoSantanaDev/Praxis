@@ -20,11 +20,6 @@ RP_RecordTiming(timings, label, startedAt, extra := "") {
     return elapsedMs
 }
 
-; ParseProtocolos delega para a canônica ParseListaCsv (globals/mv/ParseUtils.ahk).
-ParseProtocolos(str) {
-    return ParseListaCsv(str)
-}
-
 ContarContas(protocolContas) {
     total := 0
     for _, contas in protocolContas
