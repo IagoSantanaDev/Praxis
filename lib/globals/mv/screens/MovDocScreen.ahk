@@ -35,10 +35,6 @@
 ; ── Janelas ───────────────────────────────────────────────────
 ; WIN_MOVDOC_BAIXA já existe em MVConstants.ahk como MV_WIN_MOVDOC_BAIXA.
 ; Usar MV_WIN_MOVDOC_BAIXA diretamente nos callers.
-; Título do popup MOV DOC derivado de MV_CLASS_MODAL_FORMS (Dialogs.ahk já define
-; DIALOG_MOVDOC_POPUP; manter alias local sem novo literal).
-WIN_MOVDOC_POPUP := DIALOG_MOVDOC_POPUP
-
 ; ── Regiões em coordenadas Client ──────────────────────────────
 ; Não usar EditN como contrato: Oracle Forms renumera conforme estado.
 ; A grid não expõe texto confiável via ControlGetText — usar clique + Ctrl+C.
@@ -55,11 +51,6 @@ MOVDOC_CHECK_RECEBIDO_X     := 718
 MOVDOC_CHECK_RECEBIDO_Y     := 359
 
 ; ── Esperas e timings ──────────────────────────────────────────
-; Timings canonicos em MVConstants (MV_FIELD_*); aliases compat.
-MOVDOC_FIELD_FOCUS_SETTLE_MS := MV_FIELD_FOCUS_SETTLE_MS
-MOVDOC_FIELD_CLEAR_SETTLE_MS := MV_FIELD_CLEAR_SETTLE_MS
-MOVDOC_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
-
 ; ════════════════════════════════════════════════════════════════
 ;  Funções públicas
 ; ════════════════════════════════════════════════════════════════
@@ -82,7 +73,7 @@ MovDoc_SetProtocoloByClick(protocolo) {
 
     return !!MV_SetTextAndWait(MV_WIN_MOVDOC_BAIXA,
         MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, protocolo,
-        MOVDOC_KEY_SETTLE_MS * 20,
+        MV_KEY_SETTLE_MS * 20,
         (hwnd, state) => InStr(MV_GetFocusedControlText(MV_WIN_MOVDOC_BAIXA), String(protocolo)) > 0,
         "protocolo preenchido")
 }

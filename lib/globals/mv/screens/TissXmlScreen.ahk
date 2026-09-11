@@ -34,19 +34,11 @@ _ControlAtReady(winTitle, classNN, clientX, clientY, tolerance := 14) {
 ;   XML_CAMPO_REMESSA, XML_BTN_FATURAMENTO, XML_FORM_*,
 ;   XML_BTN_NAO — definidas em globals/mv/screens/FfcvScreen.ahk.
 ;
-; Timeouts herdados de FfcvScreen.ahk via RP_FINAL_*/FFCV_FINAL_*.
+; Timeouts compartilhados com FfcvScreen.ahk.
 ; ════════════════════════════════════════════════════════════════
 
 ; ── Timeouts (ms) ─────────────────────────────────────────────
 ; Compartilhados com callers XML em RemessaProtocolo.ahk.
-; Bases em MVConstants (MV_FIELD_*); aliases preservam callers.
-RP_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
-RP_FIELD_FOCUS_SETTLE_MS := MV_FIELD_FOCUS_SETTLE_MS
-RP_FIELD_CLEAR_SETTLE_MS := MV_FIELD_CLEAR_SETTLE_MS
-
-RP_FINAL_STABLE_MS         := FFCV_FINAL_STABLE_MS
-RP_FINAL_ACTION_TIMEOUT_MS  := FFCV_FINAL_ACTION_TIMEOUT_MS
-RP_XML_QUERY_MIN_WAIT_MS   := FFCV_XML_QUERY_MIN_WAIT_MS
 
 ; ════════════════════════════════════════════════════════════════
 ;  HELPERS — click/teclado/modal (movidos de RemessaProtocolo.ahk)
@@ -65,7 +57,7 @@ TissXml_ClickBySpec(winTitle, classNN, x, y)
     Delega para a versão canônica MV_ClickBySpec (components/Controls.ahk).
 */
 TissXml_ClickBySpec(winTitle, classNN, x, y) {
-    return !!MV_ClickAndWait(winTitle, classNN, x, y, RP_FINAL_ACTION_TIMEOUT_MS,
+    return !!MV_ClickAndWait(winTitle, classNN, x, y, FFCV_FINAL_ACTION_TIMEOUT_MS,
         , "ação de tela XML/TISS")
 }
 
@@ -79,13 +71,13 @@ TissXml_WaitXmlQueryReady(timeoutMs := 30000) {
         if (modal != "")
             return Map("ok", false, "elapsed", A_TickCount - startedAt, "erro", "Modal apareceu apos consultar a remessa no XML/TISS: " modal)
 
-        minWaitDone := (A_TickCount - startedAt >= RP_XML_QUERY_MIN_WAIT_MS)
+        minWaitDone := (A_TickCount - startedAt >= FFCV_XML_QUERY_MIN_WAIT_MS)
         if (minWaitDone
             && _ControlAtReady(WIN_XML, XML_BTN_FATURAMENTO, XML_BTN_FATURAMENTO_X, XML_BTN_FATURAMENTO_Y, 20)
             && A_Cursor != "Wait" && A_Cursor != "AppStarting") {
             if (stableSince = 0)
                 stableSince := A_TickCount
-            if (A_TickCount - stableSince >= RP_FINAL_STABLE_MS)
+            if (A_TickCount - stableSince >= FFCV_FINAL_STABLE_MS)
                 return Map("ok", true, "elapsed", A_TickCount - startedAt, "erro", "")
         } else {
             stableSince := 0
@@ -135,7 +127,7 @@ TissXml_HandleSaveModals() {
         if !MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), 2) {
             if (A_Index = 1)
                 Notify("Nenhum modal imediatamente apos salvar XML; aguardando estabilizacao.")
-            if MV_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, 5000)
+            if MV_WaitOracleSettled(WIN_XML_PATH_FORM, FFCV_FINAL_STABLE_MS, 5000)
                 return true
             continue
         }
@@ -167,7 +159,7 @@ TissXml_ClickModalButtonByText(winTitle, buttonText) {
     hwnd := MV_FindButtonByText(winTitle, buttonText)
     if !hwnd
         return false
-    return MV_ClickModalAndWait(winTitle, hwnd, RP_FINAL_ACTION_TIMEOUT_MS,
+    return MV_ClickModalAndWait(winTitle, hwnd, FFCV_FINAL_ACTION_TIMEOUT_MS,
         "", "modal XML/TISS respondido")
 }
 
@@ -201,12 +193,12 @@ TissXml_Gerar(numRemessa) {
 
     if !TissXml_SetTextByClickNoClear(WIN_XML, XML_CAMPO_REMESSA_X, XML_CAMPO_REMESSA_Y, numRemessa)
         return Map("ok", false, "erro", "Nao consegui preencher a remessa na tela XML/TISS.")
-    if !MV_SendFunctionAndWait(WIN_XML, "F8", RP_FINAL_ACTION_TIMEOUT_MS, , "consulta XML/TISS")
+    if !MV_SendFunctionAndWait(WIN_XML, "F8", FFCV_FINAL_ACTION_TIMEOUT_MS, , "consulta XML/TISS")
         return Map("ok", false, "erro", "F8 nao produziu uma transicao observavel na consulta XML/TISS.")
-    if !MV_WaitScreenStable(WIN_XML, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitScreenStable(WIN_XML, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Tela XML/TISS nao estabilizou apos F8.")
 
-    queryReady := TissXml_WaitXmlQueryReady(RP_FINAL_ACTION_TIMEOUT_MS)
+    queryReady := TissXml_WaitXmlQueryReady(FFCV_FINAL_ACTION_TIMEOUT_MS)
     if !queryReady["ok"]
         return Map("ok", false, "erro", "Consulta XML/TISS nao estabilizou: " queryReady["erro"])
     Notify("Consulta XML/TISS estabilizada em " queryReady["elapsed"] "ms.")
@@ -227,7 +219,7 @@ TissXml_Gerar(numRemessa) {
     if !TissXml_SetTextByClickAt(WIN_XML_PATH_FORM, XML_FORM_CAMPO_PATH_X, XML_FORM_CAMPO_PATH_Y, xmlPath)
         return Map("ok", false, "erro", "Nao consegui preencher o campo de caminho do XML.")
 
-    if !MV_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitOracleSettled(WIN_XML_PATH_FORM, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Tela de caminho do XML nao estabilizou antes de salvar.")
 
     if !TissXml_ClickBySpec(WIN_XML_PATH_FORM, XML_FORM_BTN_SALVAR, XML_FORM_BTN_SALVAR_X, XML_FORM_BTN_SALVAR_Y)
@@ -236,13 +228,13 @@ TissXml_Gerar(numRemessa) {
     if !TissXml_HandleSaveModals()
         return Map("ok", false, "erro", "Erro ao tratar modais apos salvar XML.")
 
-    if !MV_WaitOracleSettled(WIN_XML_PATH_FORM, RP_FINAL_STABLE_MS, RP_FINAL_ACTION_TIMEOUT_MS)
+    if !MV_WaitOracleSettled(WIN_XML_PATH_FORM, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Apos salvar o XML, a tela nao estabilizou para voltar.")
 
     if !TissXml_ClickBySpec(WIN_XML_PATH_FORM, XML_FORM_BTN_VOLTAR, XML_FORM_BTN_VOLTAR_X, XML_FORM_BTN_VOLTAR_Y)
         return Map("ok", false, "erro", "Nao consegui voltar da tela de XML gerado.")
 
-    if !MV_SendAndWait(WIN_XML_PATH_FORM, "{Esc}", RP_FINAL_ACTION_TIMEOUT_MS, , "saída do formulário XML")
+    if !MV_SendAndWait(WIN_XML_PATH_FORM, "{Esc}", FFCV_FINAL_ACTION_TIMEOUT_MS, , "saída do formulário XML")
         return Map("ok", false, "erro", "Esc nao produziu estado observavel de saída do XML.")
     return Map("ok", true, "path", xmlPath)
 }

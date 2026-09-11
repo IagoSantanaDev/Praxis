@@ -221,6 +221,12 @@ MV_Abort(msg, sendStatus := false)
 - **Efeito:** é encerramento de fluxo, não exceção; não relançar como erro genérico durante a canonização.
 - **Compatibilidade:** substitui conceitualmente `Protocolar_Abort` e `RP_Abort`; manter wrappers somente se houver caller público e fazê-los delegar à função canônica.
 
+### Política de wrappers de módulo
+
+- Wrappers de abort e parse permanecem somente quando preservam uma API de domínio/compatibilidade ou acrescentam semântica observável, como `sendStatus=true`; não criar wrapper para apenas renomear a primitiva.
+- Wrappers de interação permanecem somente quando acrescentam timeout, logging, fallback ou composição de estado. `TissXml_ClickBySpec` é permitido porque compõe `MV_ClickAndWait` com o timeout/relato próprio da tela XML/TISS.
+- Quando não houver semântica adicional, o caller usa diretamente `MV_Abort`, `ParseListaCsv` ou `MV_ClickBySpec`.
+
 ### Preparação de processo em `MVSession.ahk`
 
 Antes da API, o arquivo define `SetTitleMatchMode(2)`, `DetectHiddenText(true)`, atrasos de controle/janela/teclado e `CoordMode("Mouse", "Client")`. Esses efeitos são pré-condições globais do módulo e não devem ser repetidos em cada wrapper. O arquivo inclui `MVConstants.ahk` e `components/Controls.ahk`; `Dialogs.ahk`/`Popups.ahk` incluem Controls e Constants por sua vez, e não devem criar uma segunda fonte de constantes.
@@ -233,6 +239,7 @@ Antes da API, o arquivo define `SetTitleMatchMode(2)`, `DetectHiddenText(true)`,
 - `Dialog_ClassifyErroContaModal(winTitle := "")` resolve o modal ativo e delega a `FFCV_ClassifyErrorModal`; retorna um `Map` de classificação. O OCR é semântica de domínio e não deve ser absorvido por Controls.
 - `Dialog_MovDocPopupVisible()` é um wrapper fino de `WinExist` para o título do popup; preservar somente enquanto for API de domínio.
 - `Dialog_DismissMovDocPopup()` ativa o popup, aguarda `Popup_FirstControlByClass`, tenta `MV_ClickFirstControl`, usa Enter como fallback e confirma o fechamento com polling. É wrapper permitido porque expressa o fluxo MOV DOC; não duplicar a busca/clique.
+- `Dialog_DismissMovDocPopup()` e `Popup_DismissActiveModal()` permanecem separados: o primeiro retorna booleano e possui fallback `Enter` específico do MOV DOC; o segundo retorna `Map("ok", ..., "report", ...)` para o fluxo de remessa e não possui esse fallback. A sequência compartilhada continua nas primitivas canônicas, sem núcleo parametrizado que apagaria essa diferença de contrato.
 - O `try` atual converte falhas em `false`; mudanças futuras devem manter erro observável por `MV_Log` e não ocultar a razão.
 
 ### `Popups.ahk`
@@ -315,7 +322,7 @@ Esta seção complementa os contratos de interação com as famílias identifica
 | Lista CSV simples | `lib/globals/mv/ParseUtils.ahk:ParseListaCsv` | **Fonte única.** `StrSplit` por vírgula, `Trim` e descarte de vazios; não criar variante para `remessas` ou `protocolos`. | S03 | O contrato é CSV simples; não interpretar pipe, linhas ou campos compostos aqui. |
 | Protocolos de remessa | `lib/modules/remessa_protocolo/RPParsers.ahk:ParseProtocolos` | Wrapper de domínio preservado: delega para `ParseListaCsv`. `RP_RecordTiming`, `RP_ConvenioMajoritario`, `RP_FiltrarContasPorConvenio` e relatórios continuam semântica RP. | S03 | Confirmar callers antes de remover o nome público. |
 | Remessas do Protocolar | `lib/modules/protocolar/ProtocolarParsers.ahk:Protocolar_ParseRemessas` | Wrapper de compatibilidade preservado: delega para `ParseListaCsv`; `Protocolar_ExtractContasFromCsv` escolhe `CD_REG_AMB` para Ambulatorial e `CONTA` para Hospitalar/Internamento, normaliza BOM/cabeçalho, suporta aspas e deduplicação. `Protocolar_Abort` delega para `MV_Abort(msg, true)`. | S03/S05 | O relatório FFCV usa índice 121 para Ambulatorial e 177 para Hospitalar/Internamento; o CSV é consumido antes da tela Protocolação de Envio. |
-| Resultado FXML | `lib/modules/fechar_xml/FecharXml.ahk` + `FecharXmlParsers.ahk` | `RunFecharXML` valida remessas/datas, seleciona cada remessa, confirma entrega e chama `TissXml_Gerar`; `FXML_ParseFlowResult` agrega os XMLs. Parsers de payload bruto continuam placeholders não usados. | S05 | O orquestrador usa diretamente os Maps de `Ffcv_ConfirmarEntregaRemessa` e `TissXml_Gerar`; não inventar parser de payload inexistente. |
+| Resultado FXML | `lib/modules/fechar_xml/FecharXml.ahk` + `FecharXmlParsers.ahk` | `RunFecharXML` valida remessas/datas, seleciona cada remessa, confirma entrega e chama `TissXml_Gerar`; `FXML_ParseFlowResult` agrega os XMLs. Parsers de payload bruto continuam placeholders não usados. | S05 | O orquestrador usa diretamente os Maps de `Ffcv_ConfirmarEntregaNaTela` e `TissXml_Gerar`; não inventar parser de payload inexistente. |
 | Contas dos macros | `test_macros/11_ffcv_remessa_inserir_imprimir.ahk:ParseContasTeste` | Manter local: aceita `Array`, fallback, linhas, pipe e extração numérica. Não transformar em parser global por semelhança com CSV. | S04 | Entrada `Prot. | Conta | Convênio` tem semântica de fixture diferente de `ParseListaCsv`. |
 | Tipos de conta | `lib/app/ScriptRegistry.ahk`/`MVConstants.ahk` versus macros `03`/`11` | Preservar a divergência para migração e validação; não corrigir macros nesta fatia. | S04 | Alteração silenciosa pode enviar tipo errado ao Oracle Forms. |
 

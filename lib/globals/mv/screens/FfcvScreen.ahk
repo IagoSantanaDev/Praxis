@@ -72,12 +72,6 @@ FFCV_BTN_IMPRIMIR_Y    := 458
 ; ── Controles popup de envio de contas ────────────────────────
 ; Validado por captura do usuário: "Informações da Conta" não abre WinTitle próprio;
 ; o sentinela é o painel desenhado ui60Drawn W323 dentro da janela principal FFCV.
-; Constantes canônicas do popup ficam em MVConstants.ahk (MV_POPUP_*).
-; Mantidos apenas aliases de compatibilidade para callers existentes.
-FFCV_POPUP_CONTA_SENTINEL_CLASS := MV_POPUP_CONTA_SENTINEL_CLASS
-FFCV_POPUP_CONTA_SENTINEL_X     := MV_POPUP_CONTA_SENTINEL_X
-FFCV_POPUP_CONTA_SENTINEL_Y     := MV_POPUP_CONTA_SENTINEL_Y
-
 ; ── Controles tela de datas (Cadastro: Faturas e Remessas) ────
 ; Spy em Fluxos/Fluxo_FecharRemessa.
 DATAS_CAMPO_REMESSA    := "Edit5"
@@ -129,20 +123,8 @@ XML_BTN_SAIR_TELA     := ""        ; pendente
 ; ── Esperas e timings ──────────────────────────────────────────
 ; Padrão validado no macro 11: micro-settle suficiente para
 ; estabilidade sem sleeps longos em campos Oracle Forms.
-; Timings canonicos em MVConstants (MV_FIELD_*). Aliases de compat.
-FFCV_FIELD_FOCUS_SETTLE_MS := MV_FIELD_FOCUS_SETTLE_MS
-FFCV_FIELD_CLEAR_SETTLE_MS := MV_FIELD_CLEAR_SETTLE_MS
-FFCV_KEY_SETTLE_MS         := MV_KEY_SETTLE_MS
-
 ; ── Performance FFCV Inserir Conta ───────────────────────────
 ; Contrato do macro 11: manter popup aberto, reagir ao modal e liberar próxima conta por estado.
-; Timings canonicos em MVConstants (MV_CONTA_*). Aliases de compat.
-FFCV_CONTA_FOCUS_SETTLE_MS      := MV_CONTA_FOCUS_SETTLE_MS
-FFCV_CONTA_CLEAR_SETTLE_MS      := MV_CONTA_CLEAR_SETTLE_MS
-FFCV_CONTA_READY_MIN_MS         := MV_CONTA_READY_MIN_MS
-FFCV_CONTA_FIELD_EMPTY_MIN_MS   := MV_CONTA_FIELD_EMPTY_MIN_MS
-FFCV_CONTA_STABLE_MS            := MV_CONTA_STABLE_MS
-FFCV_CONTA_SUBMIT_TIMEOUT_MS    := MV_CONTA_SUBMIT_TIMEOUT_MS
 
 ; ── Esperas da fase de fechamento/XML ─────────────────────────
 ; Esta fase dispara processamentos pesados no Oracle Forms.
@@ -404,69 +386,6 @@ Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto := false) {
     return Map("ok", true, "erro", "", "remessa", numRemessa)
 }
 
-Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc) {
-    if !MV_EnsureWindowActive(MV_WIN_FFCV_ANY)
-        return Map("ok", false, "erro", "FFCV nao ficou ativa antes de abrir a tela de fechar remessa/datas.", "remessa", "")
-
-    startedAt := A_TickCount
-    if !MV_ClickAndWait(MV_WIN_FFCV_ANY, FFCV_BTN_ABRIR_DATAS, 464, 458,
-        MV_TIMEOUT_LOAD * 1000, , "Entregar Remessa acionado")
-        return Map("ok", false, "erro", "Entregar Remessa nao produziu transicao observavel.", "remessa", "")
-    if !MV_WaitExpectedState((hwnd, state) => Ffcv_IsTelaEntregaRemessas(hwnd), WIN_FFCV_DATAS,
-        MV_TIMEOUT_LOAD * 1000, "Entrega de Remessas operacional") = false
-        return Map("ok", false, "erro", "Tela de fechar remessa/datas nao ficou operacional.", "remessa", "")
-    Notify("Tela de datas operacional em " (A_TickCount - startedAt) "ms.")
-
-    datas := Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc)
-    if !datas["ok"]
-        return Map("ok", false, "erro", datas["erro"], "remessa", "")
-    numRemessa := datas["remessa"]
-
-    checkedFecharContas := MV_ControlCheckedAt(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y, 20)
-    if (checkedFecharContas = 0) {
-        if !MV_ClickAndWait(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y,
-            5000, (hwnd, state) => MV_ControlCheckedAt(WIN_FFCV_DATAS, DATAS_CHECKBOX,
-                DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y, 20) = 1, "fechamento sem fatura marcado")
-            return Map("ok", false, "erro", "Nao consegui marcar 'Fechar contas sem imprimir faturas'.", "remessa", "")
-    } else if (checkedFecharContas = "") {
-        return Map("ok", false, "erro", "Nao consegui ler o estado de 'Fechar contas sem imprimir faturas'.", "remessa", "")
-    }
-    if !MV_ClickAndWait(WIN_FFCV_DATAS, DATAS_BTN_CONFIRMAR, DATAS_BTN_CONFIRMAR_X, DATAS_BTN_CONFIRMAR_Y,
-        FFCV_FINAL_ACTION_TIMEOUT_MS, (hwnd, state) => WinExist(MV_CLASS_MODAL_FORMS),
-        "confirmação de entrega aberta")
-        return Map("ok", false, "erro", "Nao consegui confirmar a entrega da remessa.", "remessa", "")
-
-    if !MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), MV_TIMEOUT_ACOE)
-        return Map("ok", false, "erro", "Popup de confirmacao nao apareceu.", "remessa", "")
-    if !_ClickNaoModal()
-        return Map("ok", false, "erro", "Nao consegui clicar Nao no popup de confirmacao.", "remessa", "")
-    if !MV_WaitModalGone(FFCV_FINAL_ACTION_TIMEOUT_MS)
-        return Map("ok", false, "erro", "Popup de confirmacao nao fechou em tempo.", "remessa", "")
-
-    try {
-        MV_PrintDeliveryReport("Impressão da remessa " Trim(numRemessa) " em andamento...")
-    } catch as err {
-        return Map("ok", false, "erro", err.Message, "remessa", "")
-    }
-
-    if !MV_WaitOracleSettled(WIN_FFCV_DATAS, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
-        return Map("ok", false, "erro", "A tela de Entrega de Remessas nao estabilizou para sair.", "remessa", "")
-
-    if !Ffcv_SairTelaEntregaPendente()
-        return Map("ok", false, "erro", "Atalho para sair da tela Entrega de Remessas ainda nao mapeado.", "remessa", "")
-    if !MV_WaitOracleSettled(MV_WIN_FFCV_ANY, FFCV_FINAL_STABLE_MS, FFCV_FINAL_ACTION_TIMEOUT_MS)
-        return Map("ok", false, "erro", "FFCV nao estabilizou apos sair da tela Entrega de Remessas.", "remessa", "")
-
-    return Map("ok", true, "erro", "", "remessa", Trim(numRemessa))
-}
-
-
-
-
-
-
-
-
 ; ── Shared helpers ───────────────────────────────────────────
 
 /*
@@ -498,7 +417,7 @@ FFCV_WaitLoad()
     Retorna true se MV_WIN_FFCV_ANY ainda existe.
 */
 FFCV_WaitLoad() {
-    return !!MV_WaitScreenStable(MV_WIN_FFCV_ANY, FFCV_KEY_SETTLE_MS, MV_TIMEOUT_LOAD * 1000)
+    return !!MV_WaitScreenStable(MV_WIN_FFCV_ANY, MV_KEY_SETTLE_MS, MV_TIMEOUT_LOAD * 1000)
 }
 
 _TipoContaCodigo(tipoConta) {
