@@ -28,6 +28,7 @@ RunProtocolar(params) {
     setorEnvio := Trim(params["setor_envio"])
     tipo := params.Has("tipo") ? Trim(String(params["tipo"])) : "Ambulatorial"
     finalizarEnvio := Protocolar_OptionEnabled(params, "finalizar_envio", true)
+    umaRemessaUmProtocolo := Protocolar_OptionEnabled(params, "uma_remessa_um_protocolo", false)
     csvPath := params.Has("csv_path")
         ? Trim(String(params["csv_path"]))
         : ""
@@ -44,6 +45,86 @@ RunProtocolar(params) {
         tipo := "Ambulatorial"
     if (StrLower(tipo) != "ambulatorial" && StrLower(tipo) != "internamento" && StrLower(tipo) != "hospitalar")
         return Protocolar_Abort("Tipo de atendimento invalido. Use Ambulatorial ou Internamento.")
+
+    ; ── FLUXO: UMA REMESSA = UM PROTOCOLO ─────────────────────────
+    if umaRemessaUmProtocolo {
+        Notify("Iniciando fluxo: Uma Remessa = Um Protocolo...")
+        mapeamentoRemessas := []
+
+        for idx, remessa in remessas {
+            ThrowIfAppStopped()
+            Notify("Processando remessa " remessa " (" idx "/" remessas.Length ")...")
+
+            currentCsv := ""
+            if (csvPath != "" && FileExist(csvPath)) {
+                currentCsv := csvPath
+            } else {
+                try currentCsv := Protocolar_GerarCsvContas([remessa], tipo)
+                catch as e {
+                    if (e is AppStoppedError)
+                        throw e
+                    return Protocolar_Abort("Falha ao gerar CSV para remessa " remessa ": " e.Message)
+                }
+            }
+
+            if !FileExist(currentCsv)
+                return Protocolar_Abort("CSV de contas nao encontrado para remessa " remessa ": " currentCsv)
+
+            try {
+                contasRemessa := Protocolar_ExtractContasFromCsv(currentCsv, true, tipo)
+            } catch as e {
+                if (e is AppStoppedError)
+                    throw e
+                return Protocolar_Abort("Falha ao ler contas do CSV para remessa " remessa ": " e.Message)
+            }
+
+            if (contasRemessa.Length = 0) {
+                Notify("Remessa " remessa " nao possui contas no CSV. Pulando...")
+                continue
+            }
+
+            if !Protocolar_AbrirTelaEnvio(setorAtual, setorEnvio, tipo)
+                return Protocolar_Abort("Nao foi possivel abrir ou preparar a tela de Envio para a remessa " remessa ".")
+
+            Notify("Protocolar remessa " remessa ": enviando " contasRemessa.Length " conta(s)...")
+            for index, conta in contasRemessa {
+                ThrowIfAppStopped()
+                Protocolar_EnviarConta(conta)
+                popup := Protocolar_EncontrarPopupUsuario(400)
+                if popup
+                    return Protocolar_Abort(Protocolar_DescreverPopup(popup, conta))
+                if (Mod(index, 25) = 0 || index = contasRemessa.Length)
+                    Notify("Protocolar remessa " remessa ": " index "/" contasRemessa.Length " conta(s) enviada(s).")
+            }
+
+            if !Protocolar_RemoverRegistroVazio()
+                return Protocolar_Abort("Contas da remessa " remessa " enviadas, mas nao foi possivel remover registro vazio final.")
+
+            protNum := ""
+            if (finalizarEnvio) {
+                if !Protocolar_FinalizarEnvio()
+                    return Protocolar_Abort("Falha ao finalizar/imprimir o envio da remessa " remessa ".")
+
+                ; Copiar o número do protocolo gerado no campo de protocolo do MOV DOC após imprimir
+                protNum := MovDoc_CopiarNumeroProtocolo(MV_WIN_MOVDOC_ENVIO)
+                if (protNum = "")
+                    protNum := MovDoc_CopiarNumeroProtocolo(MV_WIN_MOVDOC_BAIXA)
+            }
+
+            mapeamentoRemessas.Push(Map("remessa", remessa, "protocolo", protNum != "" ? protNum : "N/I"))
+            Notify("Remessa " remessa " concluida. Protocolo gerado: " (protNum != "" ? protNum : "N/I"))
+            Progress((idx / remessas.Length) * 100)
+        }
+
+        reportMsg := "Protocolar concluído (Uma Remessa = Um Protocolo)!`n`nRELAÇÃO DE REMESSAS E PROTOCOLOS:`n"
+        for _, item in mapeamentoRemessas
+            reportMsg .= "  • Remessa: " item["remessa"] " -> Protocolo Gerado: " item["protocolo"] "`n"
+
+        Done(reportMsg)
+        return true
+    }
+
+    ; ── FLUXO LEGADO: VÁRIAS REMESSAS MISTURADAS ─────────────────
     if (csvPath = "") {
         try csvPath := Protocolar_GerarCsvContas(remessas, tipo)
         catch as e {
@@ -89,6 +170,7 @@ RunProtocolar(params) {
     Done("Protocolar concluído: " contas.Length " conta(s) enviada(s).")
     return true
 }
+
 
 Protocolar_GerarCsvContas(remessas, tipo := "Ambulatorial") {
     documentsDir := Config_GetPath("Documents")

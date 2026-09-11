@@ -56,15 +56,94 @@ RunRemessaProtocolo(params) {
     dataVenc     := params["data_vencimento"]
     numRemessa   := Trim(params["num_remessa"])
     imprimirAposInserir := RP_OptionEnabled(params, "imprimir_apos_inserir", true)
+    umProtocoloUmaRemessa := RP_OptionEnabled(params, "um_protocolo_uma_remessa", false)
     temDatas     := (dataEntrega != "" && dataVenc != "")
 
     if (protocolos.Length = 0)
         return RP_Abort("Informe ao menos um protocolo.")
 
-    linhas := [], erros := [], timings := []
+    linhas := [], erros := [], timings := [], mapeamentoRemessas := []
     totalStart := stageStart := A_TickCount
 
-    ; ── MOV DOC ──────────────────────────────────────────────
+    ; ── FLUXO: UM PROTOCOLO = UMA REMESSA ─────────────────────────
+    if umProtocoloUmaRemessa {
+        Notify("Iniciando fluxo: Um Protocolo = Uma Remessa...")
+
+        for idx, protocolo in protocolos {
+            ThrowIfAppStopped()
+            pStart := A_TickCount
+            Notify("Processando protocolo " protocolo " (" idx "/" protocolos.Length ") no MOV DOC...")
+
+            if !MV_EnsureMovDoc() || !MovDoc_AbrirTelaBaixa()
+                return RP_Abort("Nao foi possivel acessar o MOV DOC / abrir a tela Baixa para o protocolo " protocolo ".")
+
+            result := ProcessarProtocolo(protocolo)
+            if !result["ok"]
+                return RP_Abort(result["erro"])
+
+            linhasProtocolo := result["linhas"]
+            convenioNum := RP_ConvenioMajoritario(linhasProtocolo)
+            if (convenioNum = "")
+                return RP_Abort("Convenio nao identificado no MOV DOC para o protocolo " protocolo ".")
+
+            protocolContas := RP_FiltrarContasPorConvenio(linhasProtocolo, convenioNum, erros)
+            totalContasFFCV := ContarContas(protocolContas)
+
+            Notify("Abrindo FFCV para protocolo " protocolo " (convenio " convenioNum ")...")
+            if !MV_EnsureFFCV() || !Ffcv_AbrirManutencaoRemessa()
+                return RP_Abort("Nao foi possivel acessar o FFCV / abrir Manutencao de Remessa.")
+
+            if !Ffcv_CarregarConvenio(convenioNum)
+                return RP_Abort("Nao consegui carregar o convenio " convenioNum " no FFCV.")
+            Ffcv_PosicionarAreaRemessas()
+
+            if !Ffcv_CriarNovaRemessa(tipoConta)
+                return RP_Abort("Erro ao criar nova remessa para o protocolo " protocolo ".")
+
+            if !InserirContasNaRemessa(protocolContas, tipoConta, erros)
+                return false
+
+            criadaRemessa := ""
+
+            if temDatas {
+                Notify("Fechando remessa com datas para o protocolo " protocolo "...")
+                if !Ffcv_PrepararEntregaPorProtocolo()
+                    return RP_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
+
+                resEntrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true)
+                if !resEntrega["ok"]
+                    return RP_Abort(resEntrega["erro"])
+
+                criadaRemessa := resEntrega["remessa"]
+                if !Ffcv_SairTelaEntregaPendente()
+                    return RP_Abort("A tela Entrega de Remessas nao fechou apos o protocolo.")
+
+                Notify("Gerando XML TISS da remessa " criadaRemessa "...")
+                xml := TissXml_Gerar(criadaRemessa)
+                if !xml["ok"]
+                    return RP_Abort(xml["erro"])
+            } else if imprimirAposInserir {
+                Notify("Imprimindo relatorio e capturando remessa via OCR para o protocolo " protocolo "...")
+                Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa)
+            }
+
+            if (criadaRemessa != "")
+                mapeamentoRemessas.Push(Map("remessa", criadaRemessa, "protocolo", protocolo))
+            else
+                mapeamentoRemessas.Push(Map("remessa", "N/I", "protocolo", protocolo))
+
+            Notify("Concluido ciclo do protocolo " protocolo ": Remessa " criadaRemessa)
+            Ffcv_ReiniciarManutencaoRemessa()
+            Progress((idx / protocolos.Length) * 100)
+        }
+
+        RP_RecordTiming(timings, "Um Protocolo = Uma Remessa Total", totalStart, protocolos.Length " protocolo(s) processado(s)")
+        gRunning := false
+        Done(ErrosMensagem(erros, timings, mapeamentoRemessas))
+        return true
+    }
+
+    ; ── FLUXO LEGADO: VÁRIOS PROTOCOLOS = UMA REMESSA ─────────────
     Notify("Garantindo MOV DOC...")
     if !MV_EnsureMovDoc() || !MovDoc_AbrirTelaBaixa()
         return RP_Abort("Nao foi possivel acessar o MOV DOC / abrir a tela Baixa.")
@@ -139,16 +218,26 @@ RunRemessaProtocolo(params) {
         if !xml["ok"]
             return RP_Abort(xml["erro"])
         RP_RecordTiming(timings, "Gerar XML", stageStart)
+        mapeamentoRemessas.Push(Map("remessa", result["remessa"], "protocolo", RP_JoinArray(protocolos, ", ")))
     } else if imprimirAposInserir {
         stageStart := A_TickCount
-        Ffcv_ImprimirRelatorioAtendimentos()
+        criadaRemessa := ""
+        Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa)
         RP_RecordTiming(timings, "Imprimir relatorio", stageStart)
+        mapeamentoRemessas.Push(Map("remessa", criadaRemessa != "" ? criadaRemessa : "N/I", "protocolo", RP_JoinArray(protocolos, ", ")))
     }
 
     Progress(100)
     RP_RecordTiming(timings, "Total", totalStart, protocolos.Length " protocolo(s), " totalContasFFCV " conta(s)")
     gRunning := false
-    Done(ErrosMensagem(erros, timings))
+    Done(ErrosMensagem(erros, timings, mapeamentoRemessas))
+}
+
+RP_JoinArray(arr, sep := ", ") {
+    res := ""
+    for _, item in arr
+        res .= (res = "" ? "" : sep) item
+    return res
 }
 
 RP_OptionEnabled(params, key, defaultValue := false) {
@@ -158,8 +247,13 @@ RP_OptionEnabled(params, key, defaultValue := false) {
     return !(value = "false" || value = "0" || value = "nao" || value = "não")
 }
 
-ErrosMensagem(erros, timings) {
+ErrosMensagem(erros, timings, mapeamentoRemessas := []) {
     report := "Remessa concluida com sucesso!`n`n" RP_FormatTimingReport(timings)
+    if (mapeamentoRemessas.Length > 0) {
+        report .= "`n`nRELAÇÃO DE REMESSAS CRIADAS:`n"
+        for _, item in mapeamentoRemessas
+            report .= "  • Remessa: " item["remessa"] " -> Protocolo: " item["protocolo"] "`n"
+    }
     if (erros.Length > 0) {
         report .= "`nConcluido com " erros.Length " pendencia(s):`nPROTOCOLO | CONTA | ERRO`n"
         for _, e in erros
@@ -167,6 +261,7 @@ ErrosMensagem(erros, timings) {
     }
     return report
 }
+
 
 
 ProcessarProtocolo(protocolo) {
