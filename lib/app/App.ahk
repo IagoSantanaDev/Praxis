@@ -56,7 +56,8 @@ App_Run() {
     try {
         gWorkDir := Config_GetPath("WorkDir")
     } catch as e {
-        gWorkDir := A_LocalAppData "\Praxis"
+        localAppData := EnvGet("LOCALAPPDATA")
+        gWorkDir := (localAppData != "" ? localAppData : A_Temp) "\Praxis"
         try DirCreate gWorkDir
         catch as fallbackError
             OutputDebug "[App] Diretorio de trabalho indisponivel: " . fallbackError.Message

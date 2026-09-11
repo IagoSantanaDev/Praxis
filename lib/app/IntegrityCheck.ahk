@@ -13,7 +13,11 @@
 ;   #Include *i build\generated\Praxis_IntegrityManifest.ahk  (reatribui o Map com hashes reais)
 
 LogWrite(msg) {
-    candidates := [A_MyDocuments "\Praxis", A_LocalAppData "\Praxis", A_Temp "\Praxis"]
+    candidates := [A_MyDocuments "\Praxis", A_Temp "\Praxis"]
+    localAppData := EnvGet("LOCALAPPDATA")
+    if (localAppData != "")
+        candidates.InsertAt(2, localAppData "\Praxis")
+
     for logDir in candidates {
         try {
             if !DirExist(logDir)

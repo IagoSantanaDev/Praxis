@@ -21,7 +21,9 @@ GetLogPath() {
     candidates := []
     if IsSet(gWorkDir) && Trim(gWorkDir) != ""
         candidates.Push(gWorkDir)
-    candidates.Push(A_LocalAppData "\Praxis")
+    localAppData := EnvGet("LOCALAPPDATA")
+    if (localAppData != "")
+        candidates.Push(localAppData "\Praxis")
     candidates.Push(A_Temp "\Praxis")
     candidates.Push(A_ScriptDir)
 
