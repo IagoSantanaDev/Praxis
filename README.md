@@ -138,10 +138,35 @@ Esse fluxo baixa protocolos no MOV DOC e cria ou atualiza a remessa no FFCV.
 | Data de Vencimento | data | Não |
 
 ### 2. Protocolar
-**Categoria:** movimentação · fluxo em desenvolvimento
+**Categoria:** movimentação
+
+Move contas de uma ou mais remessas de um setor para outro no MV2000i. O fluxo valida a origem e o destino, gera o CSV de contas, abre a tela de envio, envia cada conta, trata popups de usuário e pode finalizar a operação com impressão/salvamento do envio.
+
+| Parâmetro | Tipo | Obrigatório |
+|---|---|---|
+| Remessas | texto | Sim |
+| Setor Atual | texto | Sim |
+| Setor de Envio | texto | Sim |
+| Tipo de Atendimento | seleção | Sim |
+| Finalizar Envio | checkbox | Não |
+| Uma Remessa = Um Protocolo | checkbox | Não |
+
+Esse módulo é usado para transferir o lote de contas para o setor de destino e concluir o processamento do protocolo operacional.
 
 ### 3. Fechar e gerar XML
-**Categoria:** faturamento · fluxo em desenvolvimento
+**Categoria:** faturamento
+
+Fecha remessas no FFCV e, opcionalmente, gera o arquivo XML TISS correspondente. A rotina confirma a entrega da remessa, aceita data de entrega e vencimento quando informado, executa a etapa de fechamento e produz o XML gerado para o lote no formato do sistema de faturamento.
+
+| Parâmetro | Tipo | Obrigatório |
+|---|---|---|
+| Remessas | texto | Sim |
+| Data de Entrega | data | Não |
+| Data de Vencimento | data | Não |
+| Fechar Remessa | checkbox | Não |
+| Gerar XML | checkbox | Não |
+
+Esse fluxo cobre a etapa final do ciclo de faturamento: encerramento documental da remessa e geração do XML para exportação/encaminhamento.
 
 ---
 
@@ -195,12 +220,6 @@ O MV2000i roda sobre **Oracle Forms 6i (`ifrun60.EXE`)**.
 1. **Teclado** como caminho principal: `SendText`, `Tab`, `Enter`, `F6`, `F7`, `F8`, `F10`
 2. **HWND por ClassNN + coordenada client** como fallback
 3. **Clipboard** para leitura: clique duplo e `Ctrl+C`
-
-### D006 — exceção do `lib/vendor/` no `.gitignore`
-
-A pasta `lib/vendor/` é distribuída no pacote de produção porque contém `WebView2.ahk`, essencial em runtime. O `.gitignore` padrão ignora `vendor/` por convenção upstream, então os blocos `!lib/vendor/32bit/` e `!lib/vendor/64bit/` garantem que as DLLs `WebView2Loader` continuem sendo rastreadas e incluídas no pacote portátil, sem serem mascaradas por padrões genéricos.
-
----
 
 ## Padrões do projeto
 
