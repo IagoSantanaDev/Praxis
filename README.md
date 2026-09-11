@@ -209,25 +209,8 @@ O MV2000i roda sobre **Oracle Forms 6i (`ifrun60.EXE`)**.
 - `WinGetText` em popups modais
 - OCR local do Windows (`Windows.Media.Ocr`) na área client dos popups de erro
 
-### Não é confiável sozinho
-
-- `ControlSetText` e `ControlGetText` para campos de texto do Forms
-- o uso de Window Spy para identificar campos por ClassNN único, já que vários controles compartilham nomes como `Edit2`
-- coordenadas de tela, porque variam conforme monitor, resolução e escala
-
 ### Estratégia para campos de texto
 
 1. **Teclado** como caminho principal: `SendText`, `Tab`, `Enter`, `F6`, `F7`, `F8`, `F10`
 2. **HWND por ClassNN + coordenada client** como fallback
 3. **Clipboard** para leitura: clique duplo e `Ctrl+C`
-
-## Padrões do projeto
-
-```autohotkey
-; polling em vez de Sleep fixo
-MV_Poll(condFn, timeoutSecs)
-
-; leitura de campo via clipboard
-MV_CopyFocusedText(timeoutMs := 600, extrairNumero := false)
-```
-
