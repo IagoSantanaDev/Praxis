@@ -103,7 +103,7 @@ Praxis/
 │       ├── protocolar/              # protocolação de contas
 │       └── fechar_xml/              # fechamento e geração de XML TISS
 ├── assets/                          # recursos do aplicativo
-│   └── icon.ico                     # ícone usado por EXE e UI
+│   └── icon.ico                     # ícone multi-resolução usado por EXE e UI
 ├── tools/                           # scripts de build e suporte
 │   ├── build-praxis.ps1             # build completo da distribuição
 │   ├── build-ocr-error-references.ps1 # gera FFCV_ErrorReferences.json
