@@ -25,7 +25,7 @@ WEBVIEW2_CTRL_TIMEOUT_MS  := 15000     ; timeout de WebView2.CreateController
 RESIZE_DEBOUNCE_MS        := 50        ; debounce negativo de OnGuiResize
 CLOSE_HANDLER_TIMEOUT_MS  := 60000     ; deadline para handler terminar ao fechar
 POLL_EXIT_INTERVAL_MS     := 100       ; intervalo de PollExitAfterStop
-CLEANUP_DISPATCH_FLUSH_MS := 50        ; tempo para WebView2 despachar SendToUI final
+UI_CLOSE_ACK_TIMEOUT_MS   := 2000     ; prazo para a UI confirmar o fechamento
 
 ; ─── App Run ──────────────────────────────────────────────────
 AwaitPromise(promise, timeoutMs, timeoutMessage) {
@@ -156,23 +156,21 @@ OnGuiResize(thisGui, minMax, width, height) {
 OnAppClose(thisGui) {
     global gExitDeadline
 
-    if !IsAppRunning() {
-        CleanupApp()
-        ExitApp()
-    }
-
     if !gExitAfterStop {
         RequestAppClose()
-        gExitDeadline := A_TickCount + CLOSE_HANDLER_TIMEOUT_MS
 
-        if !IsStopRequested() {
-            RequestAppStop()
-            SendToUI(Map("type","status","message","Interrompendo antes de fechar...","running",true))
+        if IsAppRunning() {
+            gExitDeadline := A_TickCount + CLOSE_HANDLER_TIMEOUT_MS
+            if !IsStopRequested() {
+                RequestAppStop()
+                SendToUI(Map("type","status","message","Interrompendo antes de fechar...","running",true))
+            } else {
+                SendToUI(Map("type","status","message","Aguardando interrupcao concluir...","running",true))
+            }
+            SetTimer PollExitAfterStop, POLL_EXIT_INTERVAL_MS
         } else {
-            SendToUI(Map("type","status","message","Aguardando interrupcao concluir...","running",true))
+            BeginUiClose()
         }
-
-        SetTimer PollExitAfterStop, POLL_EXIT_INTERVAL_MS
     }
 
     return true
@@ -182,16 +180,59 @@ OnAppClose(thisGui) {
 ; chamado por `PollExitAfterStop` quando o handler termina ou estoura o timeout.
 FinishAppExitAfterStop(reason := "") {
     SetTimer PollExitAfterStop, 0
+    SetTimer PollUiCloseAck, 0
+    ClearUiClose()
     ClearAppClose()
 
     if (reason != "")
         OutputDebug "[App] " . reason
 
-    ; Sleep da tempo ao WebView2 despachar a ultima SendToUI("running", false)
-    ; antes de gController.Close() invalidar o canal.
-    Sleep CLEANUP_DISPATCH_FLUSH_MS
     CleanupApp()
     ExitApp()
+}
+
+BeginUiClose(reason := "") {
+    global gUiClosePending, gUiCloseRequestId, gUiCloseDeadline
+
+    if gUiClosePending
+        return
+
+    gUiCloseRequestId += 1
+    gUiClosePending  := true
+    gUiCloseDeadline := A_TickCount + UI_CLOSE_ACK_TIMEOUT_MS
+
+    if (reason != "")
+        OutputDebug "[App] " . reason
+
+    SendToUI(Map("type", "shutdown_flush", "requestId", gUiCloseRequestId))
+    SetTimer PollUiCloseAck, POLL_EXIT_INTERVAL_MS
+}
+
+HandleUiCloseAck(data) {
+    global gUiClosePending, gUiCloseRequestId
+
+    if !gUiClosePending || !data.Has("requestId")
+        return
+
+    requestId := data["requestId"]
+    if IsObject(requestId) || (String(requestId) != String(gUiCloseRequestId))
+        return
+
+    gUiClosePending := false
+    SetTimer PollUiCloseAck, 0
+    SetTimer FinishAppExitAfterStop, -1
+}
+
+PollUiCloseAck() {
+    global gUiClosePending, gUiCloseDeadline
+
+    if !gUiClosePending {
+        SetTimer PollUiCloseAck, 0
+        return
+    }
+
+    if (A_TickCount > gUiCloseDeadline)
+        FinishAppExitAfterStop("Timeout aguardando confirmacao da UI antes de fechar.")
 }
 
 ; PollExitAfterStop verifica periodicamente o fim do handler ou o timeout e 
@@ -200,12 +241,13 @@ PollExitAfterStop() {
     Critical "On"
     try {
         if !IsAppRunning() {
-            FinishAppExitAfterStop()
+            SetTimer PollExitAfterStop, 0
+            BeginUiClose()
             return
         }
 
         if (A_TickCount > gExitDeadline)
-            FinishAppExitAfterStop("Timeout aguardando handler terminar antes de fechar.")
+            BeginUiClose("Timeout aguardando handler terminar antes de fechar.")
     } finally {
         Critical "Off"
     }

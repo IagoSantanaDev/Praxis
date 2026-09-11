@@ -19,6 +19,7 @@ OnJsMessage(handler, args) {
         case "ready":       InitializeApp()
         case "run_script":  RunScript(data["scriptId"], data["params"])
         case "stop_script": StopScript()
+        case "shutdown_ack": HandleUiCloseAck(data)
         case "exit":        OnAppClose("")
     }
 }

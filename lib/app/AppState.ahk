@@ -19,6 +19,9 @@ global gStopRequested := false
 ; permitindo controlar o shutdown e bloquear novas execuções durante o fechamento.
 global gExitAfterStop := false
 global gExitDeadline  := 0
+global gUiClosePending := false
+global gUiCloseRequestId := 0
+global gUiCloseDeadline := 0
 
 ; ─── Runtime integrity ───────────────────────────────────────
 ; O manifesto é incluído após as declarações, garantindo que o Map esteja inicializado.
@@ -120,6 +123,17 @@ ClearAppClose() {
     try {
         gExitAfterStop := false
         gExitDeadline  := 0
+    } finally {
+        Critical "Off"
+    }
+}
+
+ClearUiClose() {
+    global gUiClosePending, gUiCloseDeadline
+    Critical "On"
+    try {
+        gUiClosePending  := false
+        gUiCloseDeadline := 0
     } finally {
         Critical "Off"
     }

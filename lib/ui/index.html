@@ -350,6 +350,7 @@ const ahk = {
       case 'progress':   setProgress(data.value);              break;
       case 'done':       onDone(data.message);                 break;
       case 'error':      onError(data.message);                break;
+      case 'shutdown_flush': ahk.send({ action: 'shutdown_ack', requestId: data.requestId }); break;
     }
   }
 };
