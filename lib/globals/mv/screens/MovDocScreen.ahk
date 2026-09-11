@@ -87,6 +87,26 @@ MovDoc_SetProtocoloByClick(protocolo) {
         "protocolo preenchido")
 }
 
+MovDoc_CopiarNumeroProtocolo(winTitle := "") {
+    if (winTitle = "")
+        winTitle := WinExist(MV_WIN_MOVDOC_ENVIO) ? MV_WIN_MOVDOC_ENVIO : (WinExist(MV_WIN_MOVDOC_BAIXA) ? MV_WIN_MOVDOC_BAIXA : MV_WIN_MOVDOC_ANY)
+
+    if !MV_EnsureWindowActive(winTitle, 2)
+        return ""
+
+    if !MV_ClickAtAndWait(winTitle, MOVDOC_PROTOCOLO_X + 40, MOVDOC_PROTOCOLO_Y + 10, 3000, , "foco no campo protocolo")
+        return ""
+
+    protocolo := MV_CopyFocusedText(600, true)
+    if (protocolo = "") {
+        try protocolo := Trim(MV_GetFocusedControlText(winTitle))
+        catch
+            protocolo := ""
+    }
+    return Trim(protocolo)
+}
+
+
 MovDoc_LerGrid(protocolo, primeiraLinha?) {
     linhas := []
     vistos := Map()

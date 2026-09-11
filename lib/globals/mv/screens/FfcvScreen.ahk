@@ -248,7 +248,7 @@ Ffcv_PosicionarAreaRemessas() {
     return !!MV_SendAndWait(MV_WIN_FFCV_ANY, "{Tab 3}", 3000, , "área de remessas posicionada")
 }
 
-Ffcv_ImprimirRelatorioAtendimentos() {
+Ffcv_ImprimirRelatorioAtendimentos(&outRemessa?) {
     if !MV_EnsureFFCV() {
         Notify("FFCV não ficou ativa antes de imprimir relatório de atendimentos.")
         return false
@@ -258,12 +258,21 @@ Ffcv_ImprimirRelatorioAtendimentos() {
         return MV_PrintDeliveryReport(
             "Impressão do relatório de atendimentos em andamento...",
             MV_WIN_FFCV_ANY,
-            FFCV_BTN_IMPRIMIR)
+            FFCV_BTN_IMPRIMIR,
+            &outRemessa)
     } catch as err {
         Notify(err.Message)
         return false
     }
 }
+
+Ffcv_ReiniciarManutencaoRemessa() {
+    if !MV_EnsureFFCV()
+        return false
+    MV_SendAndWait(MV_WIN_FFCV_ANY, "{Esc 2}", 1000, , "limpeza da tela de manutenção")
+    return Ffcv_AbrirManutencaoRemessa()
+}
+
 
 Ffcv_AbrirTelaTISS() {
     if !MV_EnsureFFCV()
