@@ -39,7 +39,6 @@
 
 ; ── Janelas ───────────────────────────────────────────────────
 ; MV_WIN_FFCV_ANY / MV_WIN_FFCV_REMESSA já existem em MVConstants.ahk.
-; Usar diretamente nos callers; manter refs locais para compatibilidade.
 WIN_FFCV_DATAS         := "Cadastro: Faturas e Remessas"
 WIN_FFCV_DATAS_OK      := "Mensagem ao Usuário do MV 2000"
 WIN_XML                := "Monitoração de Faturamento - TISS"
@@ -128,8 +127,6 @@ XML_BTN_SAIR_TELA     := ""        ; pendente
 
 ; ── Esperas da fase de fechamento/XML ─────────────────────────
 ; Esta fase dispara processamentos pesados no Oracle Forms.
-FFCV_FINAL_STABLE_MS             := 800
-FFCV_FINAL_ACTION_TIMEOUT_MS     := 30000
 FFCV_XML_QUERY_MIN_WAIT_MS       := 1200
 
 ; ════════════════════════════════════════════════════════════════

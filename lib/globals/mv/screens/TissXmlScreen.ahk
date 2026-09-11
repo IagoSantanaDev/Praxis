@@ -54,14 +54,14 @@ TissXml_SetTextByClickNoClear(winTitle, x, y, value) {
 
 /*
 TissXml_ClickBySpec(winTitle, classNN, x, y)
-    Delega para a versão canônica MV_ClickBySpec (components/Controls.ahk).
+    Compõe o clique canônico com espera de transição e relato próprios da tela.
 */
 TissXml_ClickBySpec(winTitle, classNN, x, y) {
     return !!MV_ClickAndWait(winTitle, classNN, x, y, FFCV_FINAL_ACTION_TIMEOUT_MS,
         , "ação de tela XML/TISS")
 }
 
-TissXml_WaitXmlQueryReady(timeoutMs := 30000) {
+TissXml_WaitXmlQueryReady(timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     startedAt := A_TickCount
     stableSince := 0
 
@@ -90,7 +90,7 @@ TissXml_WaitXmlQueryReady(timeoutMs := 30000) {
     }
 }
 
-TissXml_WaitPathForm(timeoutSecs := 20) {
+TissXml_WaitPathForm(timeoutSecs := MV_DEFAULT_TIMEOUT_SECS) {
     startedAt := A_TickCount
     deadline := startedAt + timeoutSecs * 1000
 
@@ -182,10 +182,10 @@ TissXml_Gerar(numRemessa)
         Map("ok", false, "erro", <mensagem de erro>)
 
     Nota:
-        As coordenadas TISS_* estao marcadas como TODO em FfcvScreen.ahk.
+        A saída da tela XML/TISS ainda não tem ClassNN validado.
         Esta implementacao usa as constantes de FfcvScreen.ahk; quando
-        TissXmlScreen for totalmente mapeado, troque TissXml_SetTextByClick*
-        por versoes com ClassNN validados.
+        esse controle for mapeado, troque o fechamento pendente por uma
+        ação canônica com o seletor validado.
 */
 TissXml_Gerar(numRemessa) {
     if !Ffcv_AbrirTelaTISS()

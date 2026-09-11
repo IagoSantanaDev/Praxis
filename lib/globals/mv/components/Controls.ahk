@@ -73,7 +73,7 @@ MV_Log(funcName, detail, result) {
 }
 
 ; Aguarda o Oracle Forms estabilizar, substituindo duas funções duplicadas e idênticas por um helper único.
-MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
+MV_WaitOracleSettled(winTitle, stableMs := MV_ORACLE_STABLE_MS, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     startedAt := A_TickCount
     stableSince := 0
     lastCount := -1
@@ -105,7 +105,7 @@ MV_WaitOracleSettled(winTitle, stableMs := 800, timeoutMs := 30000) {
     }
 }
 
-MV_WaitWindowStable(winTitle, stableMs := 600, timeoutSecs := 20) {
+MV_WaitWindowStable(winTitle, stableMs := MV_DEFAULT_STABLE_MS, timeoutSecs := MV_DEFAULT_TIMEOUT_SECS) {
     global MV_POLL_MS
     startedAt := A_TickCount
     stableSince := 0
@@ -210,7 +210,7 @@ MV_FirstControlByClass(winTitle, classNN) {
 }
 
 ; Clique por ClassNN + client coords, com fallback para clique físico.
-; Canônica única de _ClickBySpec (FfcvScreen) e TissXml_ClickBySpec (TissXmlScreen).
+; Implementação canônica para callers que não precisam compor espera de estado.
 MV_ClickBySpec(winTitle, classNN, x, y) {
     if (classNN = "" || classNN = "CLASSNN" || x = "" || y = "")
         return false
@@ -232,7 +232,7 @@ MV_ClickBySpec(winTitle, classNN, x, y) {
 ; Copia o texto focado com Ctrl+C e aguarda o clipboard (ClipWait).
 ; Canônica única de _CopyFocusedNumericText (FfcvScreen) e _CopySelecionado (MovDocScreen).
 ; Extração numérica opcional via parâmetro.
-MV_CopyFocusedText(timeoutMs := 600, extrairNumero := false) {
+MV_CopyFocusedText(timeoutMs := MV_CLIPBOARD_TIMEOUT_MS, extrairNumero := false) {
     A_Clipboard := ""
     Send "^c"
     if !ClipWait(timeoutMs / 1000)
@@ -245,17 +245,17 @@ MV_CopyFocusedText(timeoutMs := 600, extrairNumero := false) {
 }
 
 ; Aguarda o modal Forms ativo sumir (base de _WaitModalGone).
-MV_WaitModalGone(timeoutMs := 30000) {
+MV_WaitModalGone(timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     return MV_Poll(() => Dialog_ActiveModalTitle() = "", timeoutMs / 1000)
 }
 
 ; Aguarda uma janela específica sumir (base de _WaitWindowGone).
-MV_WaitWindowGone(winTitle, timeoutMs := 30000) {
+MV_WaitWindowGone(winTitle, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     return MV_Poll(() => !WinExist(winTitle), timeoutMs / 1000)
 }
 
 ; Garante que a janela está ativa (base de _EnsureWindowActive).
-MV_EnsureWindowActive(winTitle, timeoutSecs := 3) {
+MV_EnsureWindowActive(winTitle, timeoutSecs := MV_WINDOW_ACTIVATE_TIMEOUT_SECS) {
     if !WinExist(winTitle)
         return false
     WinActivate winTitle

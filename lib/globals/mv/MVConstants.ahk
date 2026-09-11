@@ -83,6 +83,14 @@ MV_CONTA_SUBMIT_TIMEOUT_MS    := 650
 
 ; ── Polling / estabilidade ────────────────────────────────────
 MV_POLL_MS            := 100
+MV_DEFAULT_TIMEOUT_MS := 30000
+MV_DEFAULT_STABLE_MS  := 600
+MV_DEFAULT_TIMEOUT_SECS := 20
+MV_WINDOW_ACTIVATE_TIMEOUT_SECS := 3
+MV_CLIPBOARD_TIMEOUT_MS := 600
+MV_ORACLE_STABLE_MS   := 800
+FFCV_FINAL_STABLE_MS         := 800
+FFCV_FINAL_ACTION_TIMEOUT_MS := 30000
 ; MV_TIMEOUT_LOAD (15s) aguarda o carregamento sem a espera excessiva de 100s
 ; MV_TIMEOUT_ACOE (10s) aguarda apenas o fechamento do modal já renderizado.
 MV_TIMEOUT_LOAD       := 15

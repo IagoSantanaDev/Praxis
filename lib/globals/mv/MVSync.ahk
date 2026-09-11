@@ -67,7 +67,7 @@ MV_GetFocusedControlText(winTitle) {
     }
 }
 
-MV_WaitScreenChanged(previousState, timeoutMs := 30000, winTitle := "") {
+MV_WaitScreenChanged(previousState, timeoutMs := MV_DEFAULT_TIMEOUT_MS, winTitle := "") {
     startedAt := A_TickCount
     previousSignature := previousState is Map ? previousState["signature"] : String(previousState)
     previousHwnd := previousState is Map && previousState.Has("hwnd") ? previousState["hwnd"] : 0
@@ -87,7 +87,7 @@ MV_WaitScreenChanged(previousState, timeoutMs := 30000, winTitle := "") {
     }
 }
 
-MV_WaitScreenStable(winTitle := "", stableMs := 600, timeoutMs := 30000) {
+MV_WaitScreenStable(winTitle := "", stableMs := MV_DEFAULT_STABLE_MS, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     startedAt := A_TickCount
     stableSince := 0
     lastSignature := ""
@@ -121,7 +121,7 @@ MV_WaitScreenStable(winTitle := "", stableMs := 600, timeoutMs := 30000) {
     }
 }
 
-MV_WaitScreenChangedAndStable(previousState, winTitle := "", stableMs := 600, timeoutMs := 30000) {
+MV_WaitScreenChangedAndStable(previousState, winTitle := "", stableMs := MV_DEFAULT_STABLE_MS, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     changed := MV_WaitScreenChanged(previousState, timeoutMs, winTitle)
     if !changed
         return false
@@ -132,7 +132,7 @@ MV_WaitScreenChangedAndStable(previousState, winTitle := "", stableMs := 600, ti
     return MV_WaitScreenStable(winTitle, stableMs, remaining)
 }
 
-MV_WaitExpectedState(expectedFn, winTitle := "", timeoutMs := 30000, description := "estado esperado") {
+MV_WaitExpectedState(expectedFn, winTitle := "", timeoutMs := MV_DEFAULT_TIMEOUT_MS, description := "estado esperado") {
     startedAt := A_TickCount
     Loop {
         ThrowIfAppStopped()
@@ -149,11 +149,11 @@ MV_WaitExpectedState(expectedFn, winTitle := "", timeoutMs := 30000, description
     }
 }
 
-MV_WaitWindowChanged(previousState, timeoutMs := 30000) {
+MV_WaitWindowChanged(previousState, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     return MV_WaitScreenChanged(previousState, timeoutMs)
 }
 
-MV_WaitWindowClosed(winTitle, timeoutMs := 30000) {
+MV_WaitWindowClosed(winTitle, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     startedAt := A_TickCount
     Loop {
         ThrowIfAppStopped()
@@ -169,7 +169,7 @@ MV_WaitWindowClosed(winTitle, timeoutMs := 30000) {
     }
 }
 
-MV_ActAndWait(winTitle, actionFn, timeoutMs := 30000, expectedFn := unset, description := "ação") {
+MV_ActAndWait(winTitle, actionFn, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "ação") {
     before := MV_CaptureScreenState(winTitle)
     if !actionFn()
         return false
@@ -184,11 +184,11 @@ MV_ActAndWait(winTitle, actionFn, timeoutMs := 30000, expectedFn := unset, descr
     return changed
 }
 
-MV_ClickAndWait(winTitle, classNN, x, y, timeoutMs := 30000, expectedFn := unset, description := "clique") {
+MV_ClickAndWait(winTitle, classNN, x, y, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "clique") {
     return MV_ActAndWait(winTitle, () => MV_ClickControlAt(winTitle, classNN, x, y), timeoutMs, expectedFn, description)
 }
 
-MV_ClickAtAndWait(winTitle, x, y, timeoutMs := 30000, expectedFn := unset, description := "clique físico") {
+MV_ClickAtAndWait(winTitle, x, y, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "clique físico") {
     return MV_ActAndWait(winTitle, () => MV_ClickAt(winTitle, x, y), timeoutMs, expectedFn, description)
 }
 
@@ -213,11 +213,11 @@ MV_ClickHwnd(hwnd) {
     }
 }
 
-MV_ClickHwndAndWait(winTitle, hwnd, timeoutMs := 30000, expectedFn := unset, description := "controle acionado") {
+MV_ClickHwndAndWait(winTitle, hwnd, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "controle acionado") {
     return MV_ActAndWait(winTitle, () => MV_ClickHwnd(hwnd), timeoutMs, expectedFn, description)
 }
 
-MV_ClickModalAndWait(modalTitle, hwnd, timeoutMs := 30000, parentTitle := "", description := "modal respondido") {
+MV_ClickModalAndWait(modalTitle, hwnd, timeoutMs := MV_DEFAULT_TIMEOUT_MS, parentTitle := "", description := "modal respondido") {
     if !MV_ClickHwnd(hwnd)
         return false
     if !MV_WaitWindowClosed(modalTitle, timeoutMs)
@@ -228,7 +228,7 @@ MV_ClickModalAndWait(modalTitle, hwnd, timeoutMs := 30000, parentTitle := "", de
     return true
 }
 
-MV_SendAndWait(winTitle, keys, timeoutMs := 30000, expectedFn := unset, description := "atalho") {
+MV_SendAndWait(winTitle, keys, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "atalho") {
     return MV_ActAndWait(winTitle, () => MV_Send(keys), timeoutMs, expectedFn, description)
 }
 
@@ -237,7 +237,7 @@ MV_Send(keys) {
     return true
 }
 
-MV_SendTextAndWait(winTitle, text, timeoutMs := 30000, expectedFn := unset, description := "texto") {
+MV_SendTextAndWait(winTitle, text, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "texto") {
     return MV_ActAndWait(winTitle, () => MV_SendText(text), timeoutMs, expectedFn, description)
 }
 
@@ -246,7 +246,7 @@ MV_SendText(text) {
     return true
 }
 
-MV_SetTextAndWait(winTitle, x, y, text, timeoutMs := 30000, expectedFn := unset, description := "campo preenchido") {
+MV_SetTextAndWait(winTitle, x, y, text, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "campo preenchido") {
     return MV_ActAndWait(winTitle, () => MV_SetTextAction(winTitle, x, y, text), timeoutMs, expectedFn, description)
 }
 
@@ -258,15 +258,15 @@ MV_SetTextAction(winTitle, x, y, text) {
     return true
 }
 
-MV_SendFunctionAndWait(winTitle, functionKey, timeoutMs := 30000, expectedFn := unset, description := "tecla funcional") {
+MV_SendFunctionAndWait(winTitle, functionKey, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "tecla funcional") {
     return MV_SendAndWait(winTitle, "{" functionKey "}", timeoutMs, expectedFn, description)
 }
 
-MV_SendEnterAndWait(winTitle, timeoutMs := 30000, expectedFn := unset, description := "Enter") {
+MV_SendEnterAndWait(winTitle, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "Enter") {
     return MV_SendAndWait(winTitle, "{Enter}", timeoutMs, expectedFn, description)
 }
 
-MV_CloseWindowAndWait(winTitle, actionFn, parentTitle := "", timeoutMs := 30000, description := "janela fechada") {
+MV_CloseWindowAndWait(winTitle, actionFn, parentTitle := "", timeoutMs := MV_DEFAULT_TIMEOUT_MS, description := "janela fechada") {
     if !actionFn()
         return false
     if !MV_WaitWindowClosed(winTitle, timeoutMs)
