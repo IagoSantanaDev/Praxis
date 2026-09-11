@@ -1,4 +1,4 @@
-# EULA — Termo de Licença de Uso do Software Praxis
+# EULA — Termo de licença de uso do software Praxis
 
 > Modelo operacional. Este documento deve ser revisado por advogado antes de uso contratual real.
 
@@ -6,13 +6,13 @@
 
 **Licenciante:** Iago Santana Lima, titular declarado do software proprietário Praxis.
 
-**Licenciado:** [NOME DO CLIENTE/HOSPITAL/EMPRESA], inscrito no CNPJ/CPF sob nº [●], com sede/endereço em [●].
+**Licenciado:** [NOME DO CLIENTE/HOSPITAL/EMPRESA], inscrito no CNPJ/CPF sob nº [●], com sede e endereço em [●].
 
 ## 2. Objeto
 
-Este termo regula a licença de uso do software **Praxis**, aplicação desktop desenvolvida em AutoHotkey v2 com interface WebView2, destinada à execução de automações em ambiente autorizado.
+Este termo regula a licença de uso do software **Praxis**, uma aplicação desktop desenvolvida em AutoHotkey v2 com interface WebView2 e voltada para execução de automações em ambiente autorizado.
 
-O software é licenciado, não vendido. Este termo não transfere propriedade, titularidade, código-fonte, direitos autorais, marca, know-how, documentação interna, fluxos de automação ou quaisquer outros direitos além da licença limitada expressamente concedida.
+O software é licenciado, não vendido. Este documento não transfere propriedade, titularidade, código-fonte, direitos autorais, marca, know-how, documentação interna, fluxos de automação ou qualquer outro direito além da licença limitada expressamente concedida.
 
 ## 3. Escopo da licença
 
@@ -32,11 +32,11 @@ O uso autorizado fica restrito a:
 - Versão autorizada do Praxis: [●]
 - Prazo de vigência: [●]
 
-Qualquer uso fora do escopo acima depende de autorização prévia e expressa por escrito do Licenciante.
+Qualquer uso fora do escopo acima depende de autorização prévia e expressa por escrito do licenciante.
 
 ## 4. Restrições de uso
 
-É proibido ao Licenciado, direta ou indiretamente, sem autorização prévia e expressa por escrito:
+É proibido ao licenciado, direta ou indiretamente, sem autorização prévia e expressa por escrito:
 
 - copiar, reproduzir ou duplicar o software;
 - modificar, adaptar, traduzir ou alterar o software;
@@ -52,65 +52,65 @@ Qualquer uso fora do escopo acima depende de autorização prévia e expressa po
 
 ## 5. Código-fonte
 
-O acesso eventual ao código-fonte, arquivos internos, documentação técnica, scripts, imagens de debug, mapeamentos de tela, fluxos de automação ou versões antigas não transfere titularidade e não concede autorização para cópia, modificação, redistribuição, criação de obra derivada ou exploração comercial.
+O acesso eventual ao código-fonte, arquivos internos, documentação técnica, scripts, imagens de debug, mapeamentos de telas, fluxos de automação e versões antigas não transfere titularidade nem concede autorização para cópia, modificação, redistribuição, criação de obra derivada ou exploração comercial.
 
 ## 6. Versões antigas e materiais derivados
 
-Versões anteriores, cópias parciais, forks, builds compilados, adaptações, trechos extraídos, rotinas derivadas, documentação técnica, imagens, logs e arquivos auxiliares relacionados ao Praxis continuam protegidos por direitos autorais e sujeitos às mesmas restrições deste termo.
+Versões anteriores, cópias parciais, forks, builds compilados, adaptações, trechos extraídos, rotinas derivadas, documentação técnica, imagens, logs e arquivos auxiliares relacionados ao Praxis continuam protegidos por direitos autorais e estão sujeitos às mesmas restrições deste termo.
 
 ## 7. Confidencialidade
 
-O Licenciado deverá tratar como confidenciais o código-fonte, estrutura interna, lógica de automação, mapeamento de telas, documentação técnica, credenciais, parâmetros, logs, evidências, prints, arquivos auxiliares, regras operacionais e demais informações relacionadas ao Praxis.
+O licenciado deve tratar como confidenciais o código-fonte, a estrutura interna, a lógica de automação, o mapeamento de telas, a documentação técnica, credenciais, parâmetros, logs, evidências, prints, arquivos auxiliares, regras operacionais e demais informações relacionadas ao Praxis.
 
-Tais informações não poderão ser copiadas, divulgadas, compartilhadas ou disponibilizadas a terceiros sem autorização prévia e expressa por escrito.
+Essas informações não podem ser copiadas, divulgadas, compartilhadas ou disponibilizadas a terceiros sem autorização prévia e expressa por escrito.
 
 ## 8. Dados, LGPD e ambiente hospitalar
 
-Quando utilizado em ambiente hospitalar ou com sistemas que contenham dados pessoais ou dados sensíveis, o Licenciado deverá observar a legislação aplicável, políticas internas, regras de segurança da informação, sigilo profissional e boas práticas de proteção de dados.
+Quando o software for usado em ambiente hospitalar ou em sistemas que contenham dados pessoais ou sensíveis, o licenciado deve observar a legislação aplicável, as políticas internas, as regras de segurança da informação, o sigilo profissional e as boas práticas de proteção de dados.
 
-O Licenciado é responsável por garantir que o uso do Praxis ocorra em conformidade com a LGPD e demais normas aplicáveis, especialmente quanto a dados de pacientes, credenciais, logs, prints, XMLs, relatórios e evidências operacionais.
+O licenciado é responsável por garantir que o uso do Praxis esteja em conformidade com a LGPD e demais normas aplicáveis, especialmente no que diz respeito a dados de pacientes, credenciais, logs, prints, XMLs, relatórios e evidências operacionais.
 
-O Praxis não deve ser utilizado para coletar, armazenar, expor, transmitir ou compartilhar dados pessoais além do necessário para a finalidade autorizada.
+O Praxis não deve ser usado para coletar, armazenar, expor, transmitir ou compartilhar dados pessoais além do necessário para a finalidade autorizada.
 
 ## 9. Sistemas de terceiros
 
-O Praxis pode interagir com sistemas, ERPs, telas, fluxos e componentes de terceiros. Esses sistemas permanecem de titularidade de seus respectivos proprietários.
+O Praxis pode interagir com sistemas, ERPs, telas, fluxos e componentes de terceiros. Esses sistemas continuam sendo de propriedade de seus respectivos titulares.
 
 Este termo não concede qualquer direito sobre MV2000i, ERP hospitalar, Microsoft WebView2, AutoHotkey ou qualquer outro software, componente, biblioteca, runtime ou serviço de terceiros.
 
 ## 10. Suporte e atualizações
 
-Suporte, manutenção, atualizações, correções, melhorias, customizações e novas versões somente serão fornecidos se previstos em contrato, proposta comercial, ordem de serviço ou autorização específica.
+Suporte, manutenção, atualizações, correções, melhorias, customizações e novas versões somente serão fornecidos se estiverem previstos em contrato, proposta comercial, ordem de serviço ou autorização específica.
 
-A concessão de uma licença não obriga o Licenciante a fornecer suporte contínuo, novas funcionalidades, compatibilidade permanente ou adaptação a mudanças de sistemas de terceiros.
+A concessão de uma licença não obriga o licenciante a fornecer suporte contínuo, novas funcionalidades, compatibilidade permanente ou adaptação a mudanças em sistemas de terceiros.
 
 ## 11. Auditoria e verificação
 
-O Licenciante poderá solicitar informações razoáveis para verificar o cumprimento deste termo, incluindo identificação de máquinas autorizadas, usuários autorizados, versões utilizadas e ambiente de execução, respeitados os limites legais, contratuais e de proteção de dados.
+O licenciante pode solicitar informações razoáveis para verificar o cumprimento deste termo, incluindo identificação de máquinas autorizadas, usuários autorizados, versões utilizadas e ambiente de execução, respeitados os limites legais, contratuais e de proteção de dados.
 
 ## 12. Suspensão e encerramento
 
-O descumprimento deste termo poderá resultar na suspensão ou revogação da licença, sem prejuízo de medidas contratuais, extrajudiciais ou judiciais cabíveis.
+O descumprimento deste termo pode resultar na suspensão ou revogação da licença, sem prejuízo de medidas contratuais, extrajudiciais ou judiciais cabíveis.
 
-Encerrada a licença, o Licenciado deverá cessar imediatamente o uso do Praxis e remover cópias, builds, versões antigas, arquivos auxiliares e documentação técnica, salvo obrigação legal de retenção ou autorização escrita em sentido contrário.
+Encerrada a licença, o licenciado deve cessar imediatamente o uso do Praxis e remover cópias, builds, versões antigas, arquivos auxiliares e documentação técnica, salvo obrigação legal de retenção ou autorização escrita em sentido contrário.
 
 ## 13. Isenção de garantias
 
-O software é fornecido no estado em que se encontra, sem garantias expressas ou implícitas de funcionamento ininterrupto, ausência de erros, compatibilidade com sistemas de terceiros, adequação a finalidade específica ou atendimento a processos internos do Licenciado.
+O software é fornecido no estado em que se encontra, sem garantias expressas ou implícitas de funcionamento ininterrupto, ausência de erros, compatibilidade com sistemas de terceiros, adequação à finalidade específica ou atendimento a processos internos do licenciado.
 
 ## 14. Limitação de responsabilidade
 
-O Licenciante não será responsável por danos decorrentes de uso indevido, uso não autorizado, alteração por terceiros, falhas de sistemas externos, dados incorretos, indisponibilidade do ERP, descumprimento de normas internas, falhas operacionais, perda de dados, interrupção de atividades ou violação de legislação pelo Licenciado.
+O licenciante não será responsável por danos decorrentes de uso indevido, uso não autorizado, alteração por terceiros, falhas de sistemas externos, dados incorretos, indisponibilidade do ERP, descumprimento de normas internas, falhas operacionais, perda de dados, interrupção de atividades ou violação de legislação pelo licenciado.
 
 ## 15. Disposições finais
 
 Este termo complementa o `LICENSE`, `COPYRIGHT`, `NOTICE.md`, `NDA.md`, `PRIVACY_LGPD.md` e demais instrumentos aplicáveis.
 
-Qualquer autorização, exceção, ampliação de escopo ou transferência de direitos deverá ser feita por escrito.
+Qualquer autorização, exceção, ampliação de escopo ou transferência de direitos deve ser formalizada por escrito.
 
 ## 16. Foro e legislação aplicável
 
-Este termo será regido pelas leis brasileiras. O foro competente deverá ser definido em contrato próprio ou preenchido pelas partes: [FORO/UF].
+Este termo será regido pelas leis brasileiras. O foro competente deve ser definido em contrato próprio ou preenchido pelas partes: [FORO/UF].
 
 ---
 
@@ -119,3 +119,4 @@ Licenciante: _______________________________________
 Licenciado: _______________________________________
 
 Data: ____/____/________
+

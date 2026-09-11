@@ -1,10 +1,14 @@
 # Praxis
 
-Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão Hospitalar)**. Desenvolvido em AutoHotkey v2 com interface gráfica WebView2 (HTML/CSS/JS).
+Automação para processos de faturamento hospitalar no sistema **MV2000i (Gestão Hospitalar)**. O projeto foi desenvolvido em AutoHotkey v2 e usa uma interface desktop em WebView2 com HTML, CSS e JavaScript.
 
 > Hospital: São Rafael · Desenvolvedor: Iago Santana
 
 ---
+
+## Visão geral
+
+O Praxis automatiza etapas recorrentes do fluxo faturamento hospitalar, com foco em leitura de telas, interação com o MV2000i e geração de documentos e arquivos XML. A solução combina automação de teclado, OCR local, manipulação de janelas e uma interface leve para acompanhar o processo em execução.
 
 ## Tecnologias
 
@@ -12,39 +16,41 @@ Automação de processos de faturamento hospitalar no sistema **MV2000i (Gestão
 |---|---|
 | Shell da janela | AutoHotkey v2 (`Gui`) |
 | Interface UI | WebView2 (Chromium) + HTML/CSS/JS puro |
-| Comunicação JS↔AHK | `PostWebMessageAsJson` / `window.chrome.webview.postMessage` |
-| Automação do MV | AutoHotkey v2 — Send, ControlClick, OCR local + Clipboard |
+| Comunicação JS ↔ AHK | `PostWebMessageAsJson` / `window.chrome.webview.postMessage` |
+| Automação do MV | AutoHotkey v2 — `Send`, `ControlClick`, OCR local e clipboard |
 | Configuração | Caminhos fixos em `Documentos` |
 
-**Dependências para desenvolvimento:**
+Dependências de desenvolvimento:
+
 - AutoHotkey v2 → [autohotkey.com](https://autohotkey.com)
-- Ahk2Exe → ferramenta de build disponível no ambiente de desenvolvimento
-- WebView2 Runtime → necessário para executar a interface WebView2
+- Ahk2Exe → ferramenta usada para compilar o executável
+- WebView2 Runtime → necessário para executar a interface em desktop
 
 ---
 
-## Build e Distribuição
+## Build e distribuição
 
-O build E2E é feito por `tools/build-praxis.ps1`. Os comandos mais comuns:
+O build completo é executado por `tools/build-praxis.ps1`. Os comandos mais usados são estes:
 
-| Comando | Saída |
+| Comando | Resultado |
 |---|---|
-| `tools\build-praxis.ps1 -Version X.Y.Z` | EXE + distribuição portátil + ZIP |
-| `tools\build-praxis.ps1 -Version X.Y.Z -Release` | Build portátil com assinatura e compressão |
+| `tools\build-praxis.ps1 -Version X.Y.Z` | gera EXE, pasta portátil e ZIP |
+| `tools\build-praxis.ps1 -Version X.Y.Z -Release` | build com assinatura e compressão |
 
-Saídas geradas:
-- `dist\Praxis-<ver>\stage\Praxis.exe` — EXE compilado (sem .ahk)
+Artefatos gerados:
+
+- `dist\Praxis-<ver>\stage\Praxis.exe` — executável compilado sem arquivos `.ahk`
 - `dist\Praxis-<ver>\distribution\` — pasta portátil
-- `dist\Praxis-<ver>\Praxis-Portable-<ver>.zip` — ZIP portátil pronto para uso
-- `dist\Praxis-<ver>\Praxis-build-manifest.json` — SHA256 de cada artefato
+- `dist\Praxis-<ver>\Praxis-Portable-<ver>.zip` — pacote pronto para uso
+- `dist\Praxis-<ver>\Praxis-build-manifest.json` — hashes SHA256 dos artefatos
 
-Validação de integridade em runtime: `Praxis.exe --integrity-check` (exit 0 = OK, 70 = recurso ausente/alterado).
+A validação de integridade em runtime é feita com `Praxis.exe --integrity-check`. O retorno `0` indica integridade válida, e `70` indica que algum recurso está ausente ou alterado.
 
-### Release automático (rolling)
+### Release automático
 
-A cada push em `main`, o GitHub Actions (`.github/workflows/release.yml`) builda, zipla e publica/atualiza o **GitHub Release** com tag `continuous` (Latest), contendo `Praxis-Portable-<ver>.zip` + `SHA256SUMS.txt`.
+A cada push na branch `main`, o GitHub Actions em `.github/workflows/release.yml` compila o projeto, gera o ZIP e publica ou atualiza o release no GitHub com tag `continuous` (Latest), incluindo `Praxis-Portable-<ver>.zip` e `SHA256SUMS.txt`.
 
-Publicação manual local (com `gh auth login`):
+Publicação manual local, após `gh auth login`:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
@@ -52,106 +58,107 @@ powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
 
 ---
 
-## Estrutura de Arquivos
+## Estrutura de arquivos
 
-```
+```text
 Praxis/
-├── main.ahk                       # Entry point: shell mínimo com App_Run()
-├── cli-check.ahk                  # CLI para --integrity-check (sem GUI)
-├── lib/                           # TODO o código de script (AHK v2)
-│   ├── app/                       # Estado e bootstrap da aplicação
-│   │   ├── App.ahk                # App_Run() e shell WebView2
-│   │   ├── AppState.ahk           # Estado global da aplicação
-│   │   ├── Dispatcher.ahk         # Bridge AHK ↔ JS (SendToUI)
-│   │   └── ScriptRegistry.ahk     # Registry dos 3 módulos de faturamento
-│   ├── config/                    # Configuração, segredos e caminhos
-│   │   ├── Secrets.ahk            # DPAPI: API key (cache Map())
-│   │   └── Paths.ahk              # Documentos, logs e XMLs (cache Map())
+├── main.ahk                          # ponto de entrada com shell mínimo e App_Run()
+├── cli-check.ahk                     # CLI para --integrity-check sem interface gráfica
+├── lib/                              # código principal em AHK v2
+│   ├── app/                          # estado e bootstrap da aplicação
+│   │   ├── App.ahk                   # App_Run() e shell WebView2
+│   │   ├── AppState.ahk              # estado global da aplicação
+│   │   ├── Dispatcher.ahk            # ponte AHK ↔ JS (SendToUI)
+│   │   └── ScriptRegistry.ahk        # registro dos módulos de faturamento
+│   ├── config/                       # configuração e caminhos
+│   │   ├── Secrets.ahk               # DPAPI: API key em cache Map()
+│   │   └── Paths.ahk                 # documentos, logs e XMLs em cache Map()
 │   ├── ui/
-│   │   ├── index.html             # Interface WebView2 completa
-│   │   ├── UiBridge.ahk           # Ponte WebView2 → AHK (window.chrome.webview)
-│   │   └── UiLog.ahk              # Notify/Progress/Done para a UI
-│   ├── vendor/                    # Bibliotecas externas (distribuídas)
-│   │   ├── WebView2.ahk           # Wrapper WebView2 para AHK v2
-│   │   ├── ComVar.ahk             # Variante COM helper (deps WebView2)
-│   │   ├── JSON.ahk               # JSON parse/stringify
-│   │   ├── Promise.ahk            # Promise/await para AHK v2
-│   │   ├── 32bit/WebView2Loader.dll   # WebView2 loader (32-bit)
-│   │   └── 64bit/WebView2Loader.dll   # WebView2 loader (64-bit)
-│   ├── globals/                   # Módulos globais compartilhados
-│   │   ├── mv/                    # Automação MV2000i — screen/component/action
-│   │   │   ├── MVConstants.ahk        # Constantes de janelas, timeouts, paths MV
-│   │   │   ├── MVSession.ahk          # Login e contexto de sessão MV
-│   │   │   ├── MVWindows.ahk          # Helpers de janela MV
-│   │   │   ├── FFCV_ErrorTemplates.ahk # Cadastro de erros FFCV via OCR
-│   │   │   ├── FFCV_ErrorReferences.json # Referências SHA256 dos erros OCR
-│   │   │   ├── screens/              # Telas: Login, MovDoc, FFCV, XML, Popup
-│   │   │   ├── components/           # Componentes
-│   │   │   └── actions/              # Ações: OpenScreens, CloseScreen, etc.
-│   │   └── shared/                  # Utilitários compartilhados
+│   │   ├── index.html                # interface WebView2
+│   │   ├── UiBridge.ahk              # ponte WebView2 → AHK (window.chrome.webview)
+│   │   └── UiLog.ahk                 # notificações, progresso e conclusão para a UI
+│   ├── vendor/                       # bibliotecas externas e runtime distribuído
+│   │   ├── WebView2.ahk              # wrapper WebView2 para AHK v2
+│   │   ├── ComVar.ahk                # helper COM para WebView2
+│   │   ├── JSON.ahk                  # parse/stringify JSON
+│   │   ├── Promise.ahk               # promise/await para AHK v2
+│   │   ├── 32bit/WebView2Loader.dll  # loader WebView2 32-bit
+│   │   └── 64bit/WebView2Loader.dll  # loader WebView2 64-bit
+│   ├── globals/                      # módulos compartilhados
+│   │   ├── mv/                       # automação MV2000i — telas, componentes e ações
+│   │   │   ├── MVConstants.ahk       # janelas, timeouts e caminhos do MV
+│   │   │   ├── MVSession.ahk         # login e contexto de sessão
+│   │   │   ├── MVWindows.ahk         # helpers de janela
+│   │   │   ├── FFCV_ErrorTemplates.ahk # template de erros FFCV via OCR
+│   │   │   ├── FFCV_ErrorReferences.json # referências SHA256 dos erros OCR
+│   │   │   ├── screens/             # telas: Login, MovDoc, FFCV, XML e popup
+│   │   │   ├── components/          # componentes do MV
+│   │   │   └── actions/             # ações gerais da automação
+│   │   └── shared/                  # utilitários compartilhados
 │   │       ├── DateUtils.ahk
 │   │       ├── StringUtils.ahk
 │   │       └── Validation.ahk
-│   └── modules/                  # Scripts por módulo de faturamento
-│       ├── remessa_protocolo/    # Download de protocolos MOV DOC → FFCV
-│       ├── protocolar/           # Protocolação de contas
-│       └── fechar_xml/           # Fechamento e geração TISS XML
-├── assets/                       # Recursos externos do aplicativo
-│   └── icon.ico                  # Ícone usado pelo EXE e pela UI
-├── tools/                        # Scripts de build
-│   ├── build-praxis.ps1          # Build E2E da distribuição portátil
-│   ├── build-ocr-error-references.ps1 # Regenera FFCV_ErrorReferences.json
-│   ├── find-top-level-calls.ps1   # Sanity check anti double-execution (wired into build)
-│   └── ocr-probe.ps1             # Prova OCR contra MV (debug)
-└── README.md, LICENSE, COPYRIGHT, NOTICE.md   # Documentação e termos legais
+│   └── modules/                      # módulos por funcionalidade
+│       ├── remessa_protocolo/       # download de protocolos MOV DOC → FFCV
+│       ├── protocolar/              # protocolação de contas
+│       └── fechar_xml/              # fechamento e geração de XML TISS
+├── assets/                          # recursos do aplicativo
+│   └── icon.ico                     # ícone usado por EXE e UI
+├── tools/                           # scripts de build e suporte
+│   ├── build-praxis.ps1             # build completo da distribuição
+│   ├── build-ocr-error-references.ps1 # gera FFCV_ErrorReferences.json
+│   ├── find-top-level-calls.ps1     # checagem anti execução duplicada
+│   └── ocr-probe.ps1                # prova OCR contra o MV em debug
+├── README.md, LICENSE, COPYRIGHT, NOTICE.md  # documentação e termos legais
 ```
 
-Arquivos gerados em build (NÃO versionados, em `.gitignore`):
+Arquivos gerados durante o build e que não ficam versionados em `.gitignore`:
+
 - `build/generated/Praxis_IntegrityManifest.ahk` — hash de todos os artefatos
-- `build/generated/Praxis_Ui.ahk` — `ui/index.html` em Base64 (embarcado no EXE)
+- `build/generated/Praxis_Ui.ahk` — `ui/index.html` codificado em Base64 e embutido no EXE
 - `build/generated/Praxis_OcrReferences.ahk` — `FFCV_ErrorReferences.json` em Base64
 - `build/generated/Praxis_OcrProbe.ahk` — `ocr-probe.ps1` em Base64
 - `dist/Praxis-<ver>/` — pasta de release portátil
 
 ---
 
-## Scripts Disponíveis
+## Módulos disponíveis
 
-### 1. Remessa por Protocolo (principal)
-**Categoria:** Faturamento
+### 1. Remessa por protocolo (principal)
+**Categoria:** faturamento
 
-Baixa protocolos no MOV DOC e cria/atualiza remessa no FFCV.
+Esse fluxo baixa protocolos no MOV DOC e cria ou atualiza a remessa no FFCV.
 
 | Parâmetro | Tipo | Obrigatório |
 |---|---|---|
-| Protocolos | text | Sim |
-| Tipo de Conta | select | Sim |
-| Remessa Existente | text | Não |
-| Data de Entrega | date | Não |
-| Data de Vencimento | date | Não |
+| Protocolos | texto | Sim |
+| Tipo de Conta | seleção | Sim |
+| Remessa Existente | texto | Não |
+| Data de Entrega | data | Não |
+| Data de Vencimento | data | Não |
 
 ### 2. Protocolar
-**Categoria:** Movimentação · Stub — fluxo pendente de detalhamento
+**Categoria:** movimentação · fluxo em desenvolvimento
 
-### 3. Fechar e Gerar XML
-**Categoria:** Faturamento · Stub — fluxo pendente de detalhamento
-
----
-
-## Instalação (Desenvolvimento)
-
-1. Clonar ou copiar a pasta `Praxis/` para qualquer diretório
-2. Duplo clique em `main.ahk` ou execute o EXE compilado
-3. Os logs serão gravados em `%USERPROFILE%\Documents\Praxis`
-4. Os XMLs serão gravados em `%USERPROFILE%\Documents\XML`
-
-> **Nota:** As bibliotecas externas (p.ex. `lib/vendor/WebView2.ahk`) já estão incluídas no repositório — não é necessário baixá-las manualmente.
+### 3. Fechar e gerar XML
+**Categoria:** faturamento · fluxo em desenvolvimento
 
 ---
 
-## Execução (Produção)
+## Instalação para desenvolvimento
 
-O pacote de produção é portátil: extraia `Praxis-Portable-<versão>.zip` em qualquer diretório e execute `Praxis.exe`. O pacote não instala arquivos, não cria atalhos e não depende de Inno Setup.
+1. Clone ou copie a pasta `Praxis/` para qualquer diretório local.
+2. Abra `main.ahk` ou execute o executável compilado.
+3. Os logs ficam em `%USERPROFILE%\Documents\Praxis`.
+4. Os XMLs são gravados em `%USERPROFILE%\Documents\XML`.
+
+> As bibliotecas externas, como `lib/vendor/WebView2.ahk`, já vêm no repositório. Não é preciso baixá-las manualmente.
+
+---
+
+## Execução em produção
+
+O pacote de produção é portátil. Basta extrair `Praxis-Portable-<versão>.zip` em qualquer pasta e executar `Praxis.exe`. Ele não instala arquivos no sistema, não cria atalhos e não depende de Inno Setup.
 
 Os logs ficam em `%USERPROFILE%\Documents\Praxis`. A planilha de envio fica em `%USERPROFILE%\Documents\Envio.CSV`. Os XMLs TISS são gravados em `%USERPROFILE%\Documents\XML`. O WebView2 Runtime continua sendo um pré-requisito do Windows para a interface.
 
@@ -159,46 +166,49 @@ Os logs ficam em `%USERPROFILE%\Documents\Praxis`. A planilha de envio fica em `
 
 ## Interface
 
-- **Janela:** 750×540px (redimensionável, mínimo 640×460)
-- **App:** sidebar com módulos por categoria + formulário dinâmico + log + barra de progresso
-- **Comunicação:** bidirecional AHK↔JS via WebView2
+- **Janela:** 750 × 540 px, redimensionável, com mínimo de 640 × 460
+- **Aplicativo:** sidebar por categoria, formulário dinâmico, log e barra de progresso
+- **Comunicação:** bidirecional AHK ↔ JS via WebView2
 
 ---
 
-## Notas Técnicas — Oracle Forms 6i
+## Notas técnicas — Oracle Forms 6i
 
 O MV2000i roda sobre **Oracle Forms 6i (`ifrun60.EXE`)**.
 
 ### Funciona bem
+
 - `WinExist`, `WinActivate`, `WinWaitActive`
 - `ControlClick` com **ClassNN**
-- `Send` (teclado: F7, F8, F10, Tab, Enter, setas)
+- `Send` para teclado: F7, F8, F10, Tab, Enter e setas
 - `WinGetText` em popups modais
 - OCR local do Windows (`Windows.Media.Ocr`) na área client dos popups de erro
 
-### Não confiável sozinho
-- `ControlSetText`/`ControlGetText` para campos de texto do Forms
-- Window Spy para identificar campos por ClassNN único (muitos campos compartilham `Edit2`, etc.)
-- Coordenadas de tela (variam por monitor, resolução, escala)
+### Não é confiável sozinho
+
+- `ControlSetText` e `ControlGetText` para campos de texto do Forms
+- o uso de Window Spy para identificar campos por ClassNN único, já que vários controles compartilham nomes como `Edit2`
+- coordenadas de tela, porque variam conforme monitor, resolução e escala
 
 ### Estratégia para campos de texto
-1. **Teclado** como caminho principal (SendText, Tab, Enter, F6/F7/F8/F10)
-2. **HWND por ClassNN + coordenada Client** como fallback
-3. **Clipboard** para leitura: double-click → `Ctrl+C`
 
-### D006 — Exceção lib/vendor/ no .gitignore
+1. **Teclado** como caminho principal: `SendText`, `Tab`, `Enter`, `F6`, `F7`, `F8`, `F10`
+2. **HWND por ClassNN + coordenada client** como fallback
+3. **Clipboard** para leitura: clique duplo e `Ctrl+C`
 
-A pasta `lib/vendor/` é **distribuída** no pacote de produção (contém `WebView2.ahk`, necessária em runtime). O `.gitignore` padrão ignora `vendor/` por convenção upstream; por isso, as negações explícitas `!lib/vendor/32bit/` e `!lib/vendor/64bit/` garantem que as DLLs WebView2Loader sejam rastreadas e incluídas no pacote portátil, sem serem silenciadas por padrões genéricos upstream.
+### D006 — exceção do `lib/vendor/` no `.gitignore`
+
+A pasta `lib/vendor/` é distribuída no pacote de produção porque contém `WebView2.ahk`, essencial em runtime. O `.gitignore` padrão ignora `vendor/` por convenção upstream, então os blocos `!lib/vendor/32bit/` e `!lib/vendor/64bit/` garantem que as DLLs `WebView2Loader` continuem sendo rastreadas e incluídas no pacote portátil, sem serem mascaradas por padrões genéricos.
 
 ---
 
-## Padrões do Projeto
+## Padrões do projeto
 
 ```autohotkey
-; Polling (em vez de Sleep fixo)
+; polling em vez de Sleep fixo
 MV_Poll(condFn, timeoutSecs)
 
-; Leitura de campo via clipboard
+; leitura de campo via clipboard
 MV_CopyFocusedText(timeoutMs := 600, extrairNumero := false)
-
 ```
+

@@ -1,14 +1,14 @@
-# Política Operacional de Privacidade, Segurança e LGPD — Praxis
+# Política operacional de privacidade, segurança e LGPD — Praxis
 
 > Modelo operacional. Este documento deve ser revisado por advogado ou responsável de privacidade antes de uso contratual real.
 
 ## 1. Finalidade
 
-Esta política orienta o uso, desenvolvimento, teste, suporte, debug e distribuição do software **Praxis** em ambientes que possam envolver dados pessoais, dados sensíveis, credenciais, informações hospitalares, XMLs, protocolos, contas, guias, prints, logs e evidências operacionais.
+Esta política orienta o uso, o desenvolvimento, os testes, o suporte, o debug e a distribuição do software **Praxis** em ambientes que possam envolver dados pessoais, dados sensíveis, credenciais, informações hospitalares, XMLs, protocolos, contas, guias, prints, logs e evidências operacionais.
 
 ## 2. Princípios
 
-O Praxis deve ser utilizado com observância aos seguintes princípios:
+O uso do Praxis deve observar os seguintes princípios:
 
 - minimização de dados;
 - necessidade;
@@ -28,22 +28,22 @@ O Praxis deve ser utilizado com observância aos seguintes princípios:
 - logs e dumps;
 - prints de sistemas hospitalares com dados reais;
 - nomes de pacientes, CPF, cartão SUS, convênios, matrículas ou identificadores;
-- XMLs reais, guias, contas, protocolos ou relatórios contendo dados reais;
+- XMLs reais, guias, contas, protocolos ou relatórios com dados reais;
 - imagens de debug com informação sensível;
 - dados de usuários internos, operadores, médicos, prestadores ou setores;
 - caminhos de rede, servidores, bases, endpoints ou informações de infraestrutura sensível.
 
 ## 4. Logs
 
-Logs devem ser mínimos e técnicos. Sempre que possível, devem registrar apenas:
+Os logs devem ser mínimos e técnicos. Sempre que possível, eles devem registrar apenas:
 
-- data/hora;
+- data e hora;
 - etapa executada;
 - status da operação;
 - código técnico não sensível;
 - mensagens de erro sem dados pessoais.
 
-Evite logs contendo:
+Evite registros com:
 
 - nome de paciente;
 - documentos;
@@ -51,14 +51,14 @@ Evite logs contendo:
 - senhas;
 - usuário e senha do ERP;
 - XML completo;
-- número de guia ou conta quando permitir identificação indevida;
+- número de guia ou conta quando a identificação for indevida;
 - prints automáticos com dados reais.
 
 ## 5. Prints e imagens de debug
 
 Imagens de debug devem ser tratadas como informação confidencial.
 
-Antes de compartilhar, versionar ou usar imagens em documentação:
+Antes de compartilhar, versionar ou usar qualquer imagem em documentação:
 
 - oculte dados pessoais;
 - oculte dados de pacientes;
@@ -71,7 +71,7 @@ A pasta `Imagens_Debug/` deve permanecer fora do versionamento sempre que contiv
 
 ## 6. Credenciais
 
-Credenciais não devem ser armazenadas em texto puro. Quando necessário, devem ser protegidas por mecanismos locais seguros, como DPAPI do Windows ou solução equivalente aprovada.
+Credenciais não devem ser armazenadas em texto puro. Quando necessário, elas devem ser protegidas por mecanismos locais seguros, como DPAPI do Windows ou solução equivalente aprovada.
 
 Credenciais não devem aparecer em:
 
@@ -97,7 +97,7 @@ Nunca envie dados reais de pacientes, credenciais, telas internas sensíveis ou 
 
 ## 9. Incidentes
 
-Qualquer perda, vazamento, compartilhamento indevido, acesso não autorizado ou exposição acidental de dados, código, credenciais, logs ou prints deve ser comunicado imediatamente ao responsável pelo projeto e, quando aplicável, ao responsável de segurança/privacidade do ambiente afetado.
+Qualquer perda, vazamento, compartilhamento indevido, acesso não autorizado ou exposição acidental de dados, código, credenciais, logs ou prints deve ser comunicado imediatamente ao responsável pelo projeto e, quando aplicável, ao responsável de segurança e privacidade do ambiente afetado.
 
 ## 10. Responsabilidades
 
