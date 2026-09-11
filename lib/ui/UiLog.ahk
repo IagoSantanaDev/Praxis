@@ -7,8 +7,6 @@
 #Warn All, OutputDebug
 #Include %A_LineFile%\..\UiBridge.ahk
 
-; ─── Notificacoes visuais (log / progress / done) ─────────────
-
 ; ─── Logging MV ─────────────────────────────────────────────
 ; Mantém a API usada pelos módulos MV, mas encaminha para o logger
 ; canônico do Dispatcher em vez de descartar diagnósticos.
@@ -18,10 +16,6 @@ Log_Info(msg) {
 
 Log_Warn(msg) {
     DispatchLog("warn", "mv_log", Map("message", String(msg)))
-}
-
-Log_Error(msg) {
-    DispatchLog("error", "mv_log", Map("message", String(msg)))
 }
 
 ; ─── Notificacoes visuais (log / progress / done) ─────────────

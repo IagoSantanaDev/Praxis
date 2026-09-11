@@ -467,7 +467,7 @@ Ffcv_ConfirmarEntregaRemessa(dataEntrega, dataVenc) {
 
 
 
-; ── Shared helpers (also used by RemessaProtocolo) ────────────
+; ── Shared helpers ───────────────────────────────────────────
 
 /*
 _ClickNaoModal()

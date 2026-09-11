@@ -199,6 +199,6 @@ A pasta `lib/vendor/` é **distribuída** no pacote de produção (contém `WebV
 MV_Poll(condFn, timeoutSecs)
 
 ; Leitura de campo via clipboard
-MV_ReadAt(winTitle, cx, cy)
+MV_CopyFocusedText(timeoutMs := 600, extrairNumero := false)
 
 ```

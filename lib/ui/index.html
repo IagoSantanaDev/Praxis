@@ -567,8 +567,10 @@ function devSim(data) {
           { id:'tipo_conta',     label:'Tipo de Conta',        tipo:'select',obrigatorio:true,
             opcoes:['Internamento','Ambulatório','Emergência'] },
           { id:'num_remessa',    label:'Remessa Existente',    tipo:'text',  obrigatorio:false, hint:'Deixe vazio para criar nova' },
-          { id:'data_entrega',   label:'Data de Entrega',      tipo:'date',  obrigatorio:false },
-          { id:'data_vencimento',label:'Data de Vencimento',   tipo:'date',  obrigatorio:false }
+          { id:'data_entrega',   label:'Data de Entrega',      tipo:'date',  obrigatorio:false, format:'yyyy-MM-dd' },
+          { id:'data_vencimento',label:'Data de Vencimento',   tipo:'date',  obrigatorio:false, format:'yyyy-MM-dd' },
+          { id:'imprimir_apos_inserir', label:'Imprimir após inserir', tipo:'checkbox', obrigatorio:false, padrao:true },
+          { id:'um_protocolo_uma_remessa', label:'Um Protocolo = Uma Remessa', tipo:'checkbox', obrigatorio:false, padrao:false }
         ]
       },
       { id:'protocolar', nome:'Protocolar', categoria:'Movimentação',
@@ -576,15 +578,21 @@ function devSim(data) {
         params:[
           { id:'remessas',    label:'Número das Remessas', tipo:'text', obrigatorio:true,  hint:'Ex: 511458, 514015' },
           { id:'setor_atual', label:'Setor Atual',         tipo:'text', obrigatorio:true,  hint:'Ex: 34' },
-          { id:'setor_envio', label:'Setor de Envio',      tipo:'text', obrigatorio:true,  hint:'Ex: 365' }
+          { id:'setor_envio', label:'Setor de Envio',      tipo:'text', obrigatorio:true,  hint:'Ex: 365' },
+          { id:'tipo',        label:'Tipo de Atendimento', tipo:'select', obrigatorio:true,
+            opcoes:['Ambulatorial','Internamento'] },
+          { id:'finalizar_envio', label:'Imprimir/Salvar Envio', tipo:'checkbox', obrigatorio:false, padrao:true },
+          { id:'uma_remessa_um_protocolo', label:'Uma Remessa = Um Protocolo', tipo:'checkbox', obrigatorio:false, padrao:false }
         ]
       },
       { id:'fechar_xml', nome:'Fechar e Gerar XML', categoria:'Faturamento',
         descricao:'Fecha remessas e gera arquivo XML',
         params:[
           { id:'remessas',       label:'Número das Remessas', tipo:'text', obrigatorio:true, hint:'Ex: 511458, 514015' },
-          { id:'data_entrega',   label:'Data de Entrega',     tipo:'date', obrigatorio:true },
-          { id:'data_vencimento',label:'Data de Vencimento',  tipo:'date', obrigatorio:true }
+          { id:'data_entrega',   label:'Data de Pagamento',    tipo:'date', obrigatorio:false, format:'yyyy-MM-dd' },
+          { id:'data_vencimento',label:'Data de Vencimento',  tipo:'date', obrigatorio:false, format:'yyyy-MM-dd' },
+          { id:'fechar',         label:'Fechar Remessa',       tipo:'checkbox', obrigatorio:false, padrao:true },
+          { id:'gerar_xml',      label:'Gerar XML',            tipo:'checkbox', obrigatorio:false, padrao:true }
         ]
       }
     ]

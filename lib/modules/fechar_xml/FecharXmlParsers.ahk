@@ -23,7 +23,7 @@
     Parseia resultado bruto da operação de salvar XML do TissXmlScreen.
 */
 FXML_ParseXmlSaveResult(raw) {
-    ; TODO: implementar parse real quando TissXmlScreen gain logic
+    ; Placeholder mantido até a fatia S05 definir o payload bruto do TissXmlScreen.
     return Map(
         "success", false,
         "xmlPath", "",
@@ -36,7 +36,7 @@ FXML_ParseXmlSaveResult(raw) {
     Parseia resultado bruto da confirmação de entrega na FfcvScreen.
 */
 FXML_ParseFfcvConfirmResult(raw) {
-    ; TODO: implementar parse real quando FfcvScreen gain more logic
+    ; Placeholder mantido até a fatia S05 definir o payload bruto do FfcvScreen.
     return Map(
         "success",   false,
         "remessaId", "",
