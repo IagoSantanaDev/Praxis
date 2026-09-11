@@ -18,17 +18,24 @@ IDENTIFIER_REGEX := "^[a-z0-9_/-]+$"
 GetLogPath() {
     global gWorkDir
 
-    if IsSet(gWorkDir) && Trim(gWorkDir) != "" {
+    candidates := []
+    if IsSet(gWorkDir) && Trim(gWorkDir) != ""
+        candidates.Push(gWorkDir)
+    candidates.Push(A_LocalAppData "\Praxis")
+    candidates.Push(A_Temp "\Praxis")
+    candidates.Push(A_ScriptDir)
+
+    for path in candidates {
         try {
-            if !DirExist(gWorkDir)
-                DirCreate gWorkDir
-            return gWorkDir . "\praxis.log"
+            if !DirExist(path)
+                DirCreate path
+            return path . "\praxis.log"
         } catch as e {
             OutputDebug "[Dispatcher] GetLogPath fallback: " . e.Message
         }
     }
 
-    return A_ScriptDir . "\praxis.log"
+    return A_Temp "\praxis.log"
 }
 
 DispatchLog(level, message, extra?) {

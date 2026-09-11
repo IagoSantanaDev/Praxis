@@ -13,12 +13,19 @@
 ;   #Include *i build\generated\Praxis_IntegrityManifest.ahk  (reatribui o Map com hashes reais)
 
 LogWrite(msg) {
-    logDir := A_MyDocuments "\Praxis"
-    if !DirExist(logDir)
-        DirCreate logDir
+    candidates := [A_MyDocuments "\Praxis", A_LocalAppData "\Praxis", A_Temp "\Praxis"]
+    for logDir in candidates {
+        try {
+            if !DirExist(logDir)
+                DirCreate logDir
+            FileAppend msg "`n", logDir "\praxis-integrity.log"
+            return true
+        } catch as e {
+            OutputDebug "[Integrity] LogWrite fallback: " . e.Message
+        }
+    }
 
-    logPath := logDir "\praxis-integrity.log"
-    FileAppend msg "`n", logPath
+    return false
 }
 
 IntegrityDoCheck() {

@@ -53,8 +53,14 @@ App_Run() {
     if !IsSet(gRoot) || Trim(gRoot) = ""
         throw Error("gRoot nao inicializado. Verifique main.ahk antes de App_Run().")
 
-    ; Inicializa o diretório fixo de logs em Documentos\Praxis.
-    gWorkDir := Config_GetPath("WorkDir")
+    try {
+        gWorkDir := Config_GetPath("WorkDir")
+    } catch as e {
+        gWorkDir := A_LocalAppData "\Praxis"
+        try DirCreate gWorkDir
+        catch as fallbackError
+            OutputDebug "[App] Diretorio de trabalho indisponivel: " . fallbackError.Message
+    }
 
     webViewLoader := gRoot "\lib\vendor\" (A_PtrSize * 8) "bit\WebView2Loader.dll"
     if !FileExist(webViewLoader)
@@ -213,7 +219,6 @@ CleanupApp() {
     } catch as e {
         OutputDebug "[App] CleanupApp falhou: " . e.Message
     } finally {
-        TerminatePraxisAhkProcesses()
         ClearAppStop()
         gExitAfterStop := false
         gExitDeadline  := 0
@@ -222,41 +227,6 @@ CleanupApp() {
     }
 }
 
-; Encerra somente processos AutoHotkey que estejam executando um .ahk
-; localizado dentro da raiz desta instalação/desenvolvimento do Praxis.
-; O processo atual é excluído para que o chamador possa executar ExitApp
-; normalmente depois da limpeza.
-TerminatePraxisAhkProcesses() {
-    global gRoot
-
-    if !IsSet(gRoot) || Trim(gRoot) = ""
-        return
-
-    currentPid := DllCall("GetCurrentProcessId")
-    rootMarker := StrLower(StrReplace(RTrim(Trim(gRoot), "\/"), "/", "\")) . "\"
-
-    try {
-        wmi := ComObjGet("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
-        for process in wmi.ExecQuery("SELECT ProcessId, Name, CommandLine FROM Win32_Process") {
-            pid := Integer(process.ProcessId)
-            if (pid = currentPid)
-                continue
-
-            commandLine := StrLower(StrReplace(String(process.CommandLine), "/", "\"))
-            if !InStr(commandLine, rootMarker) || !InStr(commandLine, ".ahk")
-                continue
-
-            try {
-                process.Terminate()
-                OutputDebug "[App] Processo AHK do Praxis encerrado: PID " . pid
-            } catch as e {
-                OutputDebug "[App] Nao foi possivel encerrar PID " . pid . ": " . e.Message
-            }
-        }
-    } catch as e {
-        OutputDebug "[App] Falha ao enumerar processos AHK do Praxis: " . e.Message
-    }
-}
 
 SyncViewBounds() {
     global gController
