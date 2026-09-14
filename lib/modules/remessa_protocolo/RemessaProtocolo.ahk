@@ -56,6 +56,8 @@ RunRemessaProtocolo(params) {
 
     if (protocolos.Length = 0)
         return MV_Abort("Informe ao menos um protocolo.")
+    if (umProtocoloUmaRemessa && numRemessa != "")
+        return MV_Abort("No fluxo 'Um Protocolo = Uma Remessa' a remessa existente deve ficar vazia.")
 
     linhas := [], erros := [], timings := [], mapeamentoRemessas := []
     totalStart := stageStart := A_TickCount
@@ -105,11 +107,14 @@ RunRemessaProtocolo(params) {
                 if !Ffcv_PrepararEntregaPorProtocolo()
                     return MV_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
 
-                resEntrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true)
+                resEntrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true, false)
                 if !resEntrega["ok"]
                     return MV_Abort(resEntrega["erro"])
 
                 criadaRemessa := resEntrega["remessa"]
+                Notify("Abrindo relatório apenas para OCR da remessa " criadaRemessa " e fechando a tela.")
+                if !Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa)
+                    return MV_Abort("Nao foi possivel abrir o relatorio para OCR da remessa " criadaRemessa ".")
                 if !Ffcv_SairTelaEntregaPendente()
                     return MV_Abort("A tela Entrega de Remessas nao fechou apos o protocolo.")
 

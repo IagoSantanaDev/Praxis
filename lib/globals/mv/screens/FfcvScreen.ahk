@@ -299,7 +299,7 @@ Ffcv_CloseEntregaWindow() {
     return true
 }
 
-Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false) {
+Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false, imprimirRelatorio := true) {
     datas := Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto)
     if !datas["ok"]
         return datas
@@ -322,10 +322,12 @@ Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false) {
     if !MV_WaitModalGone(FFCV_FINAL_ACTION_TIMEOUT_MS)
         return Map("ok", false, "erro", "Popup de confirmacao da entrega nao fechou.", "remessa", "")
 
-    try {
-        MV_PrintDeliveryReport("Impressão da remessa " datas["remessa"] " em andamento...")
-    } catch as err {
-        return Map("ok", false, "erro", err.Message, "remessa", "")
+    if imprimirRelatorio {
+        try {
+            MV_PrintDeliveryReport("Impressão da remessa " datas["remessa"] " em andamento...")
+        } catch as err {
+            return Map("ok", false, "erro", err.Message, "remessa", "")
+        }
     }
 
     return Map("ok", true, "erro", "", "remessa", datas["remessa"])
