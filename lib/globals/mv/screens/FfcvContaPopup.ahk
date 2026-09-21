@@ -193,7 +193,7 @@ FfcvContaPopup_WaitSubmitOutcome(timeoutMs, submittedConta := "") {
         if (submittedConta != "" && fieldText != submittedConta && fieldText = "") {
             if (emptySince = 0)
                 emptySince := A_TickCount
-            if (A_TickCount - emptySince >= MV_CONTA_FIELD_EMPTY_MIN_MS)
+            if (A_TickCount - emptySince >= MV_KEY_SETTLE_MS)
                 return Map("status", "ready", "erro", "", "texto", "", "report",
                     " Campo esvaziou apos " Round((A_TickCount - startTick) / 1000, 2) "s; liberado para proxima conta.\n")
         } else {
@@ -205,7 +205,7 @@ FfcvContaPopup_WaitSubmitOutcome(timeoutMs, submittedConta := "") {
             if (stableSince = 0)
                 stableSince := A_TickCount
             if (A_TickCount - startTick >= MV_CONTA_READY_MIN_MS
-                && A_TickCount - stableSince >= MV_CONTA_STABLE_MS)
+                && A_TickCount - stableSince >= MV_KEY_SETTLE_MS)
                 return Map("status", "ready", "erro", "", "texto", "", "report",
                     " Nenhum modal apos " Round((A_TickCount - startTick) / 1000, 2) "s; popup estavel para proxima conta.\n")
         } else {
@@ -213,7 +213,7 @@ FfcvContaPopup_WaitSubmitOutcome(timeoutMs, submittedConta := "") {
         }
 
         if (A_TickCount > deadline) {
-            if (stableSince != 0 && A_TickCount - stableSince >= MV_CONTA_STABLE_MS)
+            if (stableSince != 0 && A_TickCount - stableSince >= MV_KEY_SETTLE_MS)
                 return Map("status", "ready", "erro", "", "texto", "", "report",
                     " Nenhum modal apos " Round((A_TickCount - startTick) / 1000, 2) "s; popup estavel para proxima conta.\n")
             return Map("status", "timeout", "erro", "Timeout aguardando modal ou popup estavel apos Enter.", "texto", "", "report",
@@ -260,7 +260,7 @@ FfcvContaPopup_WaitStable(timeoutMs) {
         if Popup_ContaVisible() {
             if (stableSince = 0)
                 stableSince := A_TickCount
-            if (A_TickCount - stableSince >= MV_CONTA_STABLE_MS)
+            if (A_TickCount - stableSince >= MV_KEY_SETTLE_MS)
                 return Map("ok", true, "erro", "")
         } else {
             stableSince := 0

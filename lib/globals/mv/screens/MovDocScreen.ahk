@@ -57,7 +57,7 @@ MOVDOC_CHECK_RECEBIDO_Y     := 359
 
 MovDoc_AbrirTelaBaixa() {
     MV_ActivateModule(MV_WIN_MOVDOC_ANY)
-    if !MV_WaitScreenStable(MV_WIN_MOVDOC_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
+    if !MV_WaitScreenStable(MV_WIN_MOVDOC_ANY, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
         return false
 
     ; Atalho validado no macro 02: Manutenção → Protocolação → Baixa.
@@ -145,7 +145,7 @@ MovDoc_FinalizarBaixa() {
     )
 
     if (checked = 0 || checked = "") {
-        if !MV_ClickAndWait(MV_WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS,
+        if !MV_ClickBySpec(MV_WIN_MOVDOC_BAIXA, MOVDOC_CHECK_RECEBIDO_CLASS,
             MOVDOC_CHECK_RECEBIDO_X, MOVDOC_CHECK_RECEBIDO_Y, MV_TRANSITION_TIMEOUT_MS,
             (hwnd, state) => MV_ControlCheckedAt(MV_WIN_MOVDOC_BAIXA,
                 MOVDOC_CHECK_RECEBIDO_CLASS, MOVDOC_CHECK_RECEBIDO_X,

@@ -40,10 +40,9 @@
 ; ── Janelas ───────────────────────────────────────────────────
 ; MV_WIN_FFCV_ANY / MV_WIN_FFCV_REMESSA já existem em MVConstants.ahk.
 WIN_FFCV_DATAS         := "Cadastro: Faturas e Remessas"
-WIN_FFCV_DATAS_OK      := "Mensagem ao Usuário do MV 2000"
 WIN_XML                := "Monitoração de Faturamento - TISS"
 WIN_XML_PATH_FORM      := "MV2000i - Faturamento - [WIN_PRINCIPAL]"
-WIN_XML_POPUP_SIMNAO   := "Mensagem ao Usuário do MV 2000"
+; Popup Sim/Não de confirmação: MV_WIN_MENSAGEM_USUARIO (MVConstants.ahk).
 
 ; ── Controles FFCV Manutenção de Remessa ─────────────────────
 ; Manutenção de Remessa usa teclado/atalhos de propósito.
@@ -154,7 +153,7 @@ Ffcv_IsTelaTISS(hwnd) {
 
 Ffcv_AbrirManutencaoRemessa() {
     MV_ActivateModule(MV_WIN_FFCV_ANY)
-    if !MV_WaitScreenStable(MV_WIN_FFCV_ANY, MV_MODULE_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
+    if !MV_WaitScreenStable(MV_WIN_FFCV_ANY, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
         return false
 
     ; Atalho validado no macro 03: Lançamentos → Manutenção de Remessa.
@@ -306,17 +305,24 @@ Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false, im
 
     checked := MV_ControlCheckedAt(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y, 20)
     if (checked = 0) {
-        if !MV_ClickBySpec(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y)
+        if !MV_ClickBySpec(WIN_FFCV_DATAS, DATAS_CHECKBOX, DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y,
+            MV_TRANSITION_TIMEOUT_MS,
+            (hwnd, state) => MV_ControlCheckedAt(WIN_FFCV_DATAS, DATAS_CHECKBOX,
+                DATAS_CHECKBOX_X, DATAS_CHECKBOX_Y) = 1, "checkbox Fechar sem imprimir marcado")
             return Map("ok", false, "erro", "Nao consegui marcar Fechar contas sem imprimir faturas.", "remessa", "")
     } else if (checked = "") {
         return Map("ok", false, "erro", "Nao consegui ler o estado da opcao de fechamento.", "remessa", "")
     }
 
-    if !MV_ClickBySpec(WIN_FFCV_DATAS, DATAS_BTN_CONFIRMAR, DATAS_BTN_CONFIRMAR_X, DATAS_BTN_CONFIRMAR_Y)
+    ; expectedFn confere o popup de confirmação diretamente — mais preciso que
+    ; a assinatura genérica de tela, que pode não mudar em WIN_FFCV_DATAS
+    ; enquanto o popup abre por cima. Substitui o MV_Poll redundante que
+    ; havia logo depois deste clique antes de 2026-09-20.
+    if !MV_ClickBySpec(WIN_FFCV_DATAS, DATAS_BTN_CONFIRMAR, DATAS_BTN_CONFIRMAR_X, DATAS_BTN_CONFIRMAR_Y,
+        MV_TIMEOUT_ACOE * 1000,
+        (hwnd, state) => WinExist(MV_CLASS_MODAL_FORMS) != 0, "popup de confirmação da entrega")
         return Map("ok", false, "erro", "Nao consegui confirmar a entrega da remessa.", "remessa", "")
 
-    if !MV_Poll(() => WinExist(MV_CLASS_MODAL_FORMS), MV_TIMEOUT_ACOE)
-        return Map("ok", false, "erro", "Popup de confirmacao da entrega nao apareceu.", "remessa", "")
     if !_ClickNaoModal()
         return Map("ok", false, "erro", "Nao consegui responder o popup de confirmacao da entrega.", "remessa", "")
     if !MV_WaitModalGone(FFCV_FINAL_ACTION_TIMEOUT_MS)
@@ -386,11 +392,11 @@ Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto := false) {
 
 /*
 _ClickNaoModal()
-    Click "Nao" button in active modal or WIN_XML_POPUP_SIMNAO.
+    Click "Nao" button in active modal or MV_WIN_MENSAGEM_USUARIO.
 */
 _ClickNaoModal() {
-    popup := WinExist(WIN_XML_POPUP_SIMNAO)
-        ? WIN_XML_POPUP_SIMNAO
+    popup := WinExist(MV_WIN_MENSAGEM_USUARIO)
+        ? MV_WIN_MENSAGEM_USUARIO
         : Dialog_ActiveModalTitle()
     if (popup = "")
         return false

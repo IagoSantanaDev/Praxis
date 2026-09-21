@@ -30,9 +30,10 @@ _ControlAtReady(winTitle, classNN, clientX, clientY, tolerance := 14) {
 ; circular (RemessaProtocolo → TissXmlScreen e vice-versa).
 ;
 ; Constantes de tela (coordenadas):
-;   WIN_XML, WIN_XML_PATH_FORM, WIN_XML_POPUP_SIMNAO,
+;   WIN_XML, WIN_XML_PATH_FORM,
 ;   XML_CAMPO_REMESSA, XML_BTN_FATURAMENTO, XML_FORM_*,
 ;   XML_BTN_NAO — definidas em globals/mv/screens/FfcvScreen.ahk.
+;   MV_WIN_MENSAGEM_USUARIO — definida em globals/mv/MVConstants.ahk.
 ;
 ; Timeouts compartilhados com FfcvScreen.ahk.
 ; ════════════════════════════════════════════════════════════════
@@ -54,10 +55,11 @@ TissXml_SetTextByClickNoClear(winTitle, x, y, value) {
 
 /*
 TissXml_ClickBySpec(winTitle, classNN, x, y)
-    Compõe o clique canônico com espera de transição e relato próprios da tela.
+    Compõe o clique canônico (MV_ClickBySpec, agora com fallback físico +
+    verificação de efeito) com o timeout e a descrição próprios da tela.
 */
 TissXml_ClickBySpec(winTitle, classNN, x, y) {
-    return !!MV_ClickAndWait(winTitle, classNN, x, y, FFCV_FINAL_ACTION_TIMEOUT_MS,
+    return MV_ClickBySpec(winTitle, classNN, x, y, FFCV_FINAL_ACTION_TIMEOUT_MS,
         , "ação de tela XML/TISS")
 }
 
