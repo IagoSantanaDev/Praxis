@@ -8,13 +8,24 @@ recursos necessários, documentos legais e manifesto de hashes. Isso NÃO é cri
 nem impede engenharia reversa por atacante determinado; é uma camada técnica dentro de uma
 estratégia maior com registro, contrato, assinatura, hashes e controle de distribuição.
 
+Assinatura de código: por padrão, TODO build exige assinatura digital válida (política alterada
+em 2026-09-20 — builds automatizados não devem produzir executável não assinado, que é tratado
+com máxima suspeita por antivírus/EDR corporativo). Informe o certificado por um destes meios:
+  -CertificateThumbprint <THUMBPRINT>  (certificado já importado no store do Windows)
+  -PfxPath <caminho.pfx>               (arquivo .pfx; a senha vem da variável de ambiente
+                                         PRAXIS_SIGNING_PFX_PASSWORD, nunca de um parâmetro de
+                                         linha de comando, para não vazar em logs de CI)
+Um build de teste local sem certificado disponível deve passar -AllowUnsigned explicitamente.
+-Release nunca aceita -AllowUnsigned.
+
 Pré-requisitos para build:
 - AutoHotkey v2 instalado.
 - Ahk2Exe disponível no ambiente de build ou informado por parâmetro.
 
 Exemplos:
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0
-  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -RequireCodeSigning
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -AllowUnsigned
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT>
+  powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -PfxPath .\cert.pfx
   powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT> -Release
 #>
 
@@ -34,7 +45,9 @@ param(
     [ValidateSet('CurrentUser','LocalMachine')]
     [string]$CertificateStoreLocation = 'CurrentUser',
     [string]$CertificateStoreName = 'My',
+    [string]$PfxPath,
     [switch]$RequireCodeSigning,
+    [switch]$AllowUnsigned,
     [string]$TimestampUrl = 'http://timestamp.digicert.com'
 )
 
@@ -63,10 +76,16 @@ $IntegrityManifestSourcePath = Join-Path $GeneratedDir 'Praxis_IntegrityManifest
 $ExePath = Join-Path $StageDir 'Praxis.exe'
 $ResolvedSignToolPath = $null
 $NormalizedCertificateThumbprint = $null
+$PfxCertificate = $null
+$SigningMethod = $null
 $CodeSigningEnabled = $false
 $ReleaseMode = [bool]$Release
 $EffectiveCompress = [bool]$Compress
-$EffectiveRequireCodeSigning = [bool]$RequireCodeSigning
+# Política 2026-09-20: assinatura é obrigatória por padrão. -RequireCodeSigning
+# é mantido apenas por compatibilidade com chamadas existentes (não muda mais
+# nada, já que passar ou não já significa "obrigatório"); -AllowUnsigned é o
+# único jeito de optar por um build de teste local sem assinatura.
+$EffectiveRequireCodeSigning = !$AllowUnsigned
 $SourceCommit = $null
 $SourceDirty = $null
 
@@ -279,6 +298,11 @@ function Wait-ForFile {
     throw "Arquivo não foi gerado dentro de ${TimeoutSeconds}s: $Path"
 }
 
+function Test-SelfSignedCertificate {
+    param([System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate)
+    return ($null -ne $Certificate) -and ($Certificate.Subject -eq $Certificate.Issuer)
+}
+
 function Invoke-SignFile {
     param([string]$Path)
 
@@ -288,7 +312,13 @@ function Invoke-SignFile {
 
     Write-Step "Assinando $([IO.Path]::GetFileName($Path))"
 
-    if (![string]::IsNullOrWhiteSpace($ResolvedSignToolPath) -and (Test-Path -LiteralPath $ResolvedSignToolPath)) {
+    if ($SigningMethod -eq 'pfx') {
+        # Set-AuthenticodeSignature funciona com o certificado já carregado em
+        # memória (via X509Certificate2), sem precisar de signtool.exe nem de
+        # importar o .pfx no certificate store do Windows — é o caminho mais
+        # portátil para CI, onde o runner é efêmero a cada execução.
+        Set-AuthenticodeSignature -FilePath $Path -Certificate $PfxCertificate -HashAlgorithm SHA256 -TimestampServer $TimestampUrl | Out-Null
+    } elseif (![string]::IsNullOrWhiteSpace($ResolvedSignToolPath) -and (Test-Path -LiteralPath $ResolvedSignToolPath)) {
         $signArgs = @(
             'sign',
             '/fd', 'SHA256',
@@ -306,14 +336,22 @@ function Invoke-SignFile {
         Assert-NativeCommandSucceeded "Falha ao assinar: $Path"
     } else {
         $cert = Get-CodeSigningCertificate -Thumbprint $NormalizedCertificateThumbprint -StoreLocation $CertificateStoreLocation -StoreName $CertificateStoreName
-        $signatureResult = Set-AuthenticodeSignature -FilePath $Path -Certificate $cert -HashAlgorithm SHA256 -TimestampServer $TimestampUrl
-        if ($signatureResult.Status -ne 'Valid') {
-            throw "Falha ao assinar com Set-AuthenticodeSignature: $($signatureResult.Status) - $($signatureResult.StatusMessage)"
-        }
+        Set-AuthenticodeSignature -FilePath $Path -Certificate $cert -HashAlgorithm SHA256 -TimestampServer $TimestampUrl | Out-Null
     }
 
+    # Fonte única de verdade: relê a assinatura já gravada no arquivo, em vez de
+    # confiar no retorno em memória do cmdlet de assinatura (que faz a mesma
+    # checagem de qualquer forma). NotTrusted/UnknownError são aceitos apenas
+    # quando o certificado embutido é autoassinado — é a limitação conhecida e
+    # documentada (não gera reputação SmartScreen), não uma falha real de
+    # assinatura. Qualquer outro status (NotSigned, HashMismatch,
+    # NotSupportedFileFormat, Incompatible) continua bloqueando o build.
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
-    if ($signature.Status -ne 'Valid') {
+    if ($signature.Status -eq 'Valid') {
+        # assinatura com cadeia confiável — nada a fazer
+    } elseif (($signature.Status -in @('NotTrusted', 'UnknownError')) -and (Test-SelfSignedCertificate -Certificate $signature.SignerCertificate)) {
+        Write-Warning "Assinado com certificado autoassinado: cadeia nao confiavel nesta maquina ($($signature.Status)) - esperado, nao gera reputacao SmartScreen. Ver docs/DISTRIBUTION.md."
+    } else {
         throw "Assinatura aplicada, mas a validação Authenticode retornou $($signature.Status): $($signature.StatusMessage)"
     }
 }
@@ -568,6 +606,9 @@ if ($ReleaseMode) {
     $EffectiveRequireCodeSigning = $true
     Write-Step 'Modo release endurecido habilitado: assinatura, compressão e Git limpo obrigatórios'
 }
+if ($ReleaseMode -and $AllowUnsigned) {
+    throw '-Release não pode ser combinado com -AllowUnsigned: todo build de release exige assinatura digital.'
+}
 
 $gitState = Get-GitBuildState -RepositoryRoot $ProjectRoot
 $SourceCommit = $gitState['Commit']
@@ -594,23 +635,60 @@ if (!$Ahk2Exe) {
 }
 
 $NormalizedCertificateThumbprint = Normalize-CertificateThumbprint -Thumbprint $CertificateThumbprint
-if ($EffectiveRequireCodeSigning -and [string]::IsNullOrWhiteSpace($NormalizedCertificateThumbprint)) {
-    throw 'Assinatura digital obrigatória: informe -CertificateThumbprint com o thumbprint do certificado de code signing.'
+$HasPfxPath = ![string]::IsNullOrWhiteSpace($PfxPath)
+$HasThumbprint = ![string]::IsNullOrWhiteSpace($NormalizedCertificateThumbprint)
+
+if ($HasPfxPath -and $HasThumbprint) {
+    throw 'Use -PfxPath ou -CertificateThumbprint, não os dois ao mesmo tempo.'
 }
 
-if (![string]::IsNullOrWhiteSpace($NormalizedCertificateThumbprint)) {
+if ($HasPfxPath) {
+    if (!(Test-Path -LiteralPath $PfxPath)) {
+        throw "Certificado PFX não encontrado: $PfxPath"
+    }
+
+    # A senha do .pfx NUNCA é aceita como parâmetro de linha de comando (apareceria
+    # em logs de CI e no histórico de processos). Ela vem de uma variável de
+    # ambiente que o workflow/terminal popula a partir de um secret.
+    $pfxPasswordPlain = $env:PRAXIS_SIGNING_PFX_PASSWORD
+    if ([string]::IsNullOrWhiteSpace($pfxPasswordPlain)) {
+        throw 'Variável de ambiente PRAXIS_SIGNING_PFX_PASSWORD não definida. Exporte a senha do certificado .pfx nela antes de usar -PfxPath.'
+    }
+
+    $pfxSecurePassword = ConvertTo-SecureString -String $pfxPasswordPlain -AsPlainText -Force
+    $PfxCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+        $PfxPath, $pfxSecurePassword,
+        [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+
+    if (!$PfxCertificate.HasPrivateKey) {
+        throw "O certificado PFX $PfxPath não contém chave privada utilizável para assinatura."
+    }
+    if ($PfxCertificate.NotAfter -lt (Get-Date)) {
+        throw "O certificado PFX $PfxPath expirou em $($PfxCertificate.NotAfter.ToString('yyyy-MM-dd'))."
+    }
+    $codeSigningEku = $PfxCertificate.EnhancedKeyUsageList | Where-Object { $_.ObjectId -eq '1.3.6.1.5.5.7.3.3' }
+    if (!$codeSigningEku) {
+        Write-Warning "O certificado PFX $PfxPath não declara EKU Code Signing (1.3.6.1.5.5.7.3.3). O SignTool/Set-AuthenticodeSignature pode rejeitar a assinatura."
+    }
+
+    $ResolvedSignToolPath = $null
+    $SigningMethod = 'pfx'
+    $CodeSigningEnabled = $true
+    Write-Step "Assinatura digital habilitada via PFX: $($PfxCertificate.Subject)"
+} elseif ($HasThumbprint) {
     $ResolvedSignToolPath = Find-SignTool -ExplicitPath $SignToolPath
     if (!$ResolvedSignToolPath) {
         Write-Warning 'SignTool não encontrado. O build usará Set-AuthenticodeSignature como fallback local.'
     }
 
     $cert = Get-CodeSigningCertificate -Thumbprint $NormalizedCertificateThumbprint -StoreLocation $CertificateStoreLocation -StoreName $CertificateStoreName
+    $SigningMethod = 'thumbprint'
     $CodeSigningEnabled = $true
     Write-Step "Assinatura digital habilitada: $($cert.Subject) [$CertificateStoreLocation\\$CertificateStoreName]"
 } elseif ($EffectiveRequireCodeSigning) {
-    throw 'Assinatura digital obrigatória, mas nenhum certificado foi configurado.'
+    throw 'Assinatura digital obrigatória (padrão desde 2026-09-20): informe -PfxPath (+ variável de ambiente PRAXIS_SIGNING_PFX_PASSWORD) ou -CertificateThumbprint. Para um build de teste local explicitamente sem assinatura, use -AllowUnsigned.'
 } else {
-    Write-Warning 'Assinatura digital desabilitada. Use -CertificateThumbprint ou -RequireCodeSigning para bloquear releases sem assinatura.'
+    Write-Warning 'Assinatura digital desabilitada (-AllowUnsigned). Este artefato não deve ser distribuído para máquinas de produção.'
 }
 
 Write-Step 'Limpando saída anterior'
@@ -695,13 +773,28 @@ if ($leakedSources) {
     throw "O staging contém arquivos de fonte/script que não devem ser distribuídos:$([Environment]::NewLine)$leakedList"
 }
 
+$signingCertificateForMetadata = if ($CodeSigningEnabled -and $SigningMethod -eq 'pfx') {
+    $PfxCertificate
+} elseif ($CodeSigningEnabled -and $SigningMethod -eq 'thumbprint') {
+    Get-CodeSigningCertificate -Thumbprint $NormalizedCertificateThumbprint -StoreLocation $CertificateStoreLocation -StoreName $CertificateStoreName
+} else {
+    $null
+}
+
 $codeSigningMetadata = [ordered]@{
     enabled = $CodeSigningEnabled
     required = $EffectiveRequireCodeSigning
-    certificateThumbprint = if ($CodeSigningEnabled) { $NormalizedCertificateThumbprint } else { $null }
-    certificateStore = if ($CodeSigningEnabled) { "$CertificateStoreLocation\\$CertificateStoreName" } else { $null }
+    certificateSource = if ($CodeSigningEnabled) { $SigningMethod } else { $null }
+    certificateThumbprint = if ($CodeSigningEnabled -and $SigningMethod -eq 'thumbprint') { $NormalizedCertificateThumbprint } else { $null }
+    certificateStore = if ($CodeSigningEnabled -and $SigningMethod -eq 'thumbprint') { "$CertificateStoreLocation\\$CertificateStoreName" } else { $null }
+    certificateSubject = if ($CodeSigningEnabled -and $SigningMethod -eq 'pfx') { $PfxCertificate.Subject } else { $null }
+    # Registrado explicitamente porque um build autoassinado passa por todos os
+    # mesmos checks (assinatura presente, hash bate) mas NÃO tem reputação
+    # SmartScreen/EDR — quem inspecionar o manifesto precisa distinguir isso de
+    # um build assinado por CA confiável sem precisar abrir o certificado.
+    isSelfSigned = if ($CodeSigningEnabled) { Test-SelfSignedCertificate -Certificate $signingCertificateForMetadata } else { $null }
     signTool = if ($CodeSigningEnabled -and $ResolvedSignToolPath) { $ResolvedSignToolPath } else { $null }
-    signingMethod = if ($CodeSigningEnabled -and $ResolvedSignToolPath) { 'signtool' } elseif ($CodeSigningEnabled) { 'Set-AuthenticodeSignature' } else { $null }
+    signingMethod = if ($CodeSigningEnabled -and $SigningMethod -eq 'pfx') { 'Set-AuthenticodeSignature (pfx)' } elseif ($CodeSigningEnabled -and $ResolvedSignToolPath) { 'signtool' } elseif ($CodeSigningEnabled) { 'Set-AuthenticodeSignature' } else { $null }
     timestampUrl = if ($CodeSigningEnabled) { $TimestampUrl } else { $null }
 }
 

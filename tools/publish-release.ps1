@@ -14,10 +14,15 @@ Autenticação:
   - No GitHub Actions, defina o env GH_TOKEN=secrets.GITHUB_TOKEN (feito pelo workflow release.yml).
   - Localmente, faça `gh auth login` antes de rodar.
 
+Assinatura digital:
+  - tools/build-praxis.ps1 exige assinatura por padrão (política 2026-09-20). Repasse
+    -PfxPath (+ variável de ambiente PRAXIS_SIGNING_PFX_PASSWORD) ou -CertificateThumbprint,
+    ou passe -AllowUnsigned para publicar explicitamente um artefato de teste não assinado.
+
 Exemplos:
-  powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
-  powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1 -Version 1.0.0
-  powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1 -Tag stable -DryRun
+  powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1 -PfxPath .\cert.pfx
+  powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1 -Version 1.0.0 -CertificateThumbprint <THUMBPRINT>
+  powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1 -Tag stable -AllowUnsigned -DryRun
 #>
 
 [CmdletBinding()]
@@ -33,6 +38,13 @@ param(
     # (caso do GitHub Actions, que baixa os zips oficiais por step).
     [string]$AutoHotkeyBasePath,
     [string]$Ahk2ExePath,
+
+    # Repassados ao build para assinatura digital (obrigatória por padrão desde
+    # 2026-09-20 — ver tools/build-praxis.ps1). Em CI, use -PfxPath com a senha
+    # na variável de ambiente PRAXIS_SIGNING_PFX_PASSWORD (nunca em parâmetro).
+    [string]$PfxPath,
+    [string]$CertificateThumbprint,
+    [switch]$AllowUnsigned,
 
     [switch]$SkipBuild,
     [switch]$DryRun
@@ -118,6 +130,9 @@ if (!$SkipBuild) {
     $buildArgs = @('-Version', $Version)
     if (![string]::IsNullOrWhiteSpace($AutoHotkeyBasePath)) { $buildArgs += @('-AutoHotkeyBasePath', $AutoHotkeyBasePath) }
     if (![string]::IsNullOrWhiteSpace($Ahk2ExePath)) { $buildArgs += @('-Ahk2ExePath', $Ahk2ExePath) }
+    if (![string]::IsNullOrWhiteSpace($PfxPath)) { $buildArgs += @('-PfxPath', $PfxPath) }
+    if (![string]::IsNullOrWhiteSpace($CertificateThumbprint)) { $buildArgs += @('-CertificateThumbprint', $CertificateThumbprint) }
+    if ($AllowUnsigned) { $buildArgs += '-AllowUnsigned' }
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $BuildScript @buildArgs
     if ($LASTEXITCODE -ne 0) {
         throw "tools/build-praxis.ps1 falhou com exit code $LASTEXITCODE."
