@@ -30,31 +30,51 @@ Dependências de desenvolvimento:
 
 ## Build e distribuição
 
-O build completo é executado por `tools/build-praxis.ps1`. Os comandos mais usados são estes:
+O build completo é executado por `tools/build-praxis.ps1`. Desde 2026-09-20, **assinatura digital é obrigatória por padrão** em qualquer build — inclusive automatizado — porque um executável compilado por Ahk2Exe sem assinatura é tratado com máxima suspeita por antivírus/EDR corporativo. Hoje o projeto usa um **certificado autoassinado** como solução temporária (gerado por `tools/new-self-signed-code-signing-cert.ps1`) enquanto um certificado de CA confiável não é adquirido — ele satisfaz a exigência técnica, mas não gera reputação SmartScreen; ver `docs/DISTRIBUTION.md` para o plano de migração. Informe o certificado por um destes meios:
+
+| Parâmetro | Uso |
+|---|---|
+| `-CertificateThumbprint <THUMBPRINT>` | certificado já importado no certificate store do Windows |
+| `-PfxPath <arquivo.pfx>` | arquivo `.pfx`; a senha vem da variável de ambiente `PRAXIS_SIGNING_PFX_PASSWORD` (nunca de um parâmetro de linha de comando) — é o caminho usado em CI, sem precisar importar nada no store |
+| `-AllowUnsigned` | opta explicitamente por um build de teste local sem assinatura; **não é aceito junto com `-Release`** |
 
 | Comando | Resultado |
 |---|---|
-| `tools\build-praxis.ps1 -Version X.Y.Z` | gera EXE, pasta portátil e ZIP |
-| `tools\build-praxis.ps1 -Version X.Y.Z -Release` | build com assinatura e compressão |
+| `tools\build-praxis.ps1 -Version X.Y.Z -AllowUnsigned` | build de teste local, sem assinatura |
+| `tools\build-praxis.ps1 -Version X.Y.Z -PfxPath cert.pfx` | build assinado via arquivo `.pfx` |
+| `tools\build-praxis.ps1 -Version X.Y.Z -CertificateThumbprint <THUMBPRINT> -Release` | build com assinatura e compressão (modo endurecido) |
 
 Artefatos gerados:
 
 - `dist\Praxis-<ver>\stage\Praxis.exe` — executável compilado sem arquivos `.ahk`
 - `dist\Praxis-<ver>\distribution\` — pasta portátil
 - `dist\Praxis-<ver>\Praxis-Portable-<ver>.zip` — pacote pronto para uso
-- `dist\Praxis-<ver>\Praxis-build-manifest.json` — hashes SHA256 dos artefatos
+- `dist\Praxis-<ver>\Praxis-build-manifest.json` — hashes SHA256 dos artefatos e metadados de assinatura (`codeSigning`)
 
 A validação de integridade em runtime é feita com `Praxis.exe --integrity-check`. O retorno `0` indica integridade válida, e `70` indica que algum recurso está ausente ou alterado.
 
 ### Release automático
 
-A cada push na branch `main`, o GitHub Actions em `.github/workflows/release.yml` compila o projeto, gera o ZIP e publica ou atualiza o release no GitHub com tag `continuous` (Latest), incluindo `Praxis-Portable-<ver>.zip` e `SHA256SUMS.txt`.
+A cada push nas branches `main`/`KAN-03`, o GitHub Actions em `.github/workflows/release.yml` compila o projeto, gera o ZIP e publica ou atualiza um release rolling por branch (`continuous-<branch>`) com `Praxis-Portable-<ver>.zip` e `SHA256SUMS.txt`. O workflow assina o executável automaticamente quando os secrets do repositório `PRAXIS_CODE_SIGNING_PFX_BASE64` (certificado `.pfx` em base64) e `PRAXIS_SIGNING_PFX_PASSWORD` estão configurados; sem eles, o build falha intencionalmente em vez de publicar um artefato não assinado. A compressão Ahk2Exe do modo `-Release` continua sendo feita manualmente na máquina de build local.
 
 Publicação manual local, após `gh auth login`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
+powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1 -PfxPath .\cert.pfx
 ```
+
+### Outras ferramentas em `tools/`
+
+| Script | Uso |
+|---|---|
+| `build-praxis.ps1` | build completo da distribuição (ver acima) |
+| `publish-release.ps1` | builda e publica/atualiza um GitHub Release rolling por branch |
+| `new-self-signed-code-signing-cert.ps1` | gera o certificado autoassinado usado hoje para `-PfxPath` (solução temporária — ver `docs/DISTRIBUTION.md`) |
+| `build-icon.ps1` | normaliza/reconstrói `assets/icon.ico` a partir da maior imagem embutida |
+| `build-ocr-error-references.ps1` | gera `lib/globals/mv/FFCV_ErrorReferences.json` a partir de referências de OCR |
+| `ocr-probe.ps1` | script de OCR (Windows.Media.Ocr) embutido no EXE e usado por `FFCV_RunOcrProbe` |
+| `find-implicit-locals.ps1` | lint: detecta atribuição a variável global sem `global X` (vira local silenciosa em AHK v2) |
+| `find-top-level-calls.ps1` | lint: detecta chamada de função solta na raiz do arquivo (causa execução duplicada ao ser incluída) |
 
 ---
 
@@ -67,16 +87,17 @@ Praxis/
 ├── lib/                              # código principal em AHK v2
 │   ├── app/                          # estado e bootstrap da aplicação
 │   │   ├── App.ahk                   # App_Run() e shell WebView2
-│   │   ├── AppState.ahk              # estado global da aplicação
-│   │   ├── Dispatcher.ahk            # ponte AHK ↔ JS (SendToUI)
-│   │   └── ScriptRegistry.ahk        # registro dos módulos de faturamento
-│   ├── config/                       # configuração e caminhos
-│   │   ├── Secrets.ahk               # DPAPI: API key em cache Map()
-│   │   └── Paths.ahk                 # documentos, logs e XMLs em cache Map()
+│   │   ├── AppConstants.ahk          # timeouts de bootstrap/fechamento da UI
+│   │   ├── AppState.ahk              # estado global (gRunning, fechamento da UI, etc.)
+│   │   ├── Dispatcher.ahk            # ponte AHK ↔ JS (SendToUI), StopScript, IDENTIFIER_REGEX
+│   │   ├── IntegrityCheck.ahk        # --integrity-check (hash dos artefatos embutidos)
+│   │   └── ScriptRegistry.ahk        # registro/validação dos módulos de faturamento
+│   ├── config/
+│   │   └── Paths.ahk                 # Config_GetPath: WorkDir, Documents, XmlDir etc.
 │   ├── ui/
 │   │   ├── index.html                # interface WebView2
 │   │   ├── UiBridge.ahk              # ponte WebView2 → AHK (window.chrome.webview)
-│   │   └── UiLog.ahk                 # notificações, progresso e conclusão para a UI
+│   │   └── UiLog.ahk                 # Log_Info/Log_Warn/Log_Error → DispatchLog
 │   ├── vendor/                       # bibliotecas externas e runtime distribuído
 │   │   ├── WebView2.ahk              # wrapper WebView2 para AHK v2
 │   │   ├── ComVar.ahk                # helper COM para WebView2
@@ -84,31 +105,37 @@ Praxis/
 │   │   ├── Promise.ahk               # promise/await para AHK v2
 │   │   ├── 32bit/WebView2Loader.dll  # loader WebView2 32-bit
 │   │   └── 64bit/WebView2Loader.dll  # loader WebView2 64-bit
-│   ├── globals/                      # módulos compartilhados
-│   │   ├── mv/                       # automação MV2000i — telas, componentes e ações
-│   │   │   ├── MVConstants.ahk       # janelas, timeouts e caminhos do MV
-│   │   │   ├── MVSession.ahk         # login e contexto de sessão
-│   │   │   ├── MVWindows.ahk         # helpers de janela
-│   │   │   ├── FFCV_ErrorTemplates.ahk # template de erros FFCV via OCR
-│   │   │   ├── FFCV_ErrorReferences.json # referências SHA256 dos erros OCR
-│   │   │   ├── screens/             # telas: Login, MovDoc, FFCV, XML e popup
-│   │   │   ├── components/          # componentes do MV
-│   │   │   └── actions/             # ações gerais da automação
-│   │   └── shared/                  # utilitários compartilhados
-│   │       ├── DateUtils.ahk
-│   │       ├── StringUtils.ahk
-│   │       └── Validation.ahk
-│   └── modules/                      # módulos por funcionalidade
-│       ├── remessa_protocolo/       # download de protocolos MOV DOC → FFCV
-│       ├── protocolar/              # protocolação de contas
-│       └── fechar_xml/              # fechamento e geração de XML TISS
-├── assets/                          # recursos do aplicativo
-│   └── icon.ico                     # ícone multi-resolução usado por EXE e UI
-├── tools/                           # scripts de build e suporte
-│   ├── build-praxis.ps1             # build completo da distribuição
-│   ├── build-ocr-error-references.ps1 # gera FFCV_ErrorReferences.json
-│   ├── find-top-level-calls.ps1     # checagem anti execução duplicada
-│   └── ocr-probe.ps1                # prova OCR contra o MV em debug
+│   ├── globals/mv/                   # automação MV2000i — telas, componentes e constantes
+│   │   ├── MVConstants.ahk           # janelas, timeouts, popups e mapeamento tipo de conta
+│   │   ├── MVSession.ahk             # MV_EnsureModule/MV_ActivateModule, MV_Abort
+│   │   ├── MVSync.ahk                # motor de sincronização por estado observável (MV_ActAndWait, MV_WaitScreenStable etc.)
+│   │   ├── ParseUtils.ahk            # ParseListaCsv — parsing de lista CSV compartilhado
+│   │   ├── FFCV_ErrorTemplates.ahk   # classificação de erro do popup FFCV via OCR
+│   │   ├── FFCV_ErrorReferences.json # referências dos erros OCR
+│   │   ├── screens/                  # telas: MovDoc, FFCV (+ popup de conta), XML/TISS
+│   │   │   ├── MovDocScreen.ahk
+│   │   │   ├── FfcvScreen.ahk
+│   │   │   ├── FfcvContaPopup.ahk
+│   │   │   └── TissXmlScreen.ahk
+│   │   └── components/               # primitivas reutilizáveis entre telas
+│   │       ├── Controls.ahk          # MV_ClickBySpec, MV_FindControlAtPoint, MV_SetTextByControl etc.
+│   │       ├── Dialogs.ahk           # Dialog_DismissMovDocPopup, Dialog_ActiveModalTitle
+│   │       ├── Popups.ahk            # popup "Informações da Conta", Popup_DismissActiveModal
+│   │       └── ReportPrint.ahk       # MV_PrintDeliveryReport (relatório de atendimentos)
+│   └── modules/                      # módulos por funcionalidade (main .ahk + Parsers + Registry)
+│       ├── remessa_protocolo/        # download de protocolos MOV DOC → FFCV
+│       ├── protocolar/               # protocolação de contas entre setores
+│       └── fechar_xml/               # fechamento e geração de XML TISS
+├── assets/
+│   └── icon.ico                      # ícone multi-resolução usado por EXE e UI
+├── docs/                             # documentação legal e de distribuição
+│   ├── DISTRIBUTION.md               # política de build/assinatura/distribuição
+│   ├── EULA.md
+│   ├── NDA.md
+│   ├── PRIVACY_LGPD.md
+│   └── THIRD_PARTY_NOTICES.md
+├── tools/                            # scripts de build, publicação e lint (ver seção acima)
+├── .github/workflows/release.yml     # release automático por push (ver seção acima)
 ├── README.md, LICENSE, COPYRIGHT, NOTICE.md  # documentação e termos legais
 ```
 

@@ -29,19 +29,20 @@ Para um build portátil:
 
 Para release assinado:
 
-- certificado de code signing instalado com chave privada disponível;
-- `signtool.exe` ou suporte ao `Set-AuthenticodeSignature` do PowerShell;
-- árvore Git limpa, a menos que seja usada uma exceção explícita com `-AllowDirty`.
+- certificado de code signing com chave privada disponível — via `.pfx` (`-PfxPath`, recomendado para CI) ou já importado no certificate store do Windows (`-CertificateThumbprint`);
+- `signtool.exe` (opcional; `-CertificateThumbprint` cai para `Set-AuthenticodeSignature` se não encontrado) ou suporte ao `Set-AuthenticodeSignature` do PowerShell (sempre usado com `-PfxPath`);
+- árvore Git limpa, a menos que seja usada uma exceção explícita com `-AllowDirty` (apenas em `-Release`).
 
 ## Tipos de build
 
-### Build de teste
+### Build de teste (sem assinatura)
 
-Esse é o caminho para validação local, QA manual e instalação temporária em ambiente controlado.
+Esse é o caminho para validação local e QA manual. Desde 2026-09-20, **assinatura é obrigatória por padrão em qualquer build** — um build sem certificado precisa optar explicitamente por `-AllowUnsigned`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 `
-  -Version 9.9.18-test
+  -Version 9.9.18-test `
+  -AllowUnsigned
 ```
 
 Ele gera:
@@ -49,24 +50,33 @@ Ele gera:
 - `Praxis.exe`;
 - pasta de distribuição;
 - ZIP portátil;
-- sem exigência de assinatura digital;
 - sem compressão forçada do Ahk2Exe;
 - registro no manifesto quando a árvore Git estiver suja.
 
-Esse tipo de build não deve ser tratado como release de produção. Se o processo avisar que a assinatura digital está desabilitada, isso é esperado em build de teste. Para release, use o modo `-Release`.
+Esse tipo de build não deve ser tratado como release de produção nem distribuído para a máquina de produção do hospital — um executável não assinado é o principal motivo de antivírus/EDR corporativo apagar o `.exe` (ver seção de troubleshooting, se existir, ou o histórico de auditoria do projeto). Para release, use o modo `-Release`.
 
-### Build com assinatura obrigatória
+### Build com assinatura (via .pfx — recomendado para CI e é o caminho atual do projeto)
 
-Use esse modo quando quiser assinar os binários, sem ativar todas as regras estritas de release.
+Esse é o caminho padrão desde 2026-09-20: **basta não passar `-AllowUnsigned`** para exigir assinatura. Com um arquivo `.pfx`, não é preciso importar nada no certificate store do Windows — útil em runners de CI, que são efêmeros. Hoje o `.pfx` usado é o certificado autoassinado gerado por `tools/new-self-signed-code-signing-cert.ps1` (ver seção "Certificado de assinatura" abaixo).
+
+```powershell
+$env:PRAXIS_SIGNING_PFX_PASSWORD = '<senha do .pfx>'   # nunca como parâmetro de linha de comando
+powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 `
+  -Version 1.0.0 `
+  -PfxPath .\build\praxis-selfsigned.pfx
+```
+
+### Build com assinatura (certificado no store do Windows)
+
+Alternativa quando o certificado já está importado localmente:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\build-praxis.ps1 `
   -Version 1.0.0 `
-  -CertificateThumbprint "THUMBPRINT_DO_CERTIFICADO" `
-  -RequireCodeSigning
+  -CertificateThumbprint "THUMBPRINT_DO_CERTIFICADO"
 ```
 
-Esse modo falha se a assinatura não puder ser aplicada ou validada.
+Qualquer um dos dois modos falha se a assinatura não puder ser aplicada ou validada. `-RequireCodeSigning` continua aceito por compatibilidade, mas não muda mais nada — assinatura já é o padrão.
 
 ### Release endurecido
 
@@ -96,23 +106,48 @@ Use `-AllowDirty` somente quando a exceção for intencional e aceitável. O man
 
 ## Certificado de assinatura
 
-Para testes internos, é possível criar um certificado autoassinado:
+**Situação atual do projeto:** builds usam um certificado **autoassinado** como
+solução temporária (gerado com o script abaixo), enquanto um certificado de CA
+confiável não é adquirido. Isso satisfaz a exigência técnica de "todo build é
+assinado", mas **não builda reputação no SmartScreen nem muda como o
+antivírus/EDR corporativo trata o executável na máquina de produção** — a
+única forma real de resolver isso é um certificado emitido por uma CA
+confiável (ver comparação de opções no histórico de auditoria do projeto).
+Trate isto como item em aberto, não como problema resolvido.
+
+Gere o certificado (uma vez só — reutilize o mesmo `.pfx` em todo build,
+inclusive CI; gerar um novo a cada build faria o "publisher" mudar toda hora):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\new-self-signed-code-signing-cert.ps1 `
-  -TrustForCurrentUser
+powershell -ExecutionPolicy Bypass -File .\tools\new-self-signed-code-signing-cert.ps1 -TrustForCurrentUser
 ```
 
-Para listar certificados disponíveis:
+O script:
+- cria um certificado de code signing autoassinado válido por 10 anos;
+- com `-TrustForCurrentUser`, importa o certificado em `Cert:\CurrentUser\Root`
+  **só nesta máquina** — evita que a checagem pós-assinatura do
+  `build-praxis.ps1` acuse cadeia não confiável nos builds locais. Não tem
+  nenhum efeito na máquina de produção do hospital;
+- exporta um `.pfx` (pede a senha interativamente — nunca hardcoded) para uso
+  com `-PfxPath`;
+- com `-PrintBase64`, imprime o `.pfx` em base64 para colar no secret do
+  GitHub Actions `PRAXIS_CODE_SIGNING_PFX_BASE64` (a senha vai no secret
+  `PRAXIS_SIGNING_PFX_PASSWORD`, separado).
+
+Para listar certificados de code signing já disponíveis:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\list-code-signing-certs.ps1 `
-  -OnlyCodeSigning
+Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert
 ```
 
-O `Thumbprint` identifica o certificado e não é um segredo. A chave privada e os arquivos `.pfx` são sensíveis e não devem ser distribuídos.
+O `Thumbprint` identifica o certificado e não é um segredo. A chave privada e
+os arquivos `.pfx` são sensíveis e não devem ser distribuídos nem commitados
+(`*.pfx` já está no `.gitignore`) — em CI, o `.pfx` fica apenas no secret
+`PRAXIS_CODE_SIGNING_PFX_BASE64` e a senha em `PRAXIS_SIGNING_PFX_PASSWORD`.
 
-Um certificado autoassinado é útil para testes e ambientes internos controlados, mas não cria reputação pública no SmartScreen nem substitui um certificado comercial para distribuição externa.
+Quando um certificado de CA confiável for adquirido, o processo é o mesmo —
+só troque o `.pfx` (ou use `-CertificateThumbprint` se preferir importar no
+certificate store) — nada mais no build muda.
 
 ## Artefatos gerados
 
@@ -245,21 +280,22 @@ Para release:
 
 ## Release automático (GitHub Actions)
 
-A cada push na branch `main`, o workflow `.github/workflows/release.yml` roda em `windows-latest` e:
+A cada push nas branches `main`/`KAN-03`, o workflow `.github/workflows/release.yml` roda em `windows-latest` e:
 
 1. baixa os zips oficiais do AutoHotkey v2 e do Ahk2Exe (sem instalar nada no runner);
-2. executa `tools/publish-release.ps1`, que roda `build-praxis.ps1` e gera o ZIP portátil;
-3. publica/atualiza o **GitHub Release rolling** com tag `continuous` (marcado como Latest):
+2. decodifica o certificado `.pfx` do secret `PRAXIS_CODE_SIGNING_PFX_BASE64`, se configurado;
+3. executa `tools/publish-release.ps1`, que roda `build-praxis.ps1` (repassando `-PfxPath` quando o certificado estiver disponível) e gera o ZIP portátil;
+4. publica/atualiza um **GitHub Release rolling por branch** (tag `continuous-<branch>`, ex.: `continuous-main`):
    - `Praxis-Portable-<versão>.zip`;
    - `SHA256SUMS.txt` (hash SHA-256 do ZIP).
 
 Publicação manual local (após `gh auth login`):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1
+powershell -ExecutionPolicy Bypass -File .\tools\publish-release.ps1 -PfxPath .\certificado.pfx
 ```
 
-O release rolling não exige certificado de code signing. Para release assinado, use `build-praxis.ps1 -Release` na máquina de build local.
+Desde 2026-09-20, o release rolling **exige** certificado de code signing como qualquer outro build — se os secrets `PRAXIS_CODE_SIGNING_PFX_BASE64` e `PRAXIS_SIGNING_PFX_PASSWORD` não estiverem configurados no repositório, o step de build falha intencionalmente em vez de publicar um artefato não assinado. Configure os dois secrets em Settings → Secrets and variables → Actions para habilitar a assinatura automática. A compressão Ahk2Exe do modo `-Release` continua sendo feita manualmente na máquina de build local, fora deste workflow.
 
 ## Proteção jurídica e limites técnicos
 
