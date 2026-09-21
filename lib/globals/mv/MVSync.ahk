@@ -87,7 +87,7 @@ MV_WaitScreenChanged(previousState, timeoutMs := MV_DEFAULT_TIMEOUT_MS, winTitle
     }
 }
 
-MV_WaitScreenStable(winTitle := "", stableMs := MV_DEFAULT_STABLE_MS, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
+MV_WaitScreenStable(winTitle := "", stableMs := MV_TARGET_STABLE_MS, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     startedAt := A_TickCount
     stableSince := 0
     lastSignature := ""
@@ -121,7 +121,7 @@ MV_WaitScreenStable(winTitle := "", stableMs := MV_DEFAULT_STABLE_MS, timeoutMs 
     }
 }
 
-MV_WaitScreenChangedAndStable(previousState, winTitle := "", stableMs := MV_DEFAULT_STABLE_MS, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
+MV_WaitScreenChangedAndStable(previousState, winTitle := "", stableMs := MV_TARGET_STABLE_MS, timeoutMs := MV_DEFAULT_TIMEOUT_MS) {
     changed := MV_WaitScreenChanged(previousState, timeoutMs, winTitle)
     if !changed
         return false
@@ -186,9 +186,10 @@ MV_ActAndWait(winTitle, actionFn, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn
     return changed
 }
 
-MV_ClickAndWait(winTitle, classNN, x, y, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "clique") {
-    return MV_ActAndWait(winTitle, () => MV_ClickControlAt(winTitle, classNN, x, y), timeoutMs, expectedFn, description)
-}
+; MV_ClickAndWait foi consolidada em MV_ClickBySpec (components/Controls.ahk)
+; em 2026-09-20: mesma verificação de efeito via MV_ActAndWait, mas com o
+; fallback físico que esta função não tinha. Callers devem chamar
+; MV_ClickBySpec diretamente.
 
 MV_ClickAtAndWait(winTitle, x, y, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "clique físico") {
     return MV_ActAndWait(winTitle, () => MV_ClickAt(winTitle, x, y), timeoutMs, expectedFn, description)

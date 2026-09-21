@@ -286,7 +286,7 @@ Protocolar_EncontrarPopupUsuario(timeoutMs := MV_USER_POPUP_TIMEOUT_MS) {
     startedAt := A_TickCount
     while (A_TickCount - startedAt <= timeoutMs) {
         ThrowIfAppStopped()
-        hwnd := WinExist("Mensagem ao Usuário do MV 2000 ahk_exe ifrun60.EXE")
+        hwnd := WinExist(MV_WIN_MENSAGEM_USUARIO " ahk_exe ifrun60.EXE")
         if hwnd
             return hwnd
         Sleep MV_POLL_MS

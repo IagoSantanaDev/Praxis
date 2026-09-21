@@ -90,7 +90,7 @@ Popup_DismissActiveModal() {
                 "Cliquei OK, mas o modal nao fechou em tempo.")
         }
 
-        Sleep MV_CONTA_STABLE_MS
+        Sleep MV_KEY_SETTLE_MS
         MV_Log("Popup_DismissActiveModal", "modal fechado com sucesso", true)
         return Map("ok", true, "report",
             "OK do modal clicado e janela fechada/estabilizada.")

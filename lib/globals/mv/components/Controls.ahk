@@ -108,7 +108,7 @@ MV_WaitOracleSettled(winTitle, stableMs := MV_ORACLE_STABLE_MS, timeoutMs := MV_
     }
 }
 
-MV_WaitWindowStable(winTitle, stableMs := MV_DEFAULT_STABLE_MS, timeoutSecs := MV_DEFAULT_TIMEOUT_SECS) {
+MV_WaitWindowStable(winTitle, stableMs := MV_TARGET_STABLE_MS, timeoutSecs := MV_DEFAULT_TIMEOUT_SECS) {
     global MV_POLL_MS
     startedAt := A_TickCount
     stableSince := 0
@@ -216,11 +216,30 @@ MV_FirstControlByClass(winTitle, classNN) {
     return 0
 }
 
-; Clique por ClassNN + client coords, com fallback para clique físico.
-; Implementação canônica para callers que não precisam compor espera de estado.
-MV_ClickBySpec(winTitle, classNN, x, y) {
+; Clique por ClassNN + client coords, com fallback para clique físico, e
+; verificação de efeito observável via MV_ActAndWait (MVSync.ahk) antes de
+; reportar sucesso.
+; Consolidação 2026-09-20 de duas implementações que coexistiam com forças
+; complementares: a antiga MV_ClickBySpec tolerava falha de detecção do
+; controle (fallback para clique físico nas coordenadas) mas nunca conferia
+; se o clique teve efeito; MV_ClickAndWait (MVSync.ahk, usada até então por
+; TissXmlScreen e MovDocScreen) conferia o efeito mas não tinha fallback
+; físico. Esta versão mantém as duas vantagens; MV_ClickAndWait foi removida.
+; expectedFn/timeoutMs/description seguem o contrato de MV_ActAndWait —
+; expectedFn é obrigatório para call sites cujo efeito não muda a assinatura
+; de tela (ex.: alternar um checkbox, que MV_GetScreenSignature não captura)
+; ou que precisam de uma condição mais específica que "algo mudou".
+MV_ClickBySpec(winTitle, classNN, x, y, timeoutMs := MV_DEFAULT_TIMEOUT_MS, expectedFn := unset, description := "clique") {
     if (classNN = "" || classNN = "CLASSNN" || x = "" || y = "")
         return false
+    return !!MV_ActAndWait(winTitle, () => MV_ClickAtSpecComFallback(winTitle, classNN, x, y),
+        timeoutMs, expectedFn, description)
+}
+
+; Ação de clique usada por MV_ClickBySpec: localiza o controle por ClassNN
+; (tolerância 20) e cai para clique físico direto nas coordenadas quando o
+; controle não é localizável.
+MV_ClickAtSpecComFallback(winTitle, classNN, x, y) {
     if MV_ClickControlAt(winTitle, classNN, x, y, 20)
         return true
     if !WinExist(winTitle)

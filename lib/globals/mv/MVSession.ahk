@@ -29,7 +29,7 @@ CoordMode("Mouse", "Client")
 
 MV_EnsureModule(moduleWin, stableMs := 0, timeoutSecs := 0) {
     if (stableMs = 0)
-        stableMs := MV_MODULE_STABLE_MS
+        stableMs := MV_TARGET_STABLE_MS
     if (timeoutSecs = 0)
         timeoutSecs := MV_TIMEOUT_LOAD
 

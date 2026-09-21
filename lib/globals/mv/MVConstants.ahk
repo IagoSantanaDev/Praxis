@@ -28,6 +28,13 @@ MV_WIN_PROGRESSO_RELATORIO := "Andamento do Relatório ahk_exe RWRBE60.EXE"
 MV_PROCESSO_RELATORIO      := "RWRBE60.EXE"
 MV_BTN_IMPRIMIR_RELATORIO  := "Button2"
 
+; ── Caixa de mensagem genérica do MV ("Mensagem ao Usuário do MV 2000") ──
+; Título usado pelo MV para popups de aviso/confirmação em vários módulos
+; (Sim/Não de fechamento no FFCV, popup de bloqueio no Protocolar/MOV DOC).
+; Fonte única — existia como WIN_FFCV_DATAS_OK (morta) e WIN_XML_POPUP_SIMNAO
+; em FfcvScreen.ahk, além de um literal hardcoded em Protocolar.ahk.
+MV_WIN_MENSAGEM_USUARIO := "Mensagem ao Usuário do MV 2000"
+
 ; ── Controles de popups conhecidos ────────────────────────────
 MV_MODAL_OK_CLASS     := "Button1"
 MV_CLASS_MODAL_FORMS  := "ahk_class ui60Modal_W32 ahk_exe ifrun60.EXE"
@@ -77,19 +84,21 @@ MV_TipoContaCodigo(tipoConta) {
     return String(MV_TIPO_CONTA[canonicalName])
 }
 
+; MV_KEY_SETTLE_MS: micro-settle padrão (100ms) após uma tecla/clique antes de
+; checar o efeito. Fonte única — absorve MV_CONTA_FIELD_EMPTY_MIN_MS e
+; MV_CONTA_STABLE_MS (FfcvContaPopup/Popups), que eram o mesmo valor com
+; nomes de domínio só para o popup de conta, sem significado distinto do
+; conceito genérico de settle.
 MV_KEY_SETTLE_MS         := 100
 
 ; ── Timings do popup de conta ───────────────────────────────────
 ; Familia unica das antigas FFCV_CONTA_*/FFCVP_CONTA_*/POPUP_STABLE_MS.
 MV_CONTA_READY_MIN_MS         := 180
-MV_CONTA_FIELD_EMPTY_MIN_MS   := 100
-MV_CONTA_STABLE_MS            := 100
 MV_CONTA_SUBMIT_TIMEOUT_MS    := 650
 
 ; ── Polling / estabilidade ────────────────────────────────────
 MV_POLL_MS            := 100
 MV_DEFAULT_TIMEOUT_MS := 30000
-MV_DEFAULT_STABLE_MS  := 600
 MV_ACTION_TIMEOUT_MS := 3000
 MV_TRANSITION_TIMEOUT_MS := 5000
 FFCV_XML_QUERY_MIN_WAIT_MS := 1200
@@ -117,5 +126,24 @@ FFCV_FINAL_ACTION_TIMEOUT_MS := 30000
 ; MV_TIMEOUT_ACOE (10s) aguarda apenas o fechamento do modal já renderizado.
 MV_TIMEOUT_LOAD       := 15
 MV_TIMEOUT_ACOE       := 10
-MV_MODULE_STABLE_MS   := 600
+; MV_TARGET_STABLE_MS: janela padrão (600ms) de "tela parada" usada por
+; MV_WaitScreenStable/MV_WaitWindowStable/MV_WaitScreenChangedAndStable —
+; tanto como default de parâmetro quanto como valor explícito nos call sites
+; que abrem um módulo (MOV DOC/FFCV) e esperam a tela estabilizar. Fonte
+; única — absorve MV_DEFAULT_STABLE_MS e MV_MODULE_STABLE_MS, que eram o
+; mesmo valor sem finalidade distinta (o primeiro só existia como default de
+; parâmetro; o segundo era o mesmo conceito aplicado à abertura de módulo).
 MV_TARGET_STABLE_MS   := 600
+
+; ── Coincidências numéricas mantidas separadas de propósito ───
+; FFCV_XML_QUERY_MIN_WAIT_MS (1200) e MV_CONTA_MODAL_WAIT_MS (1200);
+; MV_CONTA_READY_SETTLE_MS (300) e MV_GRID_FALLBACK_READ_TIMEOUT_MS (300);
+; MV_ORACLE_STABLE_MS (800) e FFCV_FINAL_STABLE_MS (800);
+; MV_INFO_DIALOG_TIMEOUT_SECS (30) e MV_FILE_APPEAR_TIMEOUT_SECS (30);
+; MV_DEFAULT_TIMEOUT_MS (30000) e FFCV_FINAL_ACTION_TIMEOUT_MS (30000).
+; Cada par tem hoje o mesmo valor por coincidência, não pela mesma
+; finalidade: são orçamentos de tempo de fases/domínios diferentes (ex.:
+; espera mínima de query XML vs. espera de modal de conta; settle de grid do
+; MOV DOC vs. settle do popup de conta; timeout de dialog de UI vs. timeout
+; de aparecimento de arquivo em disco). Mantidos como constantes distintas
+; para permitir ajuste independente futuro sem acoplar fases não relacionadas.

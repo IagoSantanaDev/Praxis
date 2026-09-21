@@ -105,7 +105,7 @@ ValidateScripts(scripts) {
         if (id = "")
             throw Error("Script com id vazio.")
 
-        if !RegExMatch(id, "^[a-z0-9_/-]+$")
+        if !RegExMatch(id, IDENTIFIER_REGEX)
             throw Error("Script com id malformado: " . id)
 
         script["id"] := id
@@ -139,7 +139,7 @@ ValidateScripts(scripts) {
             if (paramId = "")
                 throw Error("Param com id vazio em script: " . id)
 
-            if !RegExMatch(paramId, "^[a-z0-9_/-]+$")
+            if !RegExMatch(paramId, IDENTIFIER_REGEX)
                 throw Error("Param com id malformado em script " . id . ": " . paramId)
 
             param["id"] := paramId
