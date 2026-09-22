@@ -131,6 +131,7 @@ jobs:
             -Tag "$env:RELEASE_TAG" `
             -Branch "$env:RELEASE_BRANCH" `
             -AutoHotkeyBasePath "$env:AHK_EXE" `
-            -Ahk2ExePath "$env:AHK2EXE"
+            -Ahk2ExePath "$env:AHK2EXE" `
+            -AllowUnsigned
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
