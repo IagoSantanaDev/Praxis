@@ -53,7 +53,7 @@ RunFecharXML(params) {
                 return MV_Abort("Nao foi possivel abrir Entrega de Remessas para " remessa ".", true)
 
             Notify("Fechando remessa " remessa " (" index "/" remessas.Length ")...")
-            entrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc)
+            entrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, false, true, remessa)
             if !entrega["ok"]
                 return MV_Abort(entrega["erro"], true)
 

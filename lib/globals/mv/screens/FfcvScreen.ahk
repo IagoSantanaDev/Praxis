@@ -298,8 +298,8 @@ Ffcv_CloseEntregaWindow() {
     return true
 }
 
-Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false, imprimirRelatorio := true) {
-    datas := Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto)
+Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false, imprimirRelatorio := true, numRemessaFornecido := "") {
+    datas := Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto, numRemessaFornecido)
     if !datas["ok"]
         return datas
 
@@ -349,11 +349,18 @@ Ffcv_PrepararEntregaPorProtocolo() {
         MV_TIMEOUT_LOAD * 1000, "Entrega de Remessas operacional") != false
 }
 
-Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto := false) {
+Ffcv_PreencherDatasEntrega(dataEntrega, dataVenc, lerRemessaDireto := false, numRemessaFornecido := "") {
     if !MV_EnsureWindowActive(WIN_FFCV_DATAS)
         return Map("ok", false, "erro", "Tela de datas não ficou ativa para preencher entrega/vencimento.", "remessa", "")
 
-    if lerRemessaDireto {
+    if (numRemessaFornecido != "") {
+        ; Número já conhecido pelo caller — foca Data de Entrega diretamente,
+        ; sem Shift+Tab nem leitura de Edit5.
+        numRemessa := numRemessaFornecido
+        if !MV_ClickAtAndWait(WIN_FFCV_DATAS, DATAS_CAMPO_ENTREGA_X + 15,
+            DATAS_CAMPO_ENTREGA_Y + 8, MV_ACTION_TIMEOUT_MS, , "data de entrega focada")
+            return Map("ok", false, "erro", "Nao consegui focar a data de entrega.", "remessa", numRemessa)
+    } else if lerRemessaDireto {
         try numRemessa := Trim(ControlGetText(DATAS_CAMPO_REMESSA, WIN_FFCV_DATAS))
         catch
             numRemessa := ""
