@@ -8,6 +8,7 @@
 #Include ProtocolarParsers.ahk
 #Include ..\..\..\lib\config\Paths.ahk
 #Include ..\..\..\lib\globals\mv\FFCV_ErrorTemplates.ahk
+#Include ..\..\..\lib\globals\mv\screens\MovDocScreen.ahk
 
 ; ════════════════════════════════════════════════════════════════
 ;  PROTOCOLAR
@@ -89,10 +90,11 @@ RunProtocolar(params) {
             Notify("Protocolar remessa " remessa ": enviando " contasRemessa.Length " conta(s)...")
             for index, conta in contasRemessa {
                 ThrowIfAppStopped()
-                Protocolar_EnviarConta(conta)
-                popup := Protocolar_EncontrarPopupUsuario()
-                if popup
-                    return Protocolar_Abort(Protocolar_DescreverPopup(popup, conta))
+                if !Protocolar_GarantirTelaEnvio(setorAtual, setorEnvio, tipo)
+                    return Protocolar_Abort("Nao foi possivel garantir a tela de Envio para a conta " conta " (remessa " remessa ").")
+                resultado := Protocolar_ProcessarConta(conta, setorAtual, setorEnvio, tipo)
+                if !resultado["ok"]
+                    return Protocolar_Abort(resultado["erro"])
                 if (Mod(index, 25) = 0 || index = contasRemessa.Length)
                     Notify("Protocolar remessa " remessa ": " index "/" contasRemessa.Length " conta(s) enviada(s).")
             }
@@ -153,10 +155,11 @@ RunProtocolar(params) {
     Notify("Protocolar: enviando " contas.Length " conta(s) do setor " setorAtual " para " setorEnvio ".")
     for index, conta in contas {
         ThrowIfAppStopped()
-        Protocolar_EnviarConta(conta)
-        popup := Protocolar_EncontrarPopupUsuario()
-        if popup
-            return Protocolar_Abort(Protocolar_DescreverPopup(popup, conta))
+        if !Protocolar_GarantirTelaEnvio(setorAtual, setorEnvio, tipo)
+            return Protocolar_Abort("Nao foi possivel garantir a tela de Envio para a conta " conta ".")
+        resultado := Protocolar_ProcessarConta(conta, setorAtual, setorEnvio, tipo)
+        if !resultado["ok"]
+            return Protocolar_Abort(resultado["erro"])
         if (Mod(index, 25) = 0 || index = contas.Length)
             Notify("Protocolar: " index "/" contas.Length " conta(s) enviada(s).")
     }
@@ -294,28 +297,164 @@ Protocolar_EncontrarPopupUsuario(timeoutMs := MV_USER_POPUP_TIMEOUT_MS) {
     return 0
 }
 
-Protocolar_DescreverPopup(hwnd, conta) {
-    title := "ahk_id " hwnd
-    try text := Trim(WinGetText(title))
-    catch
-        text := ""
+; Lê o texto do popup "Mensagem ao Usuário do MV 2000" via OCR — o MV não
+; expõe esse texto de forma confiável por WinGetText (normalmente só
+; "&OK"). Reusa a infraestrutura de OCR do FFCV (FFCV_ResolveOcrRegion +
+; FFCV_RunOcrScreen), só sem o passo de classificação contra os templates
+; fixos do FFCV, que não se aplicam a este popup genérico do MOV DOC.
+Protocolar_LerTextoPopup(hwnd) {
+    winTitle := "ahk_id " hwnd
+    region := FFCV_ResolveOcrRegion(winTitle)
+    if !region["ok"]
+        return ""
+    ocr := FFCV_RunOcrScreen(region["x"], region["y"], region["w"], region["h"], FFCV_OCR_LANGUAGE)
+    if !ocr["ok"]
+        return ""
+    return ocr.Get("fullText", "")
+}
 
-    if (text = "" || text = "&OK") {
-        try {
-            classified := FFCV_ClassifyErrorModal(title)
-            ocrText := Trim(classified.Get("texto", ""))
-            if (ocrText != "")
-                text := ocrText
-        } catch {
+; Fecha o popup "Mensagem ao Usuário do MV 2000" identificado por hwnd.
+; Não reusa Popup_DismissActiveModal (components/Popups.ahk) porque aquela
+; função detecta o modal Forms genérico por título "Forms " + classe
+; ui60Modal_W32 — um mecanismo de detecção diferente do usado por
+; Protocolar_EncontrarPopupUsuario (título específico "Mensagem ao Usuário
+; do MV 2000"), sem garantia de que apontem para a mesma janela. Como o
+; hwnd já foi encontrado, fechamos ele diretamente.
+Protocolar_FecharPopup(hwnd) {
+    winTitle := "ahk_id " hwnd
+    if !MV_EnsureWindowActive(winTitle)
+        return false
+    button := MV_FirstControlByClass(winTitle, "Button1")
+    if button
+        return !!MV_ClickHwndAndWait(winTitle, button, MV_ACTION_TIMEOUT_MS, , "popup do MV fechado")
+    return !!MV_SendAndWait(winTitle, "{Enter}", MV_ACTION_TIMEOUT_MS, , "popup do MV fechado (Enter)")
+}
+
+; Garante que a tela de Envio está pronta para a próxima conta, reabrindo
+; do zero (Protocolar_AbrirTelaEnvio) só quando necessário. Precisa ser
+; chamada antes de CADA conta, não apenas uma vez no início do lote: baixar
+; um protocolo pendente ou corrigir um setor (Protocolar_ProcessarConta)
+; troca de tela no meio do processo e não retorna sozinho para o Envio.
+Protocolar_GarantirTelaEnvio(setorAtual, setorEnvio, tipo := "Ambulatorial") {
+    if WinExist(MV_WIN_MOVDOC_ENVIO)
+        return MV_EnsureWindowActive(MV_WIN_MOVDOC_ENVIO)
+    return Protocolar_AbrirTelaEnvio(setorAtual, setorEnvio, tipo)
+}
+
+; Envia uma conta para protocolação e trata os 3 desfechos conhecidos de
+; popup que o MV pode abrir em resposta. Reenvia a mesma conta uma vez se o
+; MV pedir para completar dados de movimentação antes; qualquer outro
+; popup não reconhecido retorna erro com o texto lido por OCR, para o
+; operador decidir manualmente.
+;
+; Regra de negócio (comportamento do MV2000i observado no Protocolar.exe
+; original, recuperado por engenharia reversa — não documentado pelo MV):
+;   - "[...] restante dos dados de movimentação antes de criar um novo
+;     registro [...]" -> o Enter anterior não foi processado pela tela;
+;     reenviar a MESMA conta resolve na quase totalidade dos casos.
+;   - "[...] documento com protocolo pendente [...]" -> a conta já tem um
+;     protocolo aberto (de uma tentativa anterior); a ação correta é
+;     baixar esse protocolo pendente em vez de criar um novo envio.
+;   - "[...] setor recebido diferente do setor atual informado [...]" -> a
+;     conta está fisicamente em outro setor; a correção é abrir um envio
+;     TEMPORÁRIO no sentido inverso (do setor onde o documento está de
+;     volta para o setor atual do operador) para gerar um protocolo, e
+;     baixar esse protocolo — isso "traz" o documento de volta
+;     corretamente roteado antes de seguir com as próximas contas.
+Protocolar_ProcessarConta(conta, setorAtual, setorEnvio, tipo) {
+    maxTentativas := 2 ; 1 tentativa original + 1 retry para dados incompletos.
+    Loop maxTentativas {
+        ThrowIfAppStopped()
+        Protocolar_EnviarConta(conta)
+        popup := Protocolar_EncontrarPopupUsuario()
+        if !popup
+            return Map("ok", true)
+
+        msg := Protocolar_LerTextoPopup(popup)
+        loose := Protocolar_NormalizeOcrText(msg)
+
+        if Protocolar_IsPopupDadosIncompletos(loose) {
+            if !Protocolar_FecharPopup(popup)
+                return Map("ok", false, "erro", "Popup de dados incompletos nao fechou para a conta " conta ".")
+            if (A_Index < maxTentativas) {
+                ; Fechar o popup nem sempre devolve o foco à tela de Envio
+                ; automaticamente; garante antes de reenviar a mesma conta.
+                if !MV_EnsureWindowActive(MV_WIN_MOVDOC_ENVIO)
+                    return Map("ok", false, "erro", "Tela de Envio nao ficou ativa para reenviar a conta " conta ".")
+                continue
+            }
+            return Map("ok", false, "erro", "MV informou dados incompletos mesmo apos reenviar a conta " conta ".")
         }
+
+        protocoloPendente := Protocolar_ExtrairProtocoloPendente(loose)
+        if (protocoloPendente != "") {
+            if !Protocolar_FecharPopup(popup)
+                return Map("ok", false, "erro", "Popup de protocolo pendente nao fechou para a conta " conta ".")
+            if !MV_EnsureMovDoc() || !MovDoc_AbrirTelaBaixa()
+                return Map("ok", false, "erro", "Nao foi possivel abrir a Baixa para o protocolo pendente " protocoloPendente " (conta " conta ").")
+            baixa := MovDoc_BaixarProtocolo(protocoloPendente)
+            if !baixa["ok"]
+                return Map("ok", false, "erro", "Falha ao baixar protocolo pendente " protocoloPendente " (conta " conta "): " baixa["erro"])
+            return Map("ok", true)
+        }
+
+        setorRecebido := Protocolar_ExtrairSetorRecebido(loose, setorEnvio, setorAtual)
+        if (setorRecebido != "") {
+            if !Protocolar_FecharPopup(popup)
+                return Map("ok", false, "erro", "Popup de setor diferente nao fechou para a conta " conta ".")
+            correcao := Protocolar_CorrigirSetorEBaixar(conta, setorRecebido, setorAtual, tipo)
+            if !correcao["ok"]
+                return Map("ok", false, "erro", "Falha ao corrigir setor da conta " conta ": " correcao["erro"])
+            return Map("ok", true)
+        }
+
+        ; Popup não reconhecido: aborta com o texto lido para o operador decidir.
+        return Map("ok", false, "erro", "Popup do MV nao reconhecido ao enviar a conta " conta ": "
+            (msg != "" ? SubStr(Trim(msg), 1, 400) : "sem texto legivel por OCR."))
     }
+    return Map("ok", false, "erro", "Conta " conta " excedeu as tentativas sem resposta reconhecida do MV.")
+}
 
-    if (text = "")
-        text := "Mensagem do MV sem texto acessível."
-    else
-        text := SubStr(text, 1, 400)
+; Corrige o roteamento de uma conta que está em setor diferente do
+; esperado: abre um envio TEMPORÁRIO no sentido inverso (setorRecebido →
+; setorAtualOriginal), confirma esse envio para gerar um protocolo, copia
+; o número gerado e baixa esse protocolo — trazendo o documento de volta
+; corretamente roteado. Não remove o registro vazio (Protocolar_RemoverRegistroVazio):
+; isso só se aplica ao fechamento final de TODAS as contas, não a este
+; atalho pontual de correção por conta.
+Protocolar_CorrigirSetorEBaixar(conta, setorRecebido, setorAtualOriginal, tipo) {
+    if !Protocolar_AbrirTelaEnvio(setorRecebido, setorAtualOriginal, tipo)
+        return Map("ok", false, "erro", "Nao foi possivel abrir o envio temporario de correcao de setor.")
 
-    return "Popup do MV ao enviar a conta " conta ": " text
+    Protocolar_EnviarConta(conta)
+
+    reportTitle := "Relatório de Registro de Envio ahk_exe ifrun60.EXE"
+    if !MV_SendAndWait(MV_WIN_MOVDOC_ENVIO, "!1", MV_TIMEOUT_LOAD * 1000, , "confirmacao do envio de correcao de setor")
+        return Map("ok", false, "erro", "Confirmacao do envio de correcao nao produziu transicao observavel.")
+    if !MV_WaitScreenStable(reportTitle, MV_TARGET_STABLE_MS, MV_TIMEOUT_LOAD * 1000)
+        return Map("ok", false, "erro", "Relatorio de registro de envio (correcao) nao estabilizou.")
+
+    reportButton := MV_FirstControlByClass(reportTitle, "Button1")
+    if !reportButton
+        return Map("ok", false, "erro", "Botao de confirmacao do relatorio de correcao nao encontrado.")
+    if !MV_CloseWindowAndWait(reportTitle, () => MV_ClickHwnd(reportButton), MV_WIN_MOVDOC_ENVIO, MV_TIMEOUT_LOAD * 1000, "relatorio de correcao fechado")
+        return Map("ok", false, "erro", "Relatorio de registro de envio (correcao) nao fechou.")
+
+    protocoloNovo := RegExReplace(MovDoc_CopiarNumeroProtocolo(MV_WIN_MOVDOC_ENVIO), "\D")
+    if (protocoloNovo = "")
+        return Map("ok", false, "erro", "Nao foi possivel copiar o protocolo gerado pela correcao de setor.")
+
+    if !MV_CloseWindowAndWait(MV_WIN_MOVDOC_ENVIO, () => MV_Send("^q"), MV_WIN_MOVDOC_ANY, MV_TIMEOUT_LOAD * 1000, "envio temporario de correcao fechado")
+        return Map("ok", false, "erro", "Envio temporario de correcao de setor nao fechou.")
+
+    if !MV_EnsureMovDoc() || !MovDoc_AbrirTelaBaixa()
+        return Map("ok", false, "erro", "Nao foi possivel abrir a Baixa para o protocolo de correcao " protocoloNovo ".")
+
+    baixa := MovDoc_BaixarProtocolo(protocoloNovo)
+    if !baixa["ok"]
+        return Map("ok", false, "erro", "Falha ao baixar o protocolo de correcao " protocoloNovo ": " baixa["erro"])
+
+    return Map("ok", true, "protocolo", protocoloNovo)
 }
 
 Protocolar_AbrirTelaEnvio(setorAtual, setorEnvio, tipo := "Ambulatorial") {
