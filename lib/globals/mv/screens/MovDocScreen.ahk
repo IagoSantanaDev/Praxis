@@ -178,6 +178,29 @@ MovDoc_FinalizarBaixa() {
     return !!MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F7", MV_TRANSITION_TIMEOUT_MS, , "retorno ao próximo protocolo")
 }
 
+; Consulta um protocolo especifico na tela Baixa (que deve ja estar ativa —
+; ver MovDoc_AbrirTelaBaixa), coleta as linhas da grade e finaliza a baixa.
+; Compartilhada entre RemessaProtocolo (baixa em lote antes de montar a
+; remessa no FFCV) e Protocolar (baixa pontual de um protocolo pendente ou
+; de correcao de setor, no meio do envio de contas — ver Protocolar.ahk).
+MovDoc_BaixarProtocolo(protocolo) {
+    if !MV_EnsureWindowActive(MV_WIN_MOVDOC_BAIXA)
+        return Map("ok", false, "erro", "MOV DOC Baixa nao ficou ativa.")
+    if !MovDoc_SetProtocoloByClick(protocolo)
+        return Map("ok", false, "erro", "Nao consegui focar/preencher o campo Protocolo.")
+    if !MV_SendFunctionAndWait(MV_WIN_MOVDOC_BAIXA, "F8", MV_TIMEOUT_LOAD * 1000,
+        , "consulta do protocolo " protocolo)
+        return Map("ok", false, "erro", "F8 nao produziu transicao observavel para o protocolo " protocolo ".")
+    if !MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida)
+        return Map("ok", false, "erro", "Grid nao ficou legivel apos F8 para o protocolo " protocolo ".")
+    linhas := MovDoc_LerGrid(protocolo, primeiraLinhaValida)
+    if (linhas.Length = 0)
+        return Map("ok", false, "erro", "Nenhuma conta/convenio coletada para o protocolo " protocolo ".")
+    if !MovDoc_FinalizarBaixa()
+        return Map("ok", false, "erro", "Falha ao salvar/baixar o protocolo " protocolo ".")
+    return Map("ok", true, "linhas", linhas)
+}
+
 MovDoc_WaitFirstGridLineReady(protocolo, &primeiraLinhaValida) {
     global
     startedAt := A_TickCount
