@@ -238,5 +238,7 @@ TissXml_Gerar(numRemessa) {
 
     if !MV_SendAndWait(WIN_XML_PATH_FORM, "{Esc}", FFCV_FINAL_ACTION_TIMEOUT_MS, , "saída do formulário XML")
         return Map("ok", false, "erro", "Esc nao produziu estado observavel de saída do XML.")
+
+    Ffcv_FecharTelaAtual(WIN_XML)
     return Map("ok", true, "path", xmlPath)
 }

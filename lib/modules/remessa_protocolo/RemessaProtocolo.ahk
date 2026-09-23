@@ -59,7 +59,7 @@ RunRemessaProtocolo(params) {
     if (umProtocoloUmaRemessa && numRemessa != "")
         return MV_Abort("No fluxo 'Um Protocolo = Uma Remessa' a remessa existente deve ficar vazia.")
 
-    linhas := [], erros := [], timings := [], mapeamentoRemessas := []
+    linhas := [], erros := [], timings := [], mapeamentoRemessas := [], remessasParaEntrega := []
     totalStart := stageStart := A_TickCount
 
     ; ── FLUXO: UM PROTOCOLO = UMA REMESSA ─────────────────────────
@@ -103,28 +103,18 @@ RunRemessaProtocolo(params) {
             criadaRemessa := ""
 
             if temDatas {
-                Notify("Fechando remessa com datas para o protocolo " protocolo "...")
-                if !Ffcv_PrepararEntregaPorProtocolo()
-                    return MV_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
-
-                resEntrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true, false)
-                if !resEntrega["ok"]
-                    return MV_Abort(resEntrega["erro"])
-
-                criadaRemessa := resEntrega["remessa"]
-                Notify("Abrindo relatório apenas para OCR da remessa " criadaRemessa " e fechando a tela.")
-                if !Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa)
-                    return MV_Abort("Nao foi possivel abrir o relatorio para OCR da remessa " criadaRemessa ".")
-                if !Ffcv_SairTelaEntregaPendente()
-                    return MV_Abort("A tela Entrega de Remessas nao fechou apos o protocolo.")
-
-                Notify("Gerando XML TISS da remessa " criadaRemessa "...")
-                xml := TissXml_Gerar(criadaRemessa)
-                if !xml["ok"]
-                    return MV_Abort(xml["erro"])
+                ; No modo um-para-um, o relatório só identifica a remessa criada.
+                Notify("Abrindo relatório apenas para capturar a remessa do protocolo " protocolo "...")
+                if !Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa, false)
+                    return MV_Abort("Nao foi possivel abrir o relatorio para OCR da remessa do protocolo " protocolo ".")
+                if (criadaRemessa = "")
+                    return MV_Abort("Nao foi possivel capturar o numero da remessa do protocolo " protocolo ".")
+                remessasParaEntrega.Push(criadaRemessa)
             } else if imprimirAposInserir {
-                Notify("Imprimindo relatorio e capturando remessa via OCR para o protocolo " protocolo "...")
-                Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa)
+                ; Sem datas, imprime o relatório sem OCR para capturar a remessa.
+                Notify("Imprimindo relatorio de atendimentos do protocolo " protocolo "...")
+                if !Ffcv_ImprimirRelatorioAtendimentos()
+                    return MV_Abort("Nao foi possivel imprimir o relatorio do protocolo " protocolo ".")
             }
 
             if (criadaRemessa != "")
@@ -135,6 +125,28 @@ RunRemessaProtocolo(params) {
             Notify("Concluido ciclo do protocolo " protocolo ": Remessa " criadaRemessa)
             Ffcv_ReiniciarManutencaoRemessa()
             Progress((idx / protocolos.Length) * 100)
+        }
+
+        if temDatas {
+            Notify("Abrindo Entrega de Remessas via Alt+LE para fechar as remessas...")
+            for _, remessa in remessasParaEntrega {
+                ThrowIfAppStopped()
+                if !Ffcv_AbrirTelaEntregaRemessas()
+                    return MV_Abort("Nao foi possivel abrir Entrega de Remessas para a remessa " remessa ".")
+
+                entrega := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, false, true, remessa)
+                if !entrega["ok"]
+                    return MV_Abort(entrega["erro"])
+                if !Ffcv_SairTelaEntregaPendente()
+                    return MV_Abort("A tela Entrega de Remessas nao fechou apos a remessa " remessa ".")
+            }
+
+            for _, remessa in remessasParaEntrega {
+                Notify("Gerando XML TISS da remessa " remessa "...")
+                xml := TissXml_Gerar(remessa)
+                if !xml["ok"]
+                    return MV_Abort(xml["erro"])
+            }
         }
 
         RP_RecordTiming(timings, "Um Protocolo = Uma Remessa Total", totalStart, protocolos.Length " protocolo(s) processado(s)")
@@ -205,7 +217,13 @@ RunRemessaProtocolo(params) {
         Notify("Iniciando diretamente a ponte FecharEXMLOLD Parte 1 / Entrega de Remessas...")
         if !Ffcv_PrepararEntregaPorProtocolo()
             return MV_Abort("Nao foi possivel sair da Manutencao e abrir Entrega de Remessas.")
-        result := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true)
+
+        if (numRemessa != "") {
+            result := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, false, false, numRemessa)
+        } else {
+            result := Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, true, false)
+        }
+
         if !result["ok"]
             return MV_Abort(result["erro"])
         if !Ffcv_SairTelaEntregaPendente()
@@ -221,10 +239,9 @@ RunRemessaProtocolo(params) {
         mapeamentoRemessas.Push(Map("remessa", result["remessa"], "protocolo", MV_JoinArray(protocolos, ", ")))
     } else if imprimirAposInserir {
         stageStart := A_TickCount
-        criadaRemessa := ""
-        Ffcv_ImprimirRelatorioAtendimentos(&criadaRemessa)
+        Ffcv_ImprimirRelatorioAtendimentos()
         RP_RecordTiming(timings, "Imprimir relatorio", stageStart)
-        mapeamentoRemessas.Push(Map("remessa", criadaRemessa != "" ? criadaRemessa : "N/I", "protocolo", MV_JoinArray(protocolos, ", ")))
+        mapeamentoRemessas.Push(Map("remessa", "N/I", "protocolo", MV_JoinArray(protocolos, ", ")))
     }
 
     Progress(100)

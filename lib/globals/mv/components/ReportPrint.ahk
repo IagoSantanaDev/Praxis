@@ -46,7 +46,8 @@ MV_OcrExtractRemessaNumber(winTitle := MV_WIN_RELATORIO_REMESSA) {
 ; Se openerTitle for informado, aciona o botão que abre o relatório
 ; antes de executar a sequência comum de impressão.
 ; Se o outRemessa (ref) for fornecido, tenta capturar o número da remessa via OCR durante a exibição.
-MV_PrintDeliveryReport(message := "Impressão do relatório em andamento...", openerTitle := "", openerControl := "Button9", &outRemessa?) {
+; imprimir=false mantém a janela aberta apenas para a captura, sem imprimir.
+MV_PrintDeliveryReport(message := "Impressão do relatório em andamento...", openerTitle := "", openerControl := "Button9", &outRemessa?, imprimir := true) {
     if (message != "")
         Notify(message)
 
@@ -75,24 +76,26 @@ MV_PrintDeliveryReport(message := "Impressão do relatório em andamento...", op
             }
         }
 
-        reportButton := MV_FirstControlByClass(MV_WIN_RELATORIO_REMESSA,
-            MV_BTN_IMPRIMIR_RELATORIO)
-        if !reportButton
-            throw Error("O botão de impressão do relatório não ficou disponível.")
+        if imprimir {
+            reportButton := MV_FirstControlByClass(MV_WIN_RELATORIO_REMESSA,
+                MV_BTN_IMPRIMIR_RELATORIO)
+            if !reportButton
+                throw Error("O botão de impressão do relatório não ficou disponível.")
 
-        if !MV_ClickHwnd(reportButton)
-            throw Error("Não foi possível acionar a impressão do relatório.")
+            if !MV_ClickHwnd(reportButton)
+                throw Error("Não foi possível acionar a impressão do relatório.")
 
-        if !MV_Poll(() => WinExist(MV_WIN_PROGRESSO_RELATORIO), MV_TIMEOUT_LOAD)
-            throw Error("A janela de andamento do relatório não apareceu.")
+            if !MV_Poll(() => WinExist(MV_WIN_PROGRESSO_RELATORIO), MV_TIMEOUT_LOAD)
+                throw Error("A janela de andamento do relatório não apareceu.")
 
-        if !MV_WaitWindowClosed(MV_WIN_PROGRESSO_RELATORIO, MV_TIMEOUT_LOAD * 1000)
-            throw Error("A janela de andamento do relatório não fechou no tempo esperado.")
+            if !MV_WaitWindowClosed(MV_WIN_PROGRESSO_RELATORIO, MV_TIMEOUT_LOAD * 1000)
+                throw Error("A janela de andamento do relatório não fechou no tempo esperado.")
 
-        if !MV_Poll(() => !ProcessExist(MV_PROCESSO_RELATORIO), MV_TIMEOUT_LOAD)
-            throw Error("O processo do relatório não finalizou no tempo esperado.")
+            if !MV_Poll(() => !ProcessExist(MV_PROCESSO_RELATORIO), MV_TIMEOUT_LOAD)
+                throw Error("O processo do relatório não finalizou no tempo esperado.")
+        }
 
-        MV_Log("MV_PrintDeliveryReport", "impressão concluída", true)
+        MV_Log("MV_PrintDeliveryReport", imprimir ? "impressão concluída" : "relatório aberto", true)
         return true
     } catch as err {
         MV_Log("MV_PrintDeliveryReport", err.Message, false)

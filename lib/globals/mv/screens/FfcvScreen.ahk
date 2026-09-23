@@ -222,18 +222,38 @@ Ffcv_PosicionarAreaRemessas() {
     return !!MV_SendAndWait(MV_WIN_FFCV_ANY, "{Tab 3}", MV_ACTION_TIMEOUT_MS, , "área de remessas posicionada")
 }
 
-Ffcv_ImprimirRelatorioAtendimentos(&outRemessa?) {
+Ffcv_FecharTelaAtual(winTitle := "") {
+    target := (winTitle != "") ? winTitle : WIN_FFCV_DATAS
+
+    if (target = "") || !WinExist(target)
+        return true
+
+    try {
+        ControlSend "^q",, target
+        Sleep 150
+        if WinExist(target)
+            WinClose target
+    } catch {
+        return false
+    }
+    return true
+}
+
+Ffcv_ImprimirRelatorioAtendimentos(&outRemessa?, imprimir := true) {
     if !MV_EnsureFFCV() {
         Notify("FFCV não ficou ativa antes de imprimir relatório de atendimentos.")
         return false
     }
 
     try {
-        return MV_PrintDeliveryReport(
+        result := MV_PrintDeliveryReport(
             "Impressão do relatório de atendimentos em andamento...",
             MV_WIN_FFCV_ANY,
             FFCV_BTN_IMPRIMIR,
-            &outRemessa)
+            &outRemessa,
+            imprimir)
+        Ffcv_FecharTelaAtual(MV_WIN_RELATORIO_REMESSA)
+        return result
     } catch as err {
         Notify(err.Message)
         return false
@@ -331,6 +351,7 @@ Ffcv_ConfirmarEntregaNaTela(dataEntrega, dataVenc, lerRemessaDireto := false, im
     if imprimirRelatorio {
         try {
             MV_PrintDeliveryReport("Impressão da remessa " datas["remessa"] " em andamento...")
+            Ffcv_FecharTelaAtual(MV_WIN_RELATORIO_REMESSA)
         } catch as err {
             return Map("ok", false, "erro", err.Message, "remessa", "")
         }
